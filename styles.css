@@ -23,10 +23,11 @@ body {
   padding: 0;
   color: #145a32;
   overflow-y: auto; /* Permite el scroll vertical */
-  background: linear-gradient(180deg, #ff7e5f, #feb47b, #86a8e7, #91eae4);
-  background-size: 400% 400%;
+  /* Fondo con gradiente animado */
+  background: linear-gradient(180deg, #ff7e5f, #feb47b, #86a8e7, #91eae4), 
+              linear-gradient(to bottom, rgba(255,255,255,0) 70%, rgba(200,200,200,1) 100%);
+  background-size: 400% 400%, 100% 100%; /* Tamaño del fondo y del gradiente fijo */
   animation: gradientBG 15s ease infinite;
-  background-attachment: fixed; /* Para el efecto de parallax */
 }
 
 @keyframes gradientBG {
