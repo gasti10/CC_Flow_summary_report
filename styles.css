@@ -129,7 +129,7 @@ h3 {
   color: white;
   font-weight: bold;
   width: 0%; /* Inicialmente en 0% */
-  animation: loadProgress 2s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite; /* Animación de la barra */
+  animation: loadProgress 4s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards; /* Animación de la barra */
   transition: background-color 0.3s ease;
 }
 
