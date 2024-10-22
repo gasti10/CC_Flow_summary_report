@@ -17,8 +17,23 @@ body {
   background-color: #f9f9f9;
   margin: 0;
   padding: 0;
-  color: #0d4d25;
+  color: #145a32;
   overflow-y: auto; /* Permite el scroll vertical */
+  background: linear-gradient(180deg, #ff7e5f, #feb47b, #86a8e7, #91eae4);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
+}
+
+@keyframes gradientBG {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 .container {
@@ -27,6 +42,8 @@ body {
   margin: 0 auto;
   text-align: center;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background-color: rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
 }
 
 h1 {
