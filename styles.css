@@ -132,6 +132,7 @@ h3 {
   width: 0%; /* Inicialmente en 0% */
   animation: loadProgress 4s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards; /* Animación de la barra */
   transition: background-color 0.3s ease;
+  max-width: 100%; /* Limitar el ancho máximo al 100% */
 }
 
 @keyframes loadProgress {
@@ -142,7 +143,7 @@ h3 {
     width: var(--progress-width); /* Llegar al valor final más rápido */
   }
   100% {
-    width: calc(var(--progress-width) + 5%); /* Rebasar un poco para el rebote */
+    width: min(var(--progress-width) + 5%); /* Rebasar un poco para el rebote */
   }
 }
 
