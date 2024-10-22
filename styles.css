@@ -129,7 +129,7 @@ h3 {
   color: white;
   font-weight: bold;
   width: 0%; /* Inicialmente en 0% */
-  animation: loadProgress 2s ease infinite; /* Animación de la barra */
+  animation: loadProgress 2s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite; /* Animación de la barra */
   transition: background-color 0.3s ease;
 }
 
@@ -137,8 +137,11 @@ h3 {
   0% {
     width: 0%; /* Comienza en 0% */
   }
+  80% {
+    width: var(--progress-width); /* Llegar al valor final más rápido */
+  }
   100% {
-    width: var(--progress-width); /* Termina en el valor final especificado */
+    width: calc(var(--progress-width) + 5%); /* Rebasar un poco para el rebote */
   }
 }
 
