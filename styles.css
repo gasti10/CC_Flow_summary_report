@@ -12,6 +12,10 @@
   font-style: normal;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: 'Roboto', sans-serif;
   background-color: #f9f9f9;
@@ -22,6 +26,7 @@ body {
   background: linear-gradient(180deg, #ff7e5f, #feb47b, #86a8e7, #91eae4);
   background-size: 400% 400%;
   animation: gradientBG 15s ease infinite;
+  background-attachment: fixed; /* Para el efecto de parallax */
 }
 
 @keyframes gradientBG {
@@ -44,6 +49,16 @@ body {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   background-color: rgba(255, 255, 255, 0.8);
   border-radius: 10px;
+  animation: fadeIn 1.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 h1 {
@@ -77,6 +92,7 @@ h3 {
   margin-bottom: 10px;
   text-transform: uppercase;
   letter-spacing: 1px;
+  text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
 }
 
 .container p, .container h2, .container h3 {
@@ -112,7 +128,18 @@ h3 {
   text-align: center;
   color: white;
   font-weight: bold;
-  transition: width 1s ease-in-out;
+  width: 0%; /* Inicialmente en 0% */
+  animation: loadProgress 2s ease infinite; /* Animación de la barra */
+  transition: background-color 0.3s ease;
+}
+
+@keyframes loadProgress {
+  0% {
+    width: 0%; /* Comienza en 0% */
+  }
+  100% {
+    width: var(--progress-width); /* Termina en el valor final especificado */
+  }
 }
 
 .progress-bar:hover {
@@ -134,9 +161,10 @@ p i {
 }
 
 .emoji {
-  font-size: 20px;
+  font-size: 22px;
   vertical-align: middle;
   margin-right: 5px;
+  text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.2); /* Agregar sombra suave */
 }
 
 table tr { 
