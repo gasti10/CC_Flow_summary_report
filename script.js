@@ -1,8 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const rawString = document.getElementById('deliveryDates').textContent.trim();
-    // Split by commas
-    const rawDates = rawString.split(',');
-    
+    const rawString = document.getElementById('deliveryDates').textContent;
+    // Remove newline characters
+    const cleanedString = rawString.replace(/\r?\n|\r/g, ' ');
+    // Now trim and split by commas
+    const rawDates = cleanedString.trim().split(',');
     // Clean up spaces
     const trimmedDates = rawDates.map(d => d.trim());
   
