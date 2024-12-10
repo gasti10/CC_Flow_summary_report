@@ -3,9 +3,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Remove newline characters
     const cleanedString = rawString.replace(/\r?\n|\r/g, ' ');
     // Now trim and split by commas
-    const rawDates = cleanedString.trim().split(',');
+    const rawDates = cleanedString.trim().split(',').map(d => d.trim()).filter(Boolean);;
     // Clean up spaces
-    const trimmedDates = rawDates.map(d => d.trim());
+    const trimmedDates = rawDates.map(d => d.replace(/\s+/g, ' '));;
   
     // Now parse each date string
     // Format is "DD/MM/YYYY HH:MM:SS"
