@@ -29,11 +29,13 @@ document.addEventListener('DOMContentLoaded', () => {
   
     const labels = Object.keys(dateCounts).sort();
     const data = labels.map(l => dateCounts[l]);
-  
-    // Now create a chart with Chart.js (assuming you included Chart.js and a canvas)
-    const chartContainer = document.createElement('div');
-    chartContainer.innerHTML = `<h3>Trips Over Time</h3><canvas id="tripChart" width="400" height="200"></canvas>`;
-    document.body.appendChild(chartContainer);
+
+    // Compute cumulative data
+    let cumulativeTotal = 0;
+    const cumulativeData = data.map(count => {
+        cumulativeTotal += count;
+        return cumulativeTotal;
+    });
   
     const ctx = document.getElementById('tripChart').getContext('2d');
   
@@ -47,7 +49,17 @@ document.addEventListener('DOMContentLoaded', () => {
           borderColor: '#4caf50',
           backgroundColor: 'rgba(76,175,80,0.2)',
           fill: true,
-        }]
+          tension: 0.3
+        },
+        {
+            label: 'Cumulative Trips',
+            data: cumulativeData,
+            borderColor: '#c1c536',
+            backgroundColor: 'rgba(193,197,54,0.2)',
+            fill: true,
+            tension: 0.3
+          }
+        ]
       },
       options: {
         responsive: true,
@@ -64,7 +76,20 @@ document.addEventListener('DOMContentLoaded', () => {
           title: {
             display: true,
             text: 'Number of Trips by Date'
+          },
+          tooltip: {
+            mode: 'index',
+            intersect: false
+          },
+          legend: {
+            labels: {
+              usePointStyle: true
+            }
           }
+        },
+        interaction: {
+          mode: 'index',
+          intersect: false
         }
       }
     });
