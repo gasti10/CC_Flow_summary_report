@@ -50,6 +50,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 backgroundColor: 'rgba(76,175,80,0.2)',
                 fill: true,
                 tension: 0.3
+            },
+            {
+                label: 'Cumulative Trips',
+                data: cumulativeData,
+                borderColor: '#c1c536',
+                backgroundColor: 'rgba(193,197,54,0.2)',
+                fill: true,
+                tension: 0.3
             }]
         },
         options: {
