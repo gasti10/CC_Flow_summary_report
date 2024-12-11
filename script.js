@@ -48,9 +48,9 @@ document.addEventListener('DOMContentLoaded', () => {
             datasets: [{
                 label: 'Trips per Day',
                 data: data,
-                borderColor: '#0af013',
+                borderColor: '#4caf50',
                 backgroundColor: 'rgba(76,175,80,0.2)',
-                pointBackgroundColor: '#ffc107',
+                pointBackgroundColor: '#0af013',
                 pointRadius: 6,
                 fill: true,
                 tension: 0.3
@@ -69,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 label: 'Delivery Allowances',
                 data: labels.map(() => deliveriesAllowed),
                 borderColor: '#cb4335',       // Red line
-                borderWidth: 5,
+                borderWidth: 4,
                 borderDash: [5,5],            // Optional: makes the line dashed
                 pointRadius: 0,               // No points, just a line
                 fill: false
