@@ -37,6 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return cumulativeTotal;
     });
 
+    const deliveriesAllowed = document.getElementById('deliveryAllowances').textContent;
+
     const ctx = document.getElementById('tripChart').getContext('2d');
 
     new Chart(ctx, {
@@ -48,6 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 data: data,
                 borderColor: '#4caf50',
                 backgroundColor: 'rgba(76,175,80,0.2)',
+                pointBackgroundColor: '#ffc107',
+                pointRadius: 5,
                 fill: true,
                 tension: 0.3
             },
@@ -56,8 +60,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 data: cumulativeData,
                 borderColor: '#c1c536',
                 backgroundColor: 'rgba(193,197,54,0.2)',
+                pointBackgroundColor: '#ffc107',
+                pointRadius: 5,
                 fill: true,
                 tension: 0.3
+            },
+            {
+                label: 'Delivery Allowances',
+                data: labels.map(() => deliveriesAllowed),
+                borderColor: '#cb4335',       // Red line
+                borderWidth: 2,
+                borderDash: [5,5],            // Optional: makes the line dashed
+                pointRadius: 0,               // No points, just a line
+                fill: false
             }]
         },
         options: {
