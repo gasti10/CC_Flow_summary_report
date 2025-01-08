@@ -1,8 +1,8 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', () => { async () => {
     const projectName = document.getElementById('projectName').textContent;
     // Datos simulados: reemplaza esto con la llamada al backend para obtener el JSON
     const apiUrl = `https://script.google.com/macros/s/AKfycby0imLlKjegWFr29LKgHWEa4RdaApP7Au8h2i3jdcrvH6GuBbyVmuhKjP898Bq4tvuf/exec`;
-    const sheetsData = fetch(`${apiUrl}?action=getSheets&project=${encodeURIComponent(projectName)}`)
+    const sheetsData = await fetch(`${apiUrl}?action=getSheets&project=${encodeURIComponent(projectName)}`)
         .then(response => response.json());
 
     // 1. Preparar datos para el gráfico
@@ -61,4 +61,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-});
+}});
