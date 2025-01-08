@@ -1,43 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+    const projectName = document.getElementById('projectName').textContent;
     // Datos simulados: reemplaza esto con la llamada al backend para obtener el JSON
-    const sheetsData = [
-        {
-            "Sheet ID": "de573420",
-            "Dimension": "2500x1250",
-            "TotalReceived": 114,
-            "TotalUsed": 117,
-            "Colour": "Shinning Silver",
-            "Thickness": "3MM",
-            "Sheet": "Shinning Silver - Aodeli Australia / 2500x1250 3MM"
-        },
-        {
-            "Sheet ID": "8e91c973",
-            "Dimension": "4000x1250",
-            "TotalReceived": 22,
-            "TotalUsed": 23,
-            "Colour": "Shinning Silver",
-            "Thickness": "3MM",
-            "Sheet": "Shinning Silver - Aodeli Australia / 4000x1250 3MM"
-        },
-        {
-            "Sheet ID": "fe9ffa2e",
-            "Dimension": "4000x1575",
-            "TotalReceived": 41,
-            "TotalUsed": 41,
-            "Colour": "Shinning Silver",
-            "Thickness": "3MM",
-            "Sheet": "Shinning Silver - Aodeli Australia / 4000x1575 3MM"
-        },
-        {
-            "Sheet ID": "b33a05d1",
-            "Dimension": "2500x1250",
-            "TotalReceived": 0,
-            "TotalUsed": 3,
-            "Colour": "Shinning Silver",
-            "Thickness": "3MM",
-            "Sheet": "Shinning Silver - Aodeli Australia / 2500x1250 3MM"
-        }
-    ];
+    const apiUrl = `https://script.google.com/macros/s/AKfycby0imLlKjegWFr29LKgHWEa4RdaApP7Au8h2i3jdcrvH6GuBbyVmuhKjP898Bq4tvuf/exec`;
+    const sheetsData = fetch(`${apiUrl}?action=getSheets&project=${encodeURIComponent(projectName)}`)
+        .then(response => response.json());
 
     // 1. Preparar datos para el gráfico
     const sheets = sheetsData.map(sheet => sheet.Sheet);
