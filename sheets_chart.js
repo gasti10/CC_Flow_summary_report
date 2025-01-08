@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: dimensions,
+            labels: sheets,
             datasets: [
                 {
                     label: 'Total Received',
