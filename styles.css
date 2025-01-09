@@ -197,3 +197,48 @@ table tr {
 table td { 
   overflow-wrap: anywhere; 
 }
+
+/* Estilo del contenedor del acordeón */
+.accordion {
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+/* Cada ítem del acordeón */
+.accordion-item {
+  border-bottom: 1px solid #ccc;
+}
+
+.accordion-item:last-child {
+  border-bottom: none;
+}
+
+/* Estilo del encabezado del acordeón */
+.accordion-header {
+  background-color: #f7f7f7;
+  padding: 1rem;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+}
+
+.accordion-header:hover {
+  background-color: #e0e0e0;
+}
+
+/* Estilo del cuerpo del acordeón */
+.accordion-body {
+  max-height: 0;
+  overflow: hidden;
+  padding: 0 1rem;
+  background-color: #fff;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+}
+
+/* Clase para abrir un ítem del acordeón */
+.accordion-item.active .accordion-body {
+  max-height: 200px; /* Ajusta según el contenido */
+  padding: 1rem;
+}
