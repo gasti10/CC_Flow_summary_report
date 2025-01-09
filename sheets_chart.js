@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => { async () => {
+    console.log('DOM completamente cargado y procesado');
     const projectName = document.getElementById('projectName').textContent;
     if (!projectName) throw new Error("Project name not found");
     // Datos simulados: reemplaza esto con la llamada al backend para obtener el JSON
