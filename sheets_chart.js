@@ -1,15 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => { async () => {
     const projectName = document.getElementById('projectName').textContent;
+    if (!projectName) throw new Error("Project name not found");
     // Datos simulados: reemplaza esto con la llamada al backend para obtener el JSON
     const apiUrl = `https://script.google.com/macros/s/AKfycby0imLlKjegWFr29LKgHWEa4RdaApP7Au8h2i3jdcrvH6GuBbyVmuhKjP898Bq4tvuf/exec`;
     
     try {
         const response = await fetch(`${apiUrl}?action=getSheets&project=${encodeURIComponent(projectName)}`);
-        if (!response.ok) {
-            throw new Error('Network response was not ok '+ response.statusText);
-        }
+        if (!response.ok) throw new Error('Network response was not ok '+ response.statusText);
         const sheetsData = await response.json();
-
         generateChart(sheetsData);
     } catch (error) {
         console.error('There has been a problem with your fetch operation:', error);
