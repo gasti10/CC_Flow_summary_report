@@ -12,15 +12,19 @@ document.addEventListener('DOMContentLoaded', () => {
         header.addEventListener('click', () => {
             // Obtener el ítem padre
             const accordionItem = header.parentElement;
+            const accordionBody = accordionItem.querySelector('.accordion-body');
 
             // Alternar la clase "active"
             const isActive = accordionItem.classList.contains('active');
             document.querySelectorAll('.accordion-item.active').forEach(item => {
                 item.classList.remove('active');
+                const body = item.querySelector('.accordion-body');
+                body.style.maxHeight = null; // Resetea el alto
             });
 
             if (!isActive) {
                 accordionItem.classList.add('active');
+                accordionBody.style.maxHeight = `${accordionBody.scrollHeight}px`; // Ajusta al contenido
                 if(window.GLOBALS.data[header.id]) {
                     setTimeout(() => {
                         generateChart(window.GLOBALS.data[header.id], header.id);
