@@ -101,12 +101,17 @@ h3 {
 }
 
 .chart-container {
+  width: 100%;
+  height: auto;
   margin: 20px 0;
+  min-height: 200px;
+  overflow: visible;
   background-color: rgba(255, 255, 255, 0.3);
   border-radius: 10px;
   padding: 20px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   animation: fadeIn 1.5s ease-in-out; /* matches your existing fade-in style */
+  transition: height 0.3s ease-in-out;
 }
 
 .chart-container h3 {
