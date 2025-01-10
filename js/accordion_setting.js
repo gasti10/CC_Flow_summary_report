@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if(window.GLOBALS.data[header.id]) {
                     setTimeout(() => {
                         if(!window.GLOBALS.charts[header.id]) generateChart(window.GLOBALS.data[header.id], header.id);
-                        else window.GLOBALS.charts[header.id].update();
+                        window.GLOBALS.charts[header.id].update();
                     }, 300);
                 }
             }
