@@ -48,6 +48,11 @@ function generateChart(sheetsData) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        bottom: 20 // Ajusta según sea necesario
+                    }
+                },
                 plugins: {
                     legend: {
                         position: 'top'
@@ -62,6 +67,11 @@ function generateChart(sheetsData) {
                         title: {
                             display: true,
                             text: 'Sheets'
+                        },
+                        ticks: {
+                            autoSkip: true, // Habilita saltos automáticos
+                            maxRotation: 45, // Rotación máxima en grados
+                            minRotation: 0 // Rotación mínima
                         }
                     },
                     y: {
