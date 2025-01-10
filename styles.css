@@ -239,7 +239,7 @@ table td {
 
 /* Clase para abrir un ítem del acordeón */
 .accordion-item.active .accordion-body {
-  max-height: none;
-  overflow: visibles;
+  max-height: 1000px;
+  overflow: visible;
   padding: 1rem;
 }
