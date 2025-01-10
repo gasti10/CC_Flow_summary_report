@@ -5,7 +5,7 @@ document.addEventListener('globalsReady', async () => {
         if (!response.ok) throw new Error('Network response was not ok '+ response.statusText);
         const sheetsData = await response.json();
         window.GLOBALS.data.sheets = sheetsData;
-        generateChart(sheetsData);
+        //generateChart(sheetsData);
     } catch (error) {
         console.error('There has been a problem with your fetch operation:', error);
     }
