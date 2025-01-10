@@ -24,11 +24,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!isActive) {
                 accordionItem.classList.add('active');
+                console.log(' 1 scrollHeight:', accordionBody.scrollHeight);
                 if(window.GLOBALS.data[header.id]) {
                     setTimeout(() => {
-                        accordionBody.style.maxHeight = `${accordionBody.scrollHeight}px`; // Ajusta al contenido
                         if(!window.GLOBALS.charts[header.id]) generateChart(window.GLOBALS.data[header.id], header.id);
-                        window.GLOBALS.charts[header.id].update();
+                        else window.GLOBALS.charts[header.id].update();
+                        console.log(' 2 scrollHeight:', accordionBody.scrollHeight);
+                        accordionBody.style.maxHeight = `${accordionBody.scrollHeight}px`; // Ajusta al contenido
+                        console.log('3 scrollHeight:', accordionBody.scrollHeight);
                     }, 300);
                 }
             }
