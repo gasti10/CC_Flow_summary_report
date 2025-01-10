@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('globalsReady', () => {
     const rawString = document.getElementById('deliveryDates').textContent;
     // Remove newline characters
     const cleanedString = rawString.replace(/\r?\n|\r/g, ' ');

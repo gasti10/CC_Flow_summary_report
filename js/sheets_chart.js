@@ -1,6 +1,7 @@
-document.addEventListener('DOMContentLoaded', async () => {   
+document.addEventListener('globalsReady', async () => {   
     try {
-        const response = await fetch(`${window.GLOBALS.apiBaseUrl}?action=getSheets&project=${encodeURIComponent(window.GLOBALS.projectName)}`);
+        const projectName = document.getElementById('projectName').textContent;
+        const response = await fetch(`${window.GLOBALS.apiBaseUrl}?action=getSheets&project=${encodeURIComponent(projectName)}`);
         if (!response.ok) throw new Error('Network response was not ok '+ response.statusText);
         const sheetsData = await response.json();
         window.GLOBALS.data.sheets = sheetsData;
