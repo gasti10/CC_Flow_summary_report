@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!isActive) {
+                if(window.GLOBALS.charts[header.id]) window.GLOBALS.charts[header.id].update();
                 accordionItem.classList.add('active');
             }
         });

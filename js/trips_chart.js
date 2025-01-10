@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const ctx = document.getElementById('tripChart').getContext('2d');
 
-    new Chart(ctx, {
+    const chart = new Chart(ctx, {
         type: 'line',
         data: {
             labels: labels,
@@ -107,4 +107,5 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+    window.GLOBALS.charts.trips = chart;
 });

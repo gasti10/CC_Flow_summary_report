@@ -206,7 +206,6 @@ table td {
   margin-bottom: 1rem;
 }
 
-/* Cada ítem del acordeón */
 .accordion-item {
   border-bottom: 1px solid #ccc;
 }
@@ -215,9 +214,7 @@ table td {
   border-bottom: none;
 }
 
-/* Estilo del encabezado del acordeón */
 .accordion-header {
-  background-color: #f7f7f7;
   padding: 1rem;
   cursor: pointer;
   font-weight: bold;
@@ -228,12 +225,10 @@ table td {
   background-color: #e0e0e0;
 }
 
-/* Estilo del cuerpo del acordeón */
 .accordion-body {
   max-height: 0;
   overflow: hidden;
   padding: 0 1rem;
-  background-color: #fff;
   transition: max-height 0.3s ease, padding 0.3s ease;
 }
 
