@@ -1,9 +1,13 @@
-const GLOBALS = {
-    charts: {},
-    apiBaseUrl: `https://script.google.com/macros/s/AKfycby0imLlKjegWFr29LKgHWEa4RdaApP7Au8h2i3jdcrvH6GuBbyVmuhKjP898Bq4tvuf/exec`,
-    data: {}
-};
+document.addEventListener('DOMContentLoaded', () => {
 
-window.GLOBALS = GLOBALS;
+    const GLOBALS = {
+        charts: {},
+        apiBaseUrl: `https://script.google.com/macros/s/AKfycby0imLlKjegWFr29LKgHWEa4RdaApP7Au8h2i3jdcrvH6GuBbyVmuhKjP898Bq4tvuf/exec`,
+        data: {}
+    };
 
-document.dispatchEvent(new CustomEvent('globalsReady'));
+    window.GLOBALS = GLOBALS;
+
+    document.dispatchEvent(new CustomEvent('globalsReady'));
+
+});
