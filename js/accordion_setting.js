@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    new Accordion('#accordion', {
+    new Accordion('.accordion', {
         duration: 300,
         showMultiple: false,
         collapse: true,
