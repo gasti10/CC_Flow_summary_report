@@ -20,11 +20,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (!isActive) {
+                accordionItem.classList.add('active');
+
                 if(window.GLOBALS.charts[header.id]) {
                     window.GLOBALS.charts[header.id].update();
-                    window.GLOBALS.charts[header.id].resize();
+                    setTimeout(() => {
+                        window.GLOBALS.charts[header.id].resize();
+                    }, 300);
                 }
-                accordionItem.classList.add('active');
             }
         });
     });
