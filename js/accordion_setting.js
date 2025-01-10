@@ -24,9 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (!isActive) {
                 accordionItem.classList.add('active');
-                accordionBody.style.maxHeight = `${accordionBody.scrollHeight}px`; // Ajusta al contenido
                 if(window.GLOBALS.data[header.id]) {
                     setTimeout(() => {
+                        accordionBody.style.maxHeight = `${accordionBody.scrollHeight}px`; // Ajusta al contenido
                         if(!window.GLOBALS.charts[header.id]) generateChart(window.GLOBALS.data[header.id], header.id);
                         window.GLOBALS.charts[header.id].update();
                     }, 300);
