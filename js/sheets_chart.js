@@ -50,14 +50,14 @@ function generateChart(sheetsData) {
                 maintainAspectRatio: false,
                 layout: {
                     padding: {
-                        bottom: 20 // Ajusta según sea necesario
+                        bottom: 30
                     }
                 },
                 plugins: {
                     legend: {
                         position: 'top',
                         font: {
-                            size: 14, 
+                            size: 20, 
                             weight: 'bold'
                         }
                     },
@@ -65,7 +65,7 @@ function generateChart(sheetsData) {
                         display: true,
                         text: 'Sheets Overview by Details',
                         font: {
-                            size: 18, 
+                            size: 24, 
                             weight: 'bold'
                         }
                     }
@@ -76,7 +76,7 @@ function generateChart(sheetsData) {
                             display: true,
                             text: 'Sheets',
                             font: {
-                                size: 16, 
+                                size: 22, 
                                 weight: 'bold'
                             }
                         },
@@ -85,7 +85,7 @@ function generateChart(sheetsData) {
                             maxRotation: 45, 
                             minRotation: 0,
                             font: {
-                                size: 14, 
+                                size: 20, 
                                 weight: 'bold'
                             }, 
                         }
@@ -96,13 +96,13 @@ function generateChart(sheetsData) {
                             display: true,
                             text: 'Quantity',
                             font: {
-                                size: 16, 
+                                size: 22, 
                                 weight: 'bold'
                             },
                         },
                         ticks: {
                             font: {
-                                size: 14, 
+                                size: 20, 
                                 weight: 'bold'
                             }
                         } 
