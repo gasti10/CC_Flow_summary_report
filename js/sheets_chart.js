@@ -54,6 +54,18 @@ function generateChart(sheetsData) {
                     }
                 },
                 plugins: {
+                    datalabels: {
+                        color: '#000',
+                        align: 'top', 
+                        anchor: 'end', // Anclaje en el extremo
+                        font: {
+                            size: 20,
+                            weight: 'bold'
+                        },
+                        formatter: function(value) {
+                            return value;
+                        }
+                    },
                     legend: {
                         position: 'top',
                         font: {
@@ -108,7 +120,8 @@ function generateChart(sheetsData) {
                         } 
                     }
                 }
-            }
+            },
+            plugins: [ChartDataLabels]
         });
     window.GLOBALS.charts.sheets = chart;
 }
