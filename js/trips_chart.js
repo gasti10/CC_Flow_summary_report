@@ -78,7 +78,7 @@ document.addEventListener('globalsReady', () => {
         options: {
             responsive: true,
             animation: {
-                duration: 2000, //ms
+                duration: 10000, //ms
                 easing: 'easeInOutQuad', // Tipo de easing
                 onProgress: function (animation) {
                     // Dibuja progresivamente mientras anima
