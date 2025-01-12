@@ -77,6 +77,18 @@ document.addEventListener('globalsReady', () => {
         },
         options: {
             responsive: true,
+            animation: {
+                duration: 2000, //ms
+                easing: 'easeInOutQuad', // Tipo de easing
+                onProgress: function (animation) {
+                    // Dibuja progresivamente mientras anima
+                    const progress = animation.currentStep / animation.numSteps;
+                    //console.log(`Progress: ${Math.round(progress * 100)}%`);
+                },
+                onComplete: function () {
+                    //console.log('Animation complete');
+                }
+            },
             scales: {
                 x: {
                     type: 'time',

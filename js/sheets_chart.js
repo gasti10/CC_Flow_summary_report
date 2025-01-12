@@ -50,7 +50,7 @@ function generateChart(sheetsData) {
                 maintainAspectRatio: false,
                 layout: {
                     padding: {
-                        bottom: 30
+                        bottom: 25
                     }
                 },
                 plugins: {
