@@ -101,10 +101,11 @@ h3 {
 }
 
 .chart-container {
-  width: 100%;
+  width: 98%;
   height: auto;
   margin: 20px 0;
-  overflow: visible;
+  overflow: hidden;
+  position: relative;
   background-color: rgba(255, 255, 255, 0.3);
   border-radius: 10px;
   padding: 20px;
@@ -222,6 +223,7 @@ table td {
   padding: 1rem;
   cursor: pointer;
   font-weight: bold;
+  position: relative;
   transition: background-color 0.3s ease;
 }
 
@@ -230,7 +232,7 @@ table td {
 }
 
 .accordion-body {
-  max-height: 0;
+  height: 0;
   overflow: hidden;
   padding: 0 1rem;
   transition: max-height 0.3s ease, padding 0.3s ease;
@@ -242,4 +244,38 @@ table td {
   overflow: visible;
   padding: 1rem;
   height: auto;
+}
+
+.accordion-indicator {
+  display: inline-block;
+  position: relative;
+  margin-right: 10px;
+  transition: transform 0.3s ease;
+}
+
+.accordion-item.active .accordion-indicator {
+  transform: rotate(180deg);
+}
+
+/* Estilo del spinner */
+.loading-spinner {
+  display: none; /* Oculto por defecto */
+  width: 50px;
+  height: 50px;
+  border: 5px solid rgba(0, 0, 0, 0.1);
+  border-top-color: #4caf50; /* Color principal */
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto; /* Centrar */
+  position: relative;
+  top: 20px; /* Ajustar según diseño */
+}
+
+@keyframes spin {
+  from {
+      transform: rotate(0deg);
+  }
+  to {
+      transform: rotate(360deg);
+  }
 }

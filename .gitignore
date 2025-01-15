@@ -1,0 +1,23 @@
+# Ignorar node_modules
+node_modules/
+
+# Ignorar archivos de paquetes
+package.json
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Ignorar archivo de configuración de Vite
+vite.config.js
+
+# Ignorar carpetas de salida de Vite
+dist/
+
+# Ignorar sistemas operativos y editores comunes
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+*.swp
+*.swo

@@ -1,13 +1,18 @@
 document.addEventListener('globalsReady', async () => {   
+    let loadingSpinner;
     try {
+        loadingSpinner = document.getElementById('sheetsLoadingSpinner');
+        loadingSpinner.style.display = 'block';
         const projectName = document.getElementById('projectName').textContent;
         const response = await fetch(`${window.GLOBALS.apiBaseUrl}?action=getSheets&project=${encodeURIComponent(projectName)}`);
         if (!response.ok) throw new Error('Network response was not ok '+ response.statusText);
         const sheetsData = await response.json();
         window.GLOBALS.data.sheets = sheetsData;
-        //generateChart(sheetsData);
+        generateChart(sheetsData);
     } catch (error) {
         console.error('There has been a problem with your fetch operation:', error);
+    } finally {
+        loadingSpinner.style.display = 'none';
     }
 });
 
@@ -47,7 +52,8 @@ function generateChart(sheetsData) {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: false,
+                maintainAspectRatio: true,
+                aspectRatio: 2,
                 layout: {
                     padding: {
                         bottom: 25
@@ -125,5 +131,3 @@ function generateChart(sheetsData) {
         });
     window.GLOBALS.charts.sheets = chart;
 }
-
-    

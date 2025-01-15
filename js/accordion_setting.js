@@ -25,10 +25,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!isActive) {
                 accordionItem.classList.add('active');
                 if(window.GLOBALS.data[header.id]) {
+                    accordionBody.style.maxHeight = `${Math.min(accordionBody.scrollHeight, 500)}px`; // Máximo de 500px
                     setTimeout(() => {
-                        if(!window.GLOBALS.charts[header.id]) generateChart(window.GLOBALS.data[header.id], header.id);
-                        else window.GLOBALS.charts[header.id].resize();
-                        accordionBody.style.maxHeight = `${Math.min(accordionBody.scrollHeight, 500)}px`; // Máximo de 500px                     
+                        if(window.GLOBALS.charts[header.id]) window.GLOBALS.charts[header.id].resize();                     
                     }, 300);
                 }
             }
