@@ -23,11 +23,7 @@ body {
   padding: 0;
   color: #145a32;
   overflow-y: auto; /* Permite el scroll vertical */
-  /* Fondo con gradiente animado */
-  background: linear-gradient(180deg, #ff7e5f, #feb47b, #86a8e7, #91eae4), 
-              linear-gradient(to bottom, rgba(255,255,255,0) 70%, rgba(200,200,200,1) 100%);
-  background-size: 400% 400%, 100% 100%; /* Tamaño del fondo y del gradiente fijo */
-  animation: gradientBG 15s ease infinite;
+  background: linear-gradient(to bottom,#feb47b, #86a8e7, #91eae4);
 }
 
 @keyframes gradientBG {
@@ -279,3 +275,138 @@ table td {
       transform: rotate(360deg);
   }
 }
+
+button {
+  background-color: #145a32;
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 25px;
+  cursor: pointer;
+  margin: 10px;
+  transition: all 0.3s ease;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+button:hover {
+  background-color: #2e7d32;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+}
+
+button.active {
+  background-color: #4caf50;
+  border: 2px solid white;
+}
+
+.hidden {
+  display: none;
+}
+
+/* Estilos Generales para Ambas Tablas */
+#materialsTable, #materialsTable_details {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 25px 0;
+  font-size: 0.9em;
+  min-width: 400px;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: none;
+  text-align: center;
+}
+
+/* Cabeceras de Tabla */
+#materialsTable thead tr,
+#materialsTable_details thead tr {
+  background-color: #145a32;
+  color: white;
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+  text-transform: uppercase;
+  transform: translateZ(0);
+}
+
+/* Celdas y Cabeceras */
+#materialsTable th, #materialsTable td,
+#materialsTable_details th, #materialsTable_details td {
+  padding: 15px;
+  border-bottom: 1px solid #dddddd;
+}
+
+/* Filas */
+#materialsTable tbody tr:nth-of-type(even),
+#materialsTable_details tbody tr:nth-of-type(even) {
+  background-color: rgba(249, 249, 249, 0.5);
+}
+
+#materialsTable tbody tr:last-of-type,
+#materialsTable_details tbody tr:last-of-type {
+  border-bottom: 2px solid #145a32;
+}
+
+/* Estilo para filas de categoría */
+tr td.category {
+  background-color: #27a75e;
+  color: white;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  position: sticky;
+}
+
+/* Efecto hover para categorías */
+tr td.category:hover {
+  background-color: #32d87a;
+}
+
+/* Efecto hover para categorías */
+tr.item:hover td {
+  background-color: #32d87a;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Efecto hover para la columna Total */
+tr.item:hover td:nth-child(4) { /* Selecciona la 4ta columna (Total) */
+  font-size: 1.7em; 
+  font-weight: bold;
+  color: #145a32;
+  transition: all 0.4s ease;
+}
+
+
+@media (max-width: 768px) {
+  #materialsTable, #materialsTable_details {
+      font-size: 0.8em;
+  }
+  
+  #materialsTable th, #materialsTable td,
+  #materialsTable_details th, #materialsTable_details td {
+      padding: 10px;
+  }
+  
+  #materialsTablesContainer button {
+      width: 100%;
+      margin: 5px 0;
+  }
+}
+
+/* Animación de Entrada */
+@keyframes slideIn {
+  from {
+      opacity: 0;
+      transform: translateY(20px);
+  }
+  to {
+      opacity: 1;
+      transform: translateY(0);
+  }
+}
+
