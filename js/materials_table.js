@@ -5,9 +5,23 @@ document.addEventListener('globalsReady', async () => {
         const response = await fetch(`${window.GLOBALS.apiBaseUrl}?action=getMaterials&orders=`+materialOrderIDs.join(','));
         if (!response.ok) throw new Error('Network response was not ok '+ response.statusText);
         
+        let materialOrderNumbers = document.getElementById('materialOrderNumbers').textContent;
+        materialOrderNumbers = materialOrderNumbers.replace(/\n/g, '').split(',').map(id => id.trim()).filter(id => id.length > 0); //clean up
+        let materialOrderDates = document.getElementById('materialOrderDueDates').textContent;
+        materialOrderDates = materialOrderDates.replace(/\n/g, '').split(',').map(id => id.trim()).filter(id => id.length > 0); //clean up
+        //join materialsOrders
+        let materialOrders = [];
+        materialOrderIDs.forEach((id, index) => {
+            materialOrders[id] = {
+                OrderNumber: materialOrderNumbers[index],
+                Date: materialOrderDates[index]
+            };
+        });     
+
         const materialsData = await response.json();
         window.GLOBALS.data.materials = materialsData;
         fillMaterialsTable(materialsData);
+        fillMaterialsTableDetails(materialsData, materialOrders);
     } catch (error) {
         console.error('There has been a problem with your fetch operation:', error);
     }
@@ -63,11 +77,47 @@ document.addEventListener('globalsReady', async () => {
                     <td>${item.Name}</td>
                     <td>${item.SubCategory}</td>
                     <td>${item.Description}</td>
-                    <td class="total">${item.Total}</td>
+                    <td>${item.Total}</td>
                 `;
             }            
         }
 
+    }
+
+    function fillMaterialsTableDetails(data, ordersData){
+        const materialsTableBody = document.getElementById('materialsTable_details').getElementsByTagName('tbody')[0];
+        materialsTableBody.innerHTML = '';
+        const categories = { 
+            'Top hat': {}, 'Angles': {}, 'Screws': {}, 
+            'Caulking Glue': {}, 'Packers': {}, 'Tapes': {}, 'Others': {} 
+        };
+
+        data.forEach(material => {
+            let category = material.Category;
+            if(!categories.hasOwnProperty(material.Category)) category = 'Others';
+            if(!categories[category].hasOwnProperty(material.ItemID)) categories[category][material.ItemID] = [];
+
+            categories[category][material.ItemID].push(Object.assign({}, material, ordersData[material.OrderID]));            
+        });
+
+        for(const [category, items] of Object.entries(categories)){
+            const categoryRow = materialsTableBody.insertRow();
+            categoryRow.innerHTML = `<td colspan="6" class="category">${category}</td>`;
+            for(const [itemID, item] of Object.entries(items)){
+                item.forEach(material => {
+                    const itemRow = materialsTableBody.insertRow();
+                    itemRow.classList.add('item');
+                    itemRow.innerHTML = `
+                        <td>${material.OrderNumber}</td>
+                        <td>${material.Date}</td>
+                        <td>${material.Name}</td>
+                        <td>${material.Description}</td>
+                        <td>${material.UserSpecification}</td>
+                        <td>${material.Quantity}</td>
+                    `;
+                });
+            }
+        };
     }
 
     // Simulando los datos para probar

@@ -373,8 +373,24 @@ tr.item:hover td {
   text-transform: uppercase;
 }
 
-/* Efecto hover para la columna Total */
-tr.item:hover td:nth-child(4) { /* Selecciona la 4ta columna (Total) */
+/* Efecto hover MT para la columna Total */
+#materialsTable tr.item:hover td:nth-child(4) {
+  font-size: 1.7em; 
+  font-weight: bold;
+  color: #145a32;
+  transition: all 0.4s ease;
+}
+
+/* Efecto hover MTD para la columna Order */
+#materialsTable_details tr.item:hover td:nth-child(1){
+  font-size: 1.7em; 
+  font-weight: bold;
+  color: #145a32;
+  transition: all 0.4s ease;
+}
+
+/* Efecto hover MTD para la columna Total */
+#materialsTable_details tr.item:hover td:nth-child(6){
   font-size: 1.7em; 
   font-weight: bold;
   color: #145a32;
