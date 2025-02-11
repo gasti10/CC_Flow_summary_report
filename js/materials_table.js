@@ -2,7 +2,7 @@ document.addEventListener('globalsReady', async () => {
     try {
         let materialOrderIDs = document.getElementById('materialOrderIDs').textContent;
         materialOrderIDs = materialOrderIDs.replace(/\n/g, '').split(',').map(id => id.trim()).filter(id => id.length > 0); //clean up
-        const response = await fetch(`${window.GLOBALS.apiBaseUrl}?action=getMaterials&orders=`+materialOrderIDs.join(','));
+        const response = await fetch(`${window.GLOBALS.apiBaseUrl}?action=getMaterials&orders=`+materialOrderIDs.join(', '));
         if (!response.ok) throw new Error('Network response was not ok '+ response.statusText);
         
         let materialOrderNumbers = document.getElementById('materialOrderNumbers').textContent;
