@@ -1,11 +1,15 @@
 # Ignorar node_modules
 node_modules/
 
-# Ignorar archivos de paquetes
+# Ignorar archivos de paquetes (solo en la raíz)
 package.json
 package-lock.json
 yarn.lock
 pnpm-lock.yaml
+
+# NO ignorar archivos de paquetes en cc-flow-dashboard
+!cc-flow-dashboard/package.json
+!cc-flow-dashboard/package-lock.json
 
 # Ignorar archivo de configuración de Vite
 vite.config.js
