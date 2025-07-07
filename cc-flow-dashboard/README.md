@@ -1,4 +1,4 @@
-# CC Projects Dashboard
+# CC Projects Dashboard 1.1
 
 Aplicación web moderna para visualizar reportes de proyectos de Cladding Creations, construida con React + Vite y conectada directamente a AppSheet API.
 
