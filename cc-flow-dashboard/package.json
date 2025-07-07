@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://gaston.github.io/cc-flow-dashboard",
+  "homepage": "https://gasti10.github.io/cc-flow-dashboard",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
