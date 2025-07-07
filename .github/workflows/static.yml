@@ -1,10 +1,19 @@
 # Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+# DISABLED - Using unified-deploy.yml instead
+name: Deploy static content to Pages (DISABLED)
 
 on:
   # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
+    paths:
+      - '*.html'
+      - '*.css'
+      - '*.js'
+      - '*.ico'
+      - 'fonts/**'
+      - 'js/**'
+      - '!cc-flow-dashboard/**'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -18,7 +27,7 @@ permissions:
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
-  group: "pages"
+  group: "static-pages"
   cancel-in-progress: false
 
 jobs:
@@ -37,14 +46,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload only static files from root, excluding cc-flow-dashboard
-          path: |
-            *.html
-            *.css
-            *.js
-            *.ico
-            fonts/
-            js/
-            !cc-flow-dashboard/
+          path: '.'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
