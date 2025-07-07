@@ -1,0 +1,306 @@
+/* Optimizaciones de Layout para mejor aprovechamiento del ancho */
+
+/* Optimización del contenedor principal */
+.App {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Optimización del header principal */
+.main-header {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0.5rem 1rem;
+}
+
+/* Optimización de la navegación */
+.header-nav {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Optimización de los contenedores de sección */
+.accordion {
+  width: 100%;
+  max-width: 100%;
+}
+
+.accordion-item {
+  width: 100%;
+}
+
+.accordion-body {
+  width: 100%;
+  padding: 20px;
+}
+
+/* Optimización de las estadísticas del proyecto */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  width: 100%;
+  margin: 20px 0;
+}
+
+/* Optimización de las cards de información */
+.project-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+/* Optimización de las tablas */
+.materials-table-view {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.materials-table {
+  width: 100%;
+  min-width: 800px;
+}
+
+/* Optimización de los gráficos */
+.chart-container {
+  width: 100%;
+  margin: 20px 0;
+}
+
+.chart-wrapper {
+  width: 100%;
+  height: 450px;
+}
+
+/* Optimización de las allowances */
+.allowances-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+/* Optimización del selector de proyectos */
+.project-selector {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Optimización de la información de corte */
+.cutting-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+/* Optimización de las estadísticas de gráficos */
+.chart-info {
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 20px;
+  width: 100%;
+  margin-top: 20px;
+}
+
+.chart-stats {
+  display: flex;
+  justify-content: space-around;
+  gap: 20px;
+  width: 100%;
+}
+
+/* Optimización para pantallas grandes */
+@media (min-width: 1200px) {
+  .container {
+    max-width: 1400px;
+  }
+  
+  .project-details-grid {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+  
+  .allowances-grid {
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  }
+  
+  .cutting-info-grid {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  
+  .chart-wrapper {
+    height: 500px;
+  }
+}
+
+/* Optimización para pantallas medianas */
+@media (max-width: 1199px) and (min-width: 769px) {
+  .container {
+    width: 95%;
+  }
+  
+  .project-details-grid {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+  
+  .allowances-grid {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+  
+  .cutting-info-grid {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
+
+/* Optimización para pantallas pequeñas */
+@media (max-width: 768px) {
+  .App {
+    padding: 0;
+  }
+  
+  .container {
+    width: 98%;
+    padding: 15px;
+    margin: 10px auto;
+  }
+  
+  .project-details-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
+  .allowances-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
+  .cutting-info-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
+  .chart-wrapper {
+    height: 350px;
+  }
+  
+  .chart-info {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .chart-stats {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .header-nav {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .nav-link {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+  }
+}
+
+/* Optimización para pantallas muy pequeñas */
+@media (max-width: 480px) {
+  .App {
+    padding: 0;
+  }
+  
+  .container {
+    width: 100%;
+    padding: 10px;
+    margin: 5px auto;
+  }
+  
+  .chart-wrapper {
+    height: 300px;
+  }
+  
+  .header-nav {
+    gap: 0.3rem;
+  }
+  
+  .nav-link {
+    font-size: 0.8rem;
+    padding: 0.3rem 0.6rem;
+  }
+  
+  .project-details-grid,
+  .allowances-grid,
+  .cutting-info-grid {
+    gap: 10px;
+  }
+}
+
+/* Scrollbar personalizado para contenedores scrolleables */
+.materials-table-view::-webkit-scrollbar {
+  height: 8px;
+}
+
+.materials-table-view::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.materials-table-view::-webkit-scrollbar-thumb {
+  background: #145a32;
+  border-radius: 4px;
+}
+
+.materials-table-view::-webkit-scrollbar-thumb:hover {
+  background: #4caf50;
+}
+
+/* Espaciado de secciones */
+.section-spacing {
+  margin: 30px 0;
+}
+
+.section-spacing:first-child {
+  margin-top: 0;
+}
+
+.section-spacing:last-child {
+  margin-bottom: 0;
+}
+
+/* Contenedores flexibles */
+.flex-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-item {
+  flex: 1;
+  min-width: 250px;
+}
+
+/* Texto responsive */
+.responsive-text {
+  font-size: clamp(12px, 2.5vw, 16px);
+}
+
+.responsive-heading {
+  font-size: clamp(18px, 4vw, 32px);
+}
+
+.responsive-spacing {
+  margin: clamp(10px, 2vw, 20px) 0;
+} 

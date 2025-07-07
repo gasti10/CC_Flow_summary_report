@@ -1,0 +1,62 @@
+name: Deploy React Dashboard to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'cc-flow-dashboard/**'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'cc-flow-dashboard/**'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        cd cc-flow-dashboard
+        npm ci
+        
+    - name: Create environment file
+      run: |
+        cd cc-flow-dashboard
+        echo "VITE_APPSHEET_APP_ID=efcdb2a0-181f-4e43-bc65-6887dc279032" > .env.production
+        echo "VITE_APPSHEET_API_KEY=${{ secrets.VITE_APPSHEET_API_KEY }}" >> .env.production
+        
+    - name: Build
+      run: |
+        cd cc-flow-dashboard
+        npm run build
+        
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+      
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: './cc-flow-dashboard/dist'
+        
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4 

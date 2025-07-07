@@ -1,0 +1,237 @@
+/* Estilos para los componentes de gráficos */
+
+.chart-container {
+  width: 100%;
+  height: auto;
+  margin: 20px 0;
+  overflow: hidden;
+  position: relative;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  animation: fadeIn 1.5s ease-in-out;
+  transition: height 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.chart-container h3 {
+  font-size: 20pt;
+  color: #4caf50;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.chart-wrapper {
+  position: relative;
+  width: 100%;
+  height: 450px;
+  margin: 0 auto;
+}
+
+/* Loading spinner para gráficos */
+.chart-container .loading-spinner {
+  display: block;
+  width: 50px;
+  height: 50px;
+  border: 5px solid rgba(0, 0, 0, 0.1);
+  border-top-color: #4caf50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive design para gráficos */
+@media (max-width: 768px) {
+  .chart-container {
+    width: 100%;
+    padding: 15px;
+  }
+  
+  .chart-container h3 {
+    font-size: 18pt;
+  }
+  
+  .chart-wrapper {
+    height: 350px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chart-container {
+    width: 100%;
+    padding: 10px;
+  }
+  
+  .chart-container h3 {
+    font-size: 16pt;
+  }
+  
+  .chart-wrapper {
+    height: 280px;
+  }
+}
+
+/* Estilos para estadísticas del gráfico */
+.chart-info {
+  margin-bottom: 20px;
+}
+
+.chart-info h3 {
+  margin: 0 0 15px 0;
+  color: var(--primary-color);
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.chart-stats {
+  display: flex;
+  gap: 20px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--background-light);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.stat-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.stat-value {
+  font-weight: bold;
+  color: var(--primary-color);
+  font-size: 16px;
+}
+
+/* Responsive para estadísticas */
+@media (max-width: 768px) {
+  .chart-stats {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .stat-item {
+    justify-content: space-between;
+  }
+}
+
+.trips-stats-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 0;
+  margin-bottom: 16px;
+  flex-wrap: nowrap;
+}
+
+.trips-stats-row .stat-item {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 7px;
+  box-shadow: none;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 1rem;
+  color: #145a32;
+  font-weight: 500;
+  min-width: 170px;
+  width: 48%;
+  transition: background 0.2s, border 0.2s, color 0.2s;
+}
+
+.trips-stats-row .stat-item:first-child {
+  justify-content: flex-start;
+}
+.trips-stats-row .stat-item:last-child {
+  justify-content: flex-end;
+}
+
+.trips-made-stat.warning {
+  background: #fffbe6;
+  border-color: #ffc107;
+  color: #b8860b;
+}
+
+.trips-made-stat.danger {
+  background: #fff0f0;
+  border-color: #cb4335;
+  color: #cb4335;
+  font-weight: bold;
+}
+
+.trips-made-stat .stat-alert {
+  margin-left: 6px;
+  font-size: 1.2em;
+  color: #ffc107;
+  vertical-align: middle;
+  animation: pulse 1.2s infinite;
+}
+
+.trips-made-stat.warning .stat-alert {
+  color: #ffc107;
+  animation: blink-warning 1s infinite;
+}
+
+.trips-made-stat.danger .stat-alert {
+  color: #cb4335;
+  font-size: 1.3em;
+  animation: blink-danger 0.7s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+@keyframes blink-warning {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+@keyframes blink-danger {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.1; }
+}
+
+@media (max-width: 600px) {
+  .trips-stats-row {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+  }
+  .trips-stats-row .stat-item {
+    min-width: 0;
+    width: 48%;
+    justify-content: flex-start;
+  }
+} 

@@ -1,0 +1,24 @@
+.section-loader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  margin: 10px 0;
+}
+
+.section-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+.section-loading-text {
+  color: #666;
+  font-size: 14px;
+  margin: 0;
+  font-style: italic;
+} 

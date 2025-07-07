@@ -1,0 +1,612 @@
+/* Importar fuentes Roboto */
+@import '@fontsource/roboto/400.css';
+@import '@fontsource/roboto/700.css';
+
+/* Variables CSS globales */
+:root {
+  --primary-color: #145a32;
+  --secondary-color: #4caf50;
+  --accent-color: #c1c536;
+  --danger-color: #cb4335;
+  --background-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --container-bg: rgba(255, 255, 255, 0.95);
+  --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  --border-radius: 16px;
+  --transition: all 0.3s ease;
+  
+  /* Colores para categorías */
+  --drafting-color: #3498db;
+  --factory-color: #e67e22;
+  --site-color: #27ae60;
+  --management-color: #9b59b6;
+  --supervision-color: #f39c12;
+  --default-color: #95a5a6;
+  
+  /* Colores de estado */
+  --success-color: #27ae60;
+  --warning-color: #f39c12;
+  --info-color: #3498db;
+  --error-color: #e74c3c;
+}
+
+/* Reset y configuración base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  width: 100%;
+  min-width: 100%;
+}
+
+body {
+  font-family: 'Roboto', sans-serif;
+  background-color: #f9f9f9;
+  margin: 0;
+  padding: 0;
+  color: #145a32;
+  overflow-x: hidden;
+  width: 100%;
+  min-width: 100%;
+  background: linear-gradient(to bottom,#feb47b, #86a8e7, #91eae4);
+  background-attachment: fixed;
+  background-size: cover;
+}
+
+@keyframes gradientBG {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* Contenedor principal */
+.container {
+  padding: 20px;
+  width: 95%;
+  max-width: 1400px;
+  margin: 0 auto;
+  text-align: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  animation: fadeIn 1.5s ease-in-out;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Tipografía */
+h1 {
+  font-size: 36pt;
+  color: #145a32;
+  text-align: center;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #4caf50;
+  padding-bottom: 10px;
+  text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+h2, .accordion-header h2 {
+  font-size: 26pt !important;
+  color: #145a32 !important;
+  margin-top: 40px !important;
+  margin-bottom: 10px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  border-bottom: 2px solid #c1c536 !important;
+  padding-bottom: 5px !important;
+  font-weight: bold !important;
+  font-family: 'Roboto', sans-serif !important;
+  background: none !important;
+  box-shadow: none !important;
+  text-shadow: 1px 1px 5px rgba(0,0,0,0.1) !important;
+}
+
+h3 {
+  font-size: 20pt;
+  color: #4caf50;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
+}
+
+.container p, .container h2, .container h3 {
+  margin-bottom: 20px;
+}
+
+p {
+  font-size: 14pt;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+p strong {
+  font-weight: bold;
+}
+
+p i {
+  font-style: italic;
+  font-size: 18pt;
+}
+
+/* Estados de proyecto */
+.to-do {
+  color: #87CEEB;
+}
+
+.in-progress {
+  color: #FFA500;
+}
+
+.defects {
+  color: #FF6347;
+}
+
+.done {
+  color: #32CD32;
+}
+
+/* Barras de progreso */
+.progress-container {
+  width: 100%;
+  background-color: #e0e0e0;
+  border-radius: 5px;
+  height: 20px;
+  margin: 20px 0;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #4caf50;
+  border-radius: 5px;
+  text-align: center;
+  color: white;
+  font-weight: bold;
+  width: 0%;
+  animation: loadProgress 4s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
+  transition: background-color 0.3s ease;
+  max-width: 100%;
+}
+
+@keyframes loadProgress {
+  0% {
+    width: 0%;
+  }
+  80% {
+    width: var(--progress-width);
+  }
+  100% {
+    width: min(calc(var(--progress-width) + 5%), 100%);
+  }
+}
+
+.progress-bar:hover {
+  background-color: #2e7d32;
+}
+
+/* Emojis */
+.emoji {
+  font-size: 22px;
+  vertical-align: middle;
+  margin-right: 5px;
+  text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Contenedores de gráficos */
+.chart-container {
+  width: 100%;
+  height: auto;
+  margin: 20px 0;
+  overflow: hidden;
+  position: relative;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  animation: fadeIn 1.5s ease-in-out;
+  transition: height 0.3s ease-in-out;
+}
+
+.chart-container h3 {
+  font-size: 20pt;
+  color: #4caf50;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Accordion */
+.accordion {
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.accordion-item {
+  border-bottom: 1px solid #ccc;
+}
+
+.accordion-item:last-child {
+  border-bottom: none;
+}
+
+.accordion-header {
+  padding: 1rem;
+  cursor: pointer;
+  font-weight: bold;
+  position: relative;
+  transition: background-color 0.3s ease;
+}
+
+.accordion-header:hover {
+  background-color: #e0e0e0;
+}
+
+.accordion-body {
+  height: 0;
+  overflow: hidden;
+  padding: 0 1rem;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+}
+
+/* Clase para abrir un ítem del acordeón */
+.accordion-item.active .accordion-body {
+  max-height: none;
+  overflow: visible;
+  padding: 1rem;
+  height: auto;
+}
+
+.accordion-indicator {
+  display: inline-block;
+  position: relative;
+  margin-right: 10px;
+  transition: transform 0.3s ease;
+}
+
+.accordion-item.active .accordion-indicator {
+  transform: rotate(180deg);
+}
+
+/* Loading spinner */
+.loading-spinner {
+  display: none;
+  width: 50px;
+  height: 50px;
+  border: 5px solid rgba(0, 0, 0, 0.1);
+  border-top-color: #4caf50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto;
+  position: relative;
+  top: 20px;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Botones */
+button {
+  background-color: #145a32;
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 25px;
+  cursor: pointer;
+  margin: 10px;
+  transition: all 0.3s ease;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+button:hover {
+  background-color: #2e7d32;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+}
+
+button.active {
+  background-color: #4caf50;
+  border: 2px solid white;
+}
+
+/* Utilidades */
+.hidden {
+  display: none;
+}
+
+/* Estilos Generales para Ambas Tablas */
+#materialsTable, #materialsTable_details {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 25px 0;
+  font-size: 0.9em;
+  min-width: 400px;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: none;
+  text-align: center;
+}
+
+/* Cabeceras de Tabla */
+#materialsTable thead tr,
+#materialsTable_details thead tr {
+  background-color: #145a32;
+  color: white;
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+  text-transform: uppercase;
+  transform: translateZ(0);
+}
+
+/* Celdas y Cabeceras */
+#materialsTable th, #materialsTable td,
+#materialsTable_details th, #materialsTable_details td {
+  padding: 15px;
+  border-bottom: 1px solid #dddddd;
+}
+
+/* Filas */
+#materialsTable tbody tr:nth-of-type(even),
+#materialsTable_details tbody tr:nth-of-type(even) {
+  background-color: rgba(249, 249, 249, 0.5);
+}
+
+#materialsTable tbody tr:last-of-type,
+#materialsTable_details tbody tr:last-of-type {
+  border-bottom: 2px solid #145a32;
+}
+
+/* Estilo para filas de categoría */
+tr td.category {
+  background-color: #27a75e;
+  color: white;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  position: sticky;
+}
+
+/* Efecto hover para categorías */
+tr td.category:hover {
+  background-color: #32d87a;
+}
+
+/* Efecto hover para items */
+tr.item:hover td {
+  background-color: #32d87a;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Efecto hover MT para la columna Total */
+#materialsTable tr.item:hover td:nth-child(4) {
+  font-size: 1.7em; 
+  font-weight: bold;
+  color: #145a32;
+  transition: all 0.4s ease;
+}
+
+/* Efecto hover MTD para la columna Order */
+#materialsTable_details tr.item:hover td:nth-child(1){
+  font-size: 1.7em; 
+  font-weight: bold;
+  color: #145a32;
+  transition: all 0.4s ease;
+}
+
+/* Efecto hover MTD para la columna Total */
+#materialsTable_details tr.item:hover td:nth-child(6){
+  font-size: 1.7em; 
+  font-weight: bold;
+  color: #145a32;
+  transition: all 0.4s ease;
+}
+
+@media (max-width: 768px) {
+  .container {
+    width: 98%;
+    padding: 15px;
+    margin: 10px auto;
+  }
+  
+  h1 {
+    font-size: 24pt;
+  }
+  
+  h2, .accordion-header h2 {
+    font-size: 20pt !important;
+  }
+  
+  h3 {
+    font-size: 16pt;
+  }
+  
+  p {
+    font-size: 12pt;
+  }
+  
+  #materialsTable, #materialsTable_details {
+    font-size: 0.8em;
+    min-width: 300px;
+  }
+  
+  #materialsTable th, #materialsTable td,
+  #materialsTable_details th, #materialsTable_details td {
+    padding: 8px 4px;
+  }
+  
+  #materialsTablesContainer button {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    width: 100%;
+    padding: 10px;
+    margin: 5px auto;
+    border-radius: 5px;
+  }
+  
+  h1 {
+    font-size: 20pt;
+  }
+  
+  h2, .accordion-header h2 {
+    font-size: 18pt !important;
+  }
+  
+  h3 {
+    font-size: 14pt;
+  }
+  
+  p {
+    font-size: 11pt;
+  }
+  
+  #materialsTable, #materialsTable_details {
+    font-size: 0.7em;
+    min-width: 250px;
+  }
+  
+  #materialsTable th, #materialsTable td,
+  #materialsTable_details th, #materialsTable_details td {
+    padding: 6px 3px;
+  }
+  
+  #materialsTablesContainer button {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Animación de Entrada */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Estilos para project-info */
+.project-info {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.project-info p {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+/* Estilos para allowances-container */
+.allowances-container {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.allowances-container h2 {
+  text-align: center;
+}
+
+.allowances-container h3 {
+  text-align: center;
+}
+
+.allowances-container p {
+  text-align: center;
+}
+
+/* Estilos para materials-table-container */
+.materials-table-container {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.materials-table-container h2 {
+  text-align: center;
+}
+
+/* Estilos para chart-info */
+.chart-info {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.chart-info p {
+  text-align: center;
+  display: inline-block;
+  margin: 0 20px;
+}
+
+/* Estilos para chart-stats */
+.chart-stats {
+  text-align: center;
+  margin: 20px 0;
+}
+
+.chart-stats .stat-item {
+  display: inline-block;
+  margin: 0 20px;
+  text-align: center;
+}
+
+table tr { 
+  break-inside: avoid; 
+} 
+
+table td { 
+  overflow-wrap: anywhere; 
+} 
+
+.project-info em,
+.allowances-container em,
+.materials-table-container em,
+.chart-info em,
+.chart-stats em {
+  font-style: italic !important;
+}

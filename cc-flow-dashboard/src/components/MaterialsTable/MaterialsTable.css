@@ -1,0 +1,416 @@
+/* Estilos para MaterialsTable */
+
+.materials-table-container {
+  margin: 25px 0;
+  padding: 20px;
+  background: transparent;
+  border-radius: var(--border-radius);
+  animation: fadeIn 1.5s ease-in-out;
+  width: 100%;
+  overflow-x: auto;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Header */
+.materials-table-container h2 {
+  font-size: 26pt;
+  color: var(--primary-color);
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-bottom: 2px solid var(--accent-color);
+  padding-bottom: 5px;
+  text-align: left;
+}
+
+/* Botones de control */
+#materialsTablesContainer {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin: 25px 0;
+  flex-wrap: wrap;
+}
+
+#materialsTablesContainer button {
+  background-color: #145a32;
+  color: white;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 25px;
+  cursor: pointer;
+  margin: 10px;
+  transition: all 0.3s ease;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+#materialsTablesContainer button:hover {
+  background-color: #2e7d32;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+}
+
+#materialsTablesContainer button.active {
+  background-color: #4caf50;
+  border: 2px solid white;
+}
+
+
+
+/* Estilos Generales para Ambas Tablas */
+#materialsTable, #materialsTable_details {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 25px 0;
+  font-size: 0.9em;
+  min-width: 800px;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: none;
+  text-align: center;
+  table-layout: fixed;
+}
+
+/* Contenedor scrolleable para las tablas */
+.table-scroll-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.8);
+  margin: 25px 0;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #145a32;
+  border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #4caf50;
+}
+
+/* Cabeceras de Tabla */
+#materialsTable thead tr,
+#materialsTable_details thead tr {
+  background-color: #145a32;
+  color: white;
+  font-weight: bold;
+  position: sticky;
+  top: 0;
+  text-transform: uppercase;
+  transform: translateZ(0);
+}
+
+/* Estilos para emojis en cabeceras */
+#materialsTable thead th,
+#materialsTable_details thead th {
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+
+#materialsTable thead th span,
+#materialsTable_details thead th span {
+  font-size: 1.2em;
+  margin-right: 5px;
+}
+
+/* Celdas y Cabeceras */
+#materialsTable th, #materialsTable td,
+#materialsTable_details th, #materialsTable_details td {
+  padding: 15px;
+  border-bottom: 1px solid #dddddd;
+}
+
+/* Filas */
+#materialsTable tbody tr:nth-of-type(even),
+#materialsTable_details tbody tr:nth-of-type(even) {
+  background-color: rgba(249, 249, 249, 0.5);
+}
+
+#materialsTable tbody tr:last-of-type,
+#materialsTable_details tbody tr:last-of-type {
+  border-bottom: 2px solid #145a32;
+}
+
+/* Estilo para filas de categoría */
+tr td.category {
+  background-color: #27a75e;
+  color: white;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  position: sticky;
+}
+
+/* Efecto hover para categorías */
+tr td.category:hover {
+  background-color: #32d87a;
+}
+
+/* Efecto hover para items */
+tr.item:hover td {
+  background-color: #32d87a;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Efecto hover MT para la columna Total */
+#materialsTable tr.item:hover td:nth-child(4) {
+  font-size: 1.7em; 
+  font-weight: bold;
+  color: #145a32;
+  transition: all 0.4s ease;
+}
+
+/* Efecto hover MTD para la columna Order */
+#materialsTable_details tr.item:hover td:nth-child(1){
+  font-size: 1.7em; 
+  font-weight: bold;
+  color: #145a32;
+  transition: all 0.4s ease;
+}
+
+/* Efecto hover MTD para la columna Status */
+#materialsTable_details tr.item:hover td:nth-child(2){
+  font-size: 1.7em; 
+  font-weight: bold;
+  color: #145a32;
+  transition: all 0.4s ease;
+}
+
+/* Efecto hover MTD para la columna Quantity */
+#materialsTable_details tr.item:hover td:nth-child(8){
+  font-size: 1.7em; 
+  font-weight: bold;
+  color: #145a32;
+  transition: all 0.4s ease;
+}
+
+/* Estilos para badges de status */
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.delivered {
+  background-color: #4caf50;
+  color: white;
+}
+
+.status-badge.pending {
+  background-color: #ff9800;
+  color: white;
+}
+
+/* Loading spinner */
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid var(--secondary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .materials-table-container {
+    padding: 15px;
+    margin: 15px 0;
+  }
+  
+  #materialsTable {
+    font-size: 0.8em;
+    min-width: 600px;
+  }
+  
+  /* Tabla detailed optimizada para móviles */
+  #materialsTable_details {
+    font-size: 0.7em;
+    min-width: 900px;
+  }
+  
+  /* Columnas específicas para tabla detailed */
+  #materialsTable_details th:nth-child(1), /* Order */
+  #materialsTable_details td:nth-child(1) {
+    width: 60px;
+    min-width: 60px;
+  }
+  
+  #materialsTable_details th:nth-child(2), /* Status */
+  #materialsTable_details td:nth-child(2) {
+    width: 50px;
+    min-width: 50px;
+  }
+  
+  #materialsTable_details th:nth-child(3), /* Date */
+  #materialsTable_details td:nth-child(3) {
+    width: 80px;
+    min-width: 80px;
+  }
+  
+  #materialsTable_details th:nth-child(4), /* Name */
+  #materialsTable_details td:nth-child(4) {
+    width: 120px;
+    min-width: 120px;
+  }
+  
+  #materialsTable_details th:nth-child(5), /* Description */
+  #materialsTable_details td:nth-child(5) {
+    width: 150px;
+    min-width: 150px;
+  }
+  
+  #materialsTable_details th:nth-child(6), /* User Spec */
+  #materialsTable_details td:nth-child(6) {
+    width: 100px;
+    min-width: 100px;
+  }
+  
+  #materialsTable_details th:nth-child(7), /* Request by */
+  #materialsTable_details td:nth-child(7) {
+    width: 100px;
+    min-width: 100px;
+  }
+  
+  #materialsTable_details th:nth-child(8), /* Quantity */
+  #materialsTable_details td:nth-child(8) {
+    width: 60px;
+    min-width: 60px;
+  }
+  
+  #materialsTable th, #materialsTable td,
+  #materialsTable_details th, #materialsTable_details td {
+    padding: 8px 4px;
+  }
+  
+  #materialsTablesContainer button {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+  }
+  
+  .materials-table-container h2 {
+    font-size: 20pt;
+  }
+}
+
+@media (max-width: 480px) {
+  .materials-table-container {
+    padding: 10px;
+    margin: 10px 0;
+  }
+  
+  #materialsTable {
+    font-size: 0.7em;
+    min-width: 500px;
+  }
+  
+  /* Tabla detailed ultra compacta para pantallas muy pequeñas */
+  #materialsTable_details {
+    font-size: 0.6em;
+    min-width: 750px;
+  }
+  
+  /* Columnas aún más compactas */
+  #materialsTable_details th:nth-child(1), /* Order */
+  #materialsTable_details td:nth-child(1) {
+    width: 50px;
+    min-width: 50px;
+  }
+  
+  #materialsTable_details th:nth-child(2), /* Status */
+  #materialsTable_details td:nth-child(2) {
+    width: 40px;
+    min-width: 40px;
+  }
+  
+  #materialsTable_details th:nth-child(3), /* Date */
+  #materialsTable_details td:nth-child(3) {
+    width: 70px;
+    min-width: 70px;
+  }
+  
+  #materialsTable_details th:nth-child(4), /* Name */
+  #materialsTable_details td:nth-child(4) {
+    width: 100px;
+    min-width: 100px;
+  }
+  
+  #materialsTable_details th:nth-child(5), /* Description */
+  #materialsTable_details td:nth-child(5) {
+    width: 120px;
+    min-width: 120px;
+  }
+  
+  #materialsTable_details th:nth-child(6), /* User Spec */
+  #materialsTable_details td:nth-child(6) {
+    width: 80px;
+    min-width: 80px;
+  }
+  
+  #materialsTable_details th:nth-child(7), /* Request by */
+  #materialsTable_details td:nth-child(7) {
+    width: 80px;
+    min-width: 80px;
+  }
+  
+  #materialsTable_details th:nth-child(8), /* Quantity */
+  #materialsTable_details td:nth-child(8) {
+    width: 50px;
+    min-width: 50px;
+  }
+  
+  #materialsTable th, #materialsTable td,
+  #materialsTable_details th, #materialsTable_details td {
+    padding: 6px 3px;
+  }
+  
+  #materialsTablesContainer button {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
+  
+  .materials-table-container h2 {
+    font-size: 18pt;
+  }
+  
+  /* Mejorar legibilidad de texto pequeño */
+  #materialsTable_details td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+} 

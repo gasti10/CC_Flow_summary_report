@@ -1,0 +1,184 @@
+/* Optimizaciones específicas para dispositivos móviles */
+
+/* Mejoras generales para móviles */
+@media (max-width: 768px) {
+  /* Mejorar la legibilidad del texto */
+  body {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  /* Optimizar espaciado general */
+  * {
+    letter-spacing: 0.2px;
+  }
+  
+  /* Mejorar contraste y legibilidad */
+  .container {
+    background-color: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+  }
+  
+  /* Optimizar botones para touch */
+  button, .nav-link {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+  }
+  
+  /* Mejorar navegación táctil */
+  .nav-link {
+    border-radius: 8px;
+    margin: 2px;
+  }
+  
+  /* Optimizar tablas para scroll táctil */
+  .table-scroll-container {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  /* Mejorar indicadores visuales */
+  .nav-link:hover, .nav-link.active {
+    transform: scale(1.05);
+    transition: transform 0.2s ease;
+  }
+  
+  /* Optimizar gráficos para móviles */
+  .chart-container {
+    margin: 15px 0;
+  }
+  
+  /* Mejorar espaciado de secciones */
+  .accordion-body {
+    padding: 15px;
+  }
+  
+  /* Optimizar grid layouts */
+  .stats-grid,
+  .project-details-grid,
+  .allowances-grid,
+  .cutting-info-grid {
+    gap: 15px;
+  }
+}
+
+/* Optimizaciones para pantallas muy pequeñas */
+@media (max-width: 480px) {
+  /* Reducir aún más el espaciado */
+  .container {
+    padding: 10px;
+    margin: 5px;
+  }
+  
+  /* Optimizar header para pantallas muy pequeñas */
+  .main-header {
+    padding: 0.3rem;
+  }
+  
+  /* Hacer botones más compactos */
+  .nav-link {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    min-height: 36px;
+  }
+  
+  /* Optimizar tablas para pantallas muy pequeñas */
+  .table-scroll-container {
+    margin: 10px 0;
+  }
+  
+  /* Mejorar legibilidad de texto pequeño */
+  #materialsTable, #materialsTable_details {
+    font-size: 0.65em;
+  }
+  
+  /* Optimizar espaciado de elementos */
+  .materials-table-container {
+    padding: 10px;
+    margin: 10px 0;
+  }
+  
+  /* Mejorar contraste en elementos pequeños */
+  .status-badge {
+    font-size: 0.7em;
+    padding: 2px 6px;
+  }
+}
+
+/* Optimizaciones para orientación landscape en móviles */
+@media (max-width: 768px) and (orientation: landscape) {
+  .main-header {
+    flex-direction: row;
+    padding: 0.3rem 1rem;
+  }
+  
+  .header-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .nav-link {
+    flex-shrink: 0;
+  }
+}
+
+/* Mejoras de accesibilidad para móviles */
+@media (max-width: 768px) {
+  /* Mejorar focus visible */
+  button:focus,
+  .nav-link:focus {
+    outline: 2px solid #4caf50;
+    outline-offset: 2px;
+  }
+  
+  /* Mejorar contraste para mejor legibilidad */
+  .category {
+    background-color: #1e8449 !important;
+  }
+  
+  /* Optimizar hover states para touch */
+  tr.item:hover td {
+    background-color: rgba(76, 175, 80, 0.1);
+  }
+}
+
+/* Optimizaciones de rendimiento para móviles */
+@media (max-width: 768px) {
+  /* Reducir animaciones complejas */
+  .progress-bar {
+    animation-duration: 2s;
+  }
+  
+  /* Optimizar transiciones */
+  * {
+    transition-duration: 0.2s;
+  }
+  
+  /* Mejorar scroll performance */
+  .table-scroll-container {
+    will-change: scroll-position;
+  }
+}
+
+/* Mejoras específicas para tablets */
+@media (min-width: 481px) and (max-width: 1024px) {
+  .container {
+    width: 95%;
+    padding: 20px;
+  }
+  
+  .nav-link {
+    font-size: 1rem;
+    padding: 0.5rem 1rem;
+  }
+  
+  .chart-wrapper {
+    height: 400px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+} 

@@ -36,8 +36,15 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository
-          path: '.'
+          # Upload only static files from root, excluding cc-flow-dashboard
+          path: |
+            *.html
+            *.css
+            *.js
+            *.ico
+            fonts/
+            js/
+            !cc-flow-dashboard/
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

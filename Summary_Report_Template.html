@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta content="text/html; charset=UTF-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" type="text/css" href="styles.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/accordion-js/dist/accordion.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/accordion-js/dist/accordion.min.js"></script>
+    <script src="js/utility.js"></script>
+    <script src="js/accordion_setting.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+    <script src="js/trips_chart.js"></script>
+    <script src="js/sheets_chart.js"></script>
+    <script src="js/materials_table.js"></script>
+</head>
+
+<body>
+    <div class="container accordion" id="accordion">
+        <h1>PROJECT SUMMARY</h1>
+        <p><strong>Project:     </strong> <i id='projectName'>&lt;&lt;[Project]&gt;&gt;</i></p>
+        <p><strong>UPDATED AT:     </strong> <i>&lt;&lt;[Created at]&gt;&gt;</i></p>
+
+        <p><strong>Status:  </strong> 
+            <span class="&lt;&lt;
+                    IF([Project].[Status] = 'To Do','to-do', 
+                        IF([Project].[Status] = 'In Progress', 'in-progress',
+                            IF([Project].[Status] = 'Defects','defects',
+                                IF([Project].[Status] = 'Done','done','')
+                            )
+                        )
+                    )&gt;&gt;">
+                <i>&lt;&lt;[Project].[Status]&gt;&gt;</i>
+            </span>
+        </p>
+
+        <p><strong>Expected Start Date:</strong> <i>&lt;&lt;[Project].[Start Date]&gt;&gt;</i></p>
+        <p><strong>Expected Completion Date:    </strong> <i>&lt;&lt;[Project].[Expected Completion Date]&gt;&gt;</i></p>
+        <p><strong>Project Manager:     </strong> <i>&lt;&lt;[Project].[PM]&gt;&gt;</i></p>
+        <p><strong>Site Supervisor:     </strong> <i>&lt;&lt;[Project].[Site Supervisor]&gt;&gt;</i></p>
+        <p><strong>EBA/Non-EBA:     </strong> <i>&lt;&lt;[Project].[EBA/Non-EBA]&gt;&gt;</i></p>
+        
+        
+        <h2>Cutting Information</h2>
+
+        <p><span class="emoji">📐</span><strong>Expected Square Meters:     </strong> <i>&lt;&lt;[Project].[Expected Square Meters]&gt;&gt;</i></p>
+        <p><span class="emoji">✂️</span><strong>Real Cut Square Meters:     </strong> <i>&lt;&lt;[Project].[Real Cut Square Meters]&gt;&gt;</i></p>
+        <p><em>Note: The value of "Real Cut Square Meters" includes all square meters in the system, including panels that have not yet been cut or orders that are in "Ready to Cut" status.</em></p>
+
+
+        <!-- Barra de progreso -->
+        <div class="progress-container">
+            <div class="progress-bar" 
+                style="
+                    --progress-width: &lt;&lt;[Project].[Progress Percentage]&gt;&gt;%; 
+                    background-color: &lt;&lt;
+                        IF([Project].[Progress Percentage] &lt; 50, '#4caf50', 
+                            IF([Project].[Progress Percentage] &lt; 99, '#c1c536', '#cb4335')
+                        )&gt;&gt;">
+                &lt;&lt;[Project].[Progress Percentage]&gt;&gt;%
+            </div>
+        </div>
+        <div class="accordion-item">
+            <div class="accordion-header" id="sheets">
+                <h2><span class="accordion-indicator">⬇️</span>Sheets Overview<span class="accordion-indicator">⬇️</span></h2>
+            </div>
+            <div class="chart-container accordion-body">
+                <h3>Comparison of Purchased vs Used Sheets</h3>
+                <div class="loading-spinner" id="sheetsLoadingSpinner"></div>
+                <canvas id="sheetsChart"></canvas>
+            </div>
+        </div>
+
+        <h2>Project Allowances</h2>
+        
+        <h3>Drafting Allowances</h3>
+        <p><span class="emoji">✏️</span><strong>Drafting Allowances (days):     </strong> <i>&lt;&lt;ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Drafting')))&gt;&gt;</i></p>
+        <p><span class="emoji">📅</span><strong>Current days used:     </strong> <i>&lt;&lt;ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Drafting')))&gt;&gt;</i></p>
+        <!-- Barra de progreso -->
+        <div class="progress-container">
+            <div class="progress-bar" 
+                style="
+                    --progress-width: &lt;&lt;(ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Drafting')))/(ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Drafting')))))*100&gt;&gt;%; 
+                    background-color: &lt;&lt;
+                        IF((ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Drafting')))/(ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Drafting')))))*100 &lt; 50, '#4caf50', 
+                            IF((ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Drafting')))/(ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Drafting')))))*100 &lt; 99, '#c1c536', '#cb4335')
+                        )&gt;&gt;">
+                &lt;&lt;(ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Drafting')))/(ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Drafting')))))*100&gt;&gt;%
+            </div>
+        </div>
+        
+        <h3>Factory Allowances</h3>
+        <p><span class="emoji">🏭</span><strong>Factory Allowances (days):     </strong> <i>&lt;&lt;ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Labourers')))&gt;&gt;</i></p>
+        <p><span class="emoji">📅</span><strong>Current days used:     </strong> <i>&lt;&lt;ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Labourers')))&gt;&gt;</i></p>
+        <!-- Barra de progreso -->
+        <div class="progress-container">
+            <div class="progress-bar" 
+                style="
+                    --progress-width: &lt;&lt;(ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Labourers')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Labourers'))))*100&gt;&gt;%; 
+                    background-color: &lt;&lt;
+                        IF((ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Labourers')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Labourers'))))*100 &lt; 50, '#4caf50', 
+                            IF((ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Labourers')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Labourers'))))*100 &lt; 99, '#c1c536', '#cb4335')
+                        )&gt;&gt;">
+                &lt;&lt;(ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Labourers')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Factory', [Category] = 'Labourers'))))*100&gt;&gt;%
+            </div>
+        </div>
+
+        <h3>Site Allowances</h3>
+        <p><span class="emoji">👷</span><strong>Tradesman Allowances (days):     </strong><i>&lt;&lt;ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Tradesman')))&gt;&gt;</i></p>
+        <p><span class="emoji">📅</span><strong>Current days used:     </strong><i>&lt;&lt;ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Tradesman')))&gt;&gt;</i></p>
+        <!-- Barra de progreso -->
+        <div class="progress-container">
+            <div class="progress-bar" 
+                style="
+                    --progress-width: &lt;&lt;(ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Tradesman')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Tradesman'))))*100&gt;&gt;%; 
+                    background-color: &lt;&lt;
+                        IF((ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Tradesman')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Tradesman'))))*100 &lt; 50, '#4caf50', 
+                            IF((ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Tradesman')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Tradesman'))))*100 &lt; 99, '#c1c536', '#cb4335')
+                        )&gt;&gt;">
+                &lt;&lt;(ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Tradesman')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Tradesman'))))*100&gt;&gt;%
+            </div>
+        </div>
+        
+        <p><span class="emoji">👷️</span><strong>Labourers Allowances (days):     </strong> <i>&lt;&lt;ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Labourers')))&gt;&gt;</i></p>
+        <p><span class="emoji">📅</span><strong>Current days used:     </strong><i>&lt;&lt;ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Labourers')))&gt;&gt;</i></p>
+        <!-- Barra de progreso -->
+        <div class="progress-container">
+            <div class="progress-bar" 
+                style="
+                    --progress-width: &lt;&lt;(ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Labourers')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Labourers'))))*100&gt;&gt;%; 
+                    background-color: &lt;&lt;
+                        IF((ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Labourers')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Labourers'))))*100 &lt; 50, '#4caf50', 
+                            IF((ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Labourers')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Labourers'))))*100 &lt; 99, '#c1c536', '#cb4335')
+                        )&gt;&gt;">
+                &lt;&lt;(ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Labourers')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'Labourers'))))*100&gt;&gt;%
+            </div>
+        </div>
+        
+        
+        <p><span class="emoji">📋</span><strong>PMs Allowances (days):     </strong> <i>&lt;&lt;ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'PMs')))&gt;&gt;</i></p>
+        <p><span class="emoji">📅</span><strong>Current days used:     </strong><i>&lt;&lt;ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'PMs')))&gt;&gt;</i></p>
+        <!-- Barra de progreso -->
+        <div class="progress-container">
+            <div class="progress-bar" 
+                style="
+                    --progress-width: &lt;&lt;(ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'PMs')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'PMs'))))*100&gt;&gt;%; 
+                    background-color: &lt;&lt;
+                        IF((ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'PMs')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'PMs'))))*100 &lt; 50, '#4caf50', 
+                            IF((ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'PMs')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'PMs'))))*100 &lt; 99, '#c1c536', '#cb4335')
+                        )&gt;&gt;">
+                &lt;&lt;(ANY(SELECT(People Allowance[Days Used],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'PMs')))/ANY(SELECT(People Allowance[Days Allowed],AND(IN([allowance_id],[_THISROW].[Project].[Related People Allowances]),[Type] = 'Site', [Category] = 'PMs'))))*100&gt;&gt;%
+            </div>
+        </div>
+        
+        <p><span class="emoji">🚡</span><strong>Vertical Access Allowances (weeks):     </strong> <i>&lt;&lt;SELECT(Vertical_Access[Name],IN([vertical_ID],[_THISROW].[Project].[Related Vertical_Access]))&gt;&gt;</i></p>
+        
+        <h2>Material tables</h2>
+        <p id="materialOrderIDs" style="display:none;">&lt;&lt;SELECT(Orders[Order ID], [Project ID] = [_THISROW].[Project])&gt;&gt;</p>
+        <p id="materialOrderNumbers" style="display:none;">&lt;&lt;SELECT(Orders[Number], [Project ID] = [_THISROW].[Project])&gt;&gt;</p>
+        <p id="materialOrderDueDates" style="display:none;">&lt;&lt;SELECT(Orders[Due Date], [Project ID] = [_THISROW].[Project])&gt;&gt;</p>
+        
+        <div id="materialsTablesContainer">
+            <button id="btnSummary">📊 Summary Table</button>
+            <button id="btnDetails">📋 Detailed Table</button>
+        
+            <!-- Summary Table (MaterialsTable) -->
+            <table id="materialsTable" class="hidden">
+                <thead>
+                    <tr>
+                        <th colspan="4">Summary materials</th>
+                    </tr>
+                    <tr>
+                        <th>Name</th>
+                        <th>Sub Category</th>
+                        <th>Description</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody><!-- Data rows for summary will go here -->
+                </tbody>
+            </table>
+            <!-- Detailed Table (MaterialsTable_details) -->
+            <table id="materialsTable_details" class="hidden">
+                <thead>
+                    <tr>
+                        <th colspan="6">Summary detailed materials</th>
+                    </tr>
+                    <tr>
+                        <th>Order</th>
+                        <th>Date</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>User Specification</th>
+                        <th>Quantity</th>
+                    </tr>
+                </thead>
+                <tbody><!-- Data rows for detailed materials will go here -->
+                </tbody>
+            </table>
+        </div>
+        
+        <h2>Trips Over Time</h2>
+        <p><span class="emoji">🚚</span><strong>Delivery Allowances (trips):     </strong><i id="deliveryAllowances">&lt;&lt;[Project].[Deliveries Allowed]&gt;&gt;</i><span class="emoji">     -    📦</span><strong>Trips Made:     </strong> <i>&lt;&lt;COUNT([Project].[Related Delivery_Dockets])&gt;&gt;</i>
+        </p>
+        <p><em>These data are collected from the "Delivery Dockets" performed by the manufacturing team. You can view the detailed records by </em><a href="https://www.appsheet.com/start/efcdb2a0-181f-4e43-bc65-6887dc279032&lt;&lt;LINKTOFILTEREDVIEW('Delivery Dockets', [Project] = [_THISROW].[Project])&gt;&gt;" target="_blank">clicking here</a>.
+        </p>
+        <div class="chart-container">
+            <h3>Daily and Cumulative Trips</h3>
+            <p id="deliveryDates" style="display:none;">&lt;&lt;SELECT(Delivery_Dockets[Ready at], [Project]=[_THISROW].[Project])&gt;&gt;</p>
+            <canvas id="tripChart" width="400" height="200"></canvas>
+        </div>
+    </div>
+</body>
+</html>
