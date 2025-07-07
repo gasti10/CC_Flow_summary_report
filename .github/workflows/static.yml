@@ -1,20 +1,17 @@
 # Simple workflow for deploying static content to GitHub Pages
 # DISABLED - Using unified-deploy.yml instead
-name: Deploy static content to Pages (DISABLED)
+name: Deploy Static Files to GitHub Pages
 
 on:
   # Runs on pushes targeting the default branch
   push:
     branches: ["main"]
-    paths:
-      - '*.html'
-      - '*.css'
-      - '*.js'
-      - '*.ico'
-      - 'fonts/**'
-      - 'js/**'
-      - '!cc-flow-dashboard/**'
-
+    paths-ignore:
+      - 'dashboard/**'
+  pull_request:
+    branches: ["main"]
+    paths-ignore:
+      - 'dashboard/**'
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -27,26 +24,50 @@ permissions:
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
 concurrency:
-  group: "static-pages"
+  group: "pages"
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
-  deploy:
+  deploy-static:
+    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Filter static files
+        run: |
+          # Create a temporary directory for static files
+          mkdir -p static-files
+          
+          # Copy only static files, excluding dashboard
+          find . -maxdepth 1 -type f \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.ico" \) -exec cp {} static-files/ \;
+          
+          # Copy fonts and js directories if they exist
+          if [ -d "fonts" ]; then
+            cp -r fonts static-files/
+          fi
+          if [ -d "js" ]; then
+            cp -r js static-files/
+          fi
+          
+          # Copy any other static assets
+          if [ -f "styles.css" ]; then
+            cp styles.css static-files/
+          fi
+          
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v4
+        
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload only static files from root, excluding cc-flow-dashboard
-          path: '.'
+          path: './static-files'
+          
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

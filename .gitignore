@@ -7,9 +7,9 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 
-# NO ignorar archivos de paquetes en cc-flow-dashboard
-!cc-flow-dashboard/package.json
-!cc-flow-dashboard/package-lock.json
+# NO ignorar archivos de paquetes en dashboard
+!dashboard/package.json
+!dashboard/package-lock.json
 
 # Ignorar archivo de configuración de Vite
 vite.config.js

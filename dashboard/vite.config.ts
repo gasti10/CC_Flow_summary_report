@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react-swc'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/cc-flow-dashboard/',
+  base: '/CC_Flow_summary_report/dashboard/',
   server: {
     port: 3000,
     open: true
