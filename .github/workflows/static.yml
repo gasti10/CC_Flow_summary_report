@@ -1,6 +1,6 @@
 # Simple workflow for deploying static content to GitHub Pages
 # DISABLED - Using unified-deploy.yml instead
-name: Deploy Static Files to GitHub Pages
+name: Deploy Static Files to GitHub Pages (DISABLED)
 
 on:
   # Runs on pushes targeting the default branch
