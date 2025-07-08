@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { 
   useItemsData, 
   useProjectData, 
@@ -6,7 +6,7 @@ import {
   useProjectMaterials, 
   useProjectSheets
 } from '../../hooks/useProjectData'
-
+import { useUrlParams } from '../../hooks/useUrlParams'
 
 import SectionLoader from '../Common/SectionLoader'
 import ProjectSelectorComponent from '../Common/ProjectSelector'
@@ -32,6 +32,9 @@ const ProjectSummary: React.FC = () => {
   const [showDebugTools, setShowDebugTools] = useState<boolean>(false)
   const [showContact, setShowContact] = useState<boolean>(false)
   
+  // Hook para manejar parámetros de URL
+  const { projectParam } = useUrlParams()
+  
   // Cargar items en background (no bloquear renderizado)
   useItemsData()
   
@@ -44,7 +47,12 @@ const ProjectSummary: React.FC = () => {
   // Determinar si hay algún error general
   const hasError = projectError
 
-
+  // Efecto para sincronizar con parámetros de URL
+  useEffect(() => {
+    if (projectParam && projectParam !== selectedProjectName) {
+      setSelectedProjectName(projectParam)
+    }
+  }, [projectParam, selectedProjectName])
 
   const handleProjectSelect = (project: Project) => {
     setSelectedProjectName(project.Name)

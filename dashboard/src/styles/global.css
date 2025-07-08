@@ -8,7 +8,7 @@
   --secondary-color: #4caf50;
   --accent-color: #c1c536;
   --danger-color: #cb4335;
-  --background-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --background-gradient: linear-gradient(135deg, #feb47b 0%, #86a8e7 50%, #91eae4 100%);
   --container-bg: rgba(255, 255, 255, 0.95);
   --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   --border-radius: 16px;

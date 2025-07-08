@@ -108,7 +108,7 @@ const handleProjectChange = async (projectId: string) => {
 ```javascript
 // Ejemplo de integración
 const projectName = "Site Development";
-const dashboardUrl = `https://gaston.github.io/cc-flow-dashboard/#/?project=${encodeURIComponent(projectName)}`;
+const dashboardUrl = `https://gaston.github.io/dashboard/#/?project=${encodeURIComponent(projectName)}`;
 window.open(dashboardUrl, '_blank');
 ```
 
@@ -125,7 +125,7 @@ npm run generate-links
 Para generar enlaces manualmente:
 
 ```javascript
-const baseUrl = 'https://gaston.github.io/cc-flow-dashboard/#/?project=';
+const baseUrl = 'https://gaston.github.io/dashboard/#/?project=';
 const projectName = 'Mi Proyecto';
 const encodedProject = encodeURIComponent(projectName);
 const fullUrl = baseUrl + encodedProject;
