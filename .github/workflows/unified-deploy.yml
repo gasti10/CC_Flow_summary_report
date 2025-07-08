@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   detect-changes:
@@ -22,6 +22,7 @@ jobs:
     outputs:
       has-react-changes: ${{ steps.changes.outputs.react }}
       has-static-changes: ${{ steps.changes.outputs.static }}
+      deploy-type: ${{ steps.changes.outputs.deploy_type }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,20 +35,24 @@ jobs:
           # Check for React changes
           if git diff --name-only HEAD~1 | grep -q "^dashboard/"; then
             echo "react=true" >> $GITHUB_OUTPUT
+            echo "deploy_type=react" >> $GITHUB_OUTPUT
           else
             echo "react=false" >> $GITHUB_OUTPUT
           fi
           
-          # Check for static changes
+          # Check for static changes (only if no React changes)
           if git diff --name-only HEAD~1 | grep -E "\.(html|css|js|ico)$|fonts/|js/" | grep -v "^dashboard/"; then
             echo "static=true" >> $GITHUB_OUTPUT
+            if [ "${{ steps.changes.outputs.react }}" != "true" ]; then
+              echo "deploy_type=static" >> $GITHUB_OUTPUT
+            fi
           else
             echo "static=false" >> $GITHUB_OUTPUT
           fi
 
   deploy-react:
     needs: detect-changes
-    if: needs.detect-changes.outputs.has-react-changes == 'true'
+    if: needs.detect-changes.outputs.deploy-type == 'react'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -91,7 +96,7 @@ jobs:
 
   deploy-static:
     needs: detect-changes
-    if: needs.detect-changes.outputs.has-static-changes == 'true'
+    if: needs.detect-changes.outputs.deploy-type == 'static'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -100,7 +105,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v4
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
