@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react-swc'
 // Configuración específica para producción
 export default defineConfig({
   plugins: [react()],
-  base: '/cc-flow-dashboard/',
+  base: '/CC_Flow_summary_report/dashboard/',
   build: {
     outDir: 'dist',
     target: 'es2015',
