@@ -43,11 +43,29 @@ function App() {
   const [showContent, setShowContent] = useState(false);
   const [animationPhase, setAnimationPhase] = useState(0);
 
-  // Configurar basename para GitHub Pages
-  const basename = '/CC_Flow_summary_report/dashboard';
+  // Configurar basename dinámicamente según el entorno
+  const getBasename = () => {
+    // En desarrollo (localhost), no usar basename
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return '';
+    }
+    // En producción (GitHub Pages), usar el basename
+    return '/CC_Flow_summary_report';
+  };
   
-  // Ruta de la imagen para GitHub Pages
-  const logoPath = '/CC_Flow_summary_report/dashboard/CC-logo-NEW_1.webp';
+  const basename = getBasename();
+  
+  // Ruta de la imagen dinámicamente según el entorno
+  const getLogoPath = () => {
+    // En desarrollo (localhost), usar ruta relativa
+    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+      return '/CC-logo-NEW_1.webp';
+    }
+    // En producción (GitHub Pages), usar ruta completa
+    return '/CC_Flow_summary_report/CC-logo-NEW_1.webp';
+  };
+  
+  const logoPath = getLogoPath();
 
   // Efecto para manejar la animación de entrada dramática
   useEffect(() => {
