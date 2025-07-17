@@ -4,16 +4,28 @@
     <meta charset="utf-8">
     <title>CC Flow Dashboard</title>
     <script type="text/javascript">
-      // Redirección simple para SPA en GitHub Pages
+      // Redirección simple para SPA con HashRouter en GitHub Pages
       var l = window.location;
       var basePath = '/CC_Flow_summary_report/';
       
-      // Si no estamos en la ruta base, redirigir
-      if (l.pathname !== basePath && !l.pathname.startsWith(basePath)) {
-        l.replace(basePath + '?/' + l.pathname.slice(1) + l.search + l.hash);
+      // Obtener la ruta actual sin el dominio
+      var currentPath = l.pathname;
+      
+      // Si estamos en una ruta que no es la base
+      if (currentPath !== basePath && !currentPath.startsWith(basePath)) {
+        // Extraer la ruta después del nombre del repositorio
+        var repoPath = '/CC_Flow_summary_report';
+        var routePath = currentPath.replace(repoPath, '');
+        
+        // Redirigir a la base con la ruta como hash
+        if (routePath && routePath !== '/') {
+          l.replace(basePath + '#' + routePath + l.search);
+        } else {
+          l.replace(basePath + l.search);
+        }
       } else {
         // Si ya estamos en la ruta correcta, solo cargar la app
-        l.replace(basePath);
+        l.replace(basePath + l.search);
       }
     </script>
   </head>

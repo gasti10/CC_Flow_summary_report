@@ -1,11 +1,14 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import ErrorBoundary from './components/Common/ErrorBoundary'
 import './App.css'
 import ProgressiveLoader from './components/Common/ProgressiveLoader'
 import ProjectSummary from './components/ProjectSummary/ProjectSummary'
+import OrderDelivery from './components/OrderDelivery/OrderDelivery'
 import DataPreloader from './components/Common/DataPreloader'
+import LogoMenu from './components/Common/LogoMenu'
+import { getRouteConfig } from './config/routeConfig'
 import { useState, useEffect } from 'react'
 
 // Configurar QueryClient con optimizaciones
@@ -38,22 +41,15 @@ const scrollToSection = (id: string) => {
   }
 };
 
-function App() {
+// Componente interno para manejar la lógica de rutas
+function AppContent() {
+  const location = useLocation();
   const [isLoading, setIsLoading] = useState(true);
   const [showContent, setShowContent] = useState(false);
   const [animationPhase, setAnimationPhase] = useState(0);
-
-  // Configurar basename dinámicamente según el entorno
-  const getBasename = () => {
-    // En desarrollo (localhost), no usar basename
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return '';
-    }
-    // En producción (GitHub Pages), usar el basename
-    return '/CC_Flow_summary_report';
-  };
   
-  const basename = getBasename();
+  // Obtener configuración de la ruta actual
+  const currentRouteConfig = getRouteConfig(location.pathname);
   
   // Ruta de la imagen dinámicamente según el entorno
   const getLogoPath = () => {
@@ -67,87 +63,110 @@ function App() {
   
   const logoPath = getLogoPath();
 
+  // Definir elementos del menú
+  const menuItems = [
+    {
+      id: 'order-delivery',
+      label: 'Order Delivery',
+      path: '/order-delivery',
+      icon: '🚛'
+    }
+  ];
+
   // Efecto para manejar la animación de entrada dramática
   useEffect(() => {
-    // Fase 1: Oscuro (0-2s)
+    const { animationDuration } = currentRouteConfig;
+    
+    // Calcular tiempos de animación basados en la duración configurada
+    const phase1Time = animationDuration * 0.25;
+    const phase2Time = animationDuration * 0.5;
+    const phase3Time = animationDuration * 0.75;
+    const finalTime = animationDuration;
+    
     const phase1 = setTimeout(() => {
       setAnimationPhase(1);
-    }, 1000);
+    }, phase1Time);
 
-    // Fase 2: Naranja (2-4s)
     const phase2 = setTimeout(() => {
       setAnimationPhase(2);
-    }, 2000);
+    }, phase2Time);
 
-    // Fase 3: Oscuro (4-6s)
     const phase3 = setTimeout(() => {
       setAnimationPhase(3);
-    }, 3000);
+    }, phase3Time);
 
-    // Fase 4: Naranja (6-7.5s)
-    const phase4 = setTimeout(() => {
-      setAnimationPhase(4);
-    }, 4000);
-
-    // Final: Mostrar contenido (7.5s)
     const final = setTimeout(() => {
       setIsLoading(false);
       setTimeout(() => {
         setShowContent(true);
-      }, 500);
-    }, 4000);
+      }, 200);
+    }, finalTime);
 
     return () => {
       clearTimeout(phase1);
       clearTimeout(phase2);
       clearTimeout(phase3);
-      clearTimeout(phase4);
       clearTimeout(final);
     };
-  }, []);
+  }, [currentRouteConfig]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Router basename={basename}>
-        <div className={`App ${isLoading ? 'loading' : 'loaded'}`}>
-          <ErrorBoundary>
-            {/* Precargar datos en background */}
-            <DataPreloader />
-            
-            {/* Pantalla de carga inicial */}
-            {isLoading && (
-              <div className={`loading-screen phase-${animationPhase}`}>
-                <div className="loading-content">
-                  <img src={logoPath} alt="CC Logo" className="loading-logo" />
-                  <div className="loading-subtitle">Loading projects...</div>
-                </div>
+    <div className={`App ${isLoading ? 'loading' : 'loaded'}`}>
+      <ErrorBoundary>
+        {/* Precargar datos en background según configuración de ruta */}
+        {currentRouteConfig.showDataPreloader && <DataPreloader />}
+        
+        {/* Pantalla de carga inicial */}
+        {isLoading && (
+          <div className={`loading-screen phase-${animationPhase}`}>
+            <div className="loading-content">
+              <img src={logoPath} alt="CC Logo" className="loading-logo" />
+              <div className="loading-subtitle">
+                {currentRouteConfig.loadingText}
               </div>
-            )}
+            </div>
+          </div>
+        )}
 
-            {/* Contenido principal */}
-            {showContent && (
-              <>
-                <ProgressiveLoader>
-                  <header className="main-header">
-                    <div className="header-left">
-                      <img src={logoPath} alt="Decorative CC Logo" className="header-deco" />
-                    </div>
-                    <nav className="header-nav">
-                      {sections.map((section) => (
-                        <button key={section.id} className="nav-link" onClick={() => scrollToSection(section.id)}>
-                          {section.label}
-                        </button>
-                      ))}
-                    </nav>
-                  </header>
-                  <Routes>
-                    <Route path="/" element={<ProjectSummary />} />
-                  </Routes>
-                </ProgressiveLoader>
-              </>
-            )}
-          </ErrorBoundary>
-        </div>
+        {/* Contenido principal */}
+        {showContent && (
+          <>
+            <ProgressiveLoader>
+              <Routes>
+                <Route path="/" element={
+                  <>
+                    {currentRouteConfig.showHeader && (
+                      <header className="main-header">
+                        <div className="header-left">
+                          <LogoMenu logoPath={logoPath} menuItems={menuItems} />
+                        </div>
+                        <nav className="header-nav">
+                          {sections.map((section) => (
+                            <button key={section.id} className="nav-link" onClick={() => scrollToSection(section.id)}>
+                              {section.label}
+                            </button>
+                          ))}
+                        </nav>
+                      </header>
+                    )}
+                    <ProjectSummary />
+                  </>
+                } />
+                <Route path="/order-delivery" element={<OrderDelivery />} />
+              </Routes>
+            </ProgressiveLoader>
+          </>
+        )}
+      </ErrorBoundary>
+    </div>
+  )
+}
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <AppContent />
       </Router>
       
       <ReactQueryDevtools initialIsOpen={false} />

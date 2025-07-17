@@ -91,18 +91,41 @@ class AppSheetAPI {
       }
     }
     
-    const requestBody = {
-      Action: action,
-      Properties: {
-        Locale: 'en-AU',
-        Location: '-28.0167, 153.4000',
-        Timezone: 'E. Australia Standard Time',
-        ...requestProperties
-      },
-      Rows: requestRows
+    // Handle custom AppSheet Actions
+    let requestBody: Record<string, unknown>
+    if (action !== 'Find' && action !== 'Update' && action !== 'Add' && action !== 'Delete') {
+      // Custom action structure as per AppSheet documentation
+      requestBody = {
+        Action: action,
+        Properties: {
+          Locale: 'en-US',
+          Location: '-28.0167, 153.4000',
+          Timezone: 'E. Australia Standard Time',
+          ...requestProperties
+        },
+        Rows: requestRows
+      }
+    } else {
+      // Standard action structure
+      requestBody = {
+        Action: action,
+        Properties: {
+          Locale: 'en-AU',
+          Location: '-28.0167, 153.4000',
+          Timezone: 'E. Australia Standard Time',
+          ...requestProperties
+        },
+        Rows: requestRows
+      }
     }
 
     try {
+      /*console.log(`📤 Sending request to ${tableName}:`, {
+        url,
+        action,
+        requestBody
+      })*/
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -118,8 +141,33 @@ class AppSheetAPI {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      const data = await response.json()
-      return data as AppSheetResponse<T>
+      const responseText = await response.text()
+      //console.log(`📡 Raw response from ${tableName}:`, responseText)
+      
+      if (!responseText || responseText.trim() === '') {
+        console.warn(`⚠️ Empty response from ${tableName}`)
+        return [] as AppSheetResponse<T>
+      }
+
+      try {
+        const data = JSON.parse(responseText)
+        
+        // Handle different response structures
+        if (data.Rows && Array.isArray(data.Rows)) {
+          // Response has {Rows: [...]} structure
+          return data.Rows as AppSheetResponse<T>
+        } else if (Array.isArray(data)) {
+          // Response is directly an array
+          return data as AppSheetResponse<T>
+        } else {
+          // Single object response
+          return [data] as AppSheetResponse<T>
+        }
+      } catch (parseError) {
+        console.error(`❌ JSON parse error for ${tableName}:`, parseError)
+        console.error(`📄 Response text:`, responseText)
+        throw new Error(`Invalid JSON response from ${tableName}`)
+      }
     } catch (error) {
       console.error(`Error making request to ${tableName}:`, error)
       throw new Error(`Failed to fetch data from ${tableName}: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -550,6 +598,30 @@ class AppSheetAPI {
       return response
     } catch (error) {
       console.error('Error fetching people allowances:', error)
+      return []
+    }
+  }
+
+  // Mark order as delivered using AppSheet Action
+  async markOrderAsDelivered(orderId: string): Promise<Order[]> {
+    try {
+      console.log(`🔄 Marking order ${orderId} as delivered...`)
+      
+      // Use AppSheet Action to mark order as delivered in Orders cut table
+      const actionResponse = await this.makeRequest<Order>('Orders cut', 'Delivered', [{
+        'Order ID': orderId
+      }])
+
+      if (actionResponse && actionResponse.length > 0) {
+        console.log(`✅ Order ${orderId} marked as delivered successfully`)
+        console.log(`📋 Updated order details:`, actionResponse[0])
+        return actionResponse
+      } else {
+        console.error(`❌ Failed to mark order ${orderId} as delivered - empty response`)
+        return []
+      }
+    } catch (error) {
+      console.error(`Error marking order ${orderId} as delivered:`, error)
       return []
     }
   }
