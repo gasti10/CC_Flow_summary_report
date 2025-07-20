@@ -15,6 +15,8 @@ export const useUrlParams = (): UseUrlParamsReturn => {
   })
 
   const setProjectParam = useCallback((project: string | null) => {
+    // Evitar actualizaciones innecesarias si el valor no cambia
+    if (projectParam === project) return
     setProjectParamState(project)
     
     // Actualizar la URL
@@ -27,7 +29,7 @@ export const useUrlParams = (): UseUrlParamsReturn => {
     
     // Actualizar la URL sin recargar la página
     window.history.replaceState({}, '', url.toString())
-  }, [])
+  }, [projectParam])
 
   const updateUrlWithProject = useCallback((projectName: string) => {
     setProjectParam(projectName)

@@ -35,12 +35,12 @@ const ProjectSelectorComponent: React.FC<ProjectSelectorProps> = ({ onProjectSel
   useEffect(() => {
     if (projectParam && projects.length > 0) {
       const projectFromUrl = projects.find(p => p.Name === projectParam)
-      if (projectFromUrl) {
+      if (projectFromUrl && selectedProjectName !== projectParam) {
         setSelectedProjectName(projectParam)
         onProjectSelect(projectFromUrl)
       }
     }
-  }, [projectParam, projects, onProjectSelect])
+  }, [projectParam, projects, onProjectSelect, selectedProjectName])
 
   // Cerrar combobox al hacer clic fuera
   useEffect(() => {

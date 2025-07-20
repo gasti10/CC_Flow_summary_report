@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { 
   useItemsData, 
   useProjectData, 
@@ -35,6 +35,9 @@ const ProjectSummary: React.FC = () => {
   // Hook para manejar parámetros de URL
   const { projectParam } = useUrlParams()
   
+  // Ref para rastrear si ya se procesó el parámetro de URL inicial
+  const hasProcessedInitialParam = useRef(false)
+  
   // Cargar items en background (no bloquear renderizado)
   useItemsData()
   
@@ -47,12 +50,13 @@ const ProjectSummary: React.FC = () => {
   // Determinar si hay algún error general
   const hasError = projectError
 
-  // Efecto para sincronizar con parámetros de URL
+  // Efecto para sincronizar con parámetros de URL - solo una vez al inicio
   useEffect(() => {
-    if (projectParam && projectParam !== selectedProjectName) {
+    if (projectParam && !hasProcessedInitialParam.current) {
       setSelectedProjectName(projectParam)
+      hasProcessedInitialParam.current = true
     }
-  }, [projectParam, selectedProjectName])
+  }, [projectParam])
 
   const handleProjectSelect = (project: Project) => {
     setSelectedProjectName(project.Name)
