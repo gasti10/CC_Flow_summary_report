@@ -25,3 +25,9 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# Data
+data/
+
+# Apps Script files
+Apps_Script_Creator_of_Orders/

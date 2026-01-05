@@ -1,10 +1,16 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
+import tailwindcss from '@tailwindcss/vite'
 
 // Configuración específica para producción
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   base: '/CC_Flow_summary_report/',
+  css: {
+    postcss: {
+      plugins: []
+    }
+  },
   build: {
     outDir: 'dist',
     target: 'es2015',
