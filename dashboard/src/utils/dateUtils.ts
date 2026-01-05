@@ -57,4 +57,81 @@ export const formatDateTime = (dateString: string | undefined): string => {
     console.warn('Error formateando fecha y hora:', dateString, error);
     return dateString;
   }
+};
+
+/**
+ * Formatea un rango de fechas para mostrar
+ * @param startDate - Fecha de inicio
+ * @param endDate - Fecha de fin
+ * @returns String formateado del rango de fechas
+ */
+export const formatDateRange = (startDate: string, endDate: string): string => {
+  if (!startDate || !endDate) return 'N/A';
+  
+  try {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return `${startDate} - ${endDate}`;
+    }
+    
+    const startFormatted = formatDate(startDate);
+    const endFormatted = formatDate(endDate);
+    
+    return `${startFormatted} - ${endFormatted}`;
+  } catch (error) {
+    console.warn('Error formateando rango de fechas:', error);
+    return `${startDate} - ${endDate}`;
+  }
+};
+
+/**
+ * Obtiene la fecha de hace N días
+ * @param days - Número de días hacia atrás
+ * @returns Fecha en formato YYYY-MM-DD
+ */
+export const getDateDaysAgo = (days: number): string => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().split('T')[0];
+};
+
+/**
+ * Obtiene la fecha de hoy en formato YYYY-MM-DD
+ * @returns Fecha actual en formato YYYY-MM-DD
+ */
+export const getTodayDate = (): string => {
+  return new Date().toISOString().split('T')[0];
+};
+
+/**
+ * Obtiene el primer día del mes actual
+ * @returns Fecha en formato YYYY-MM-DD
+ */
+export const getFirstDayOfMonth = (): string => {
+  const date = new Date();
+  date.setDate(1);
+  return date.toISOString().split('T')[0];
+};
+
+/**
+ * Obtiene el primer día del mes anterior
+ * @returns Fecha en formato YYYY-MM-DD
+ */
+export const getFirstDayOfLastMonth = (): string => {
+  const date = new Date();
+  date.setMonth(date.getMonth() - 1);
+  date.setDate(1);
+  return date.toISOString().split('T')[0];
+};
+
+/**
+ * Obtiene el último día del mes anterior
+ * @returns Fecha en formato YYYY-MM-DD
+ */
+export const getLastDayOfLastMonth = (): string => {
+  const date = new Date();
+  date.setDate(0); // Último día del mes anterior
+  return date.toISOString().split('T')[0];
 }; 

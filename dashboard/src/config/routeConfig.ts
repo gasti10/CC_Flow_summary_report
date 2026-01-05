@@ -21,6 +21,34 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     showDataPreloader: false,
     loadingText: 'Loading...',
     showHeader: false
+  },
+  '/analytics': {
+    name: 'analytics',
+    animationDuration: 1200,
+    showDataPreloader: false,
+    loadingText: 'Loading CC Analytics...',
+    showHeader: false
+  },
+  '/login': {
+    name: 'login',
+    animationDuration: 0,
+    showDataPreloader: false,
+    loadingText: '',
+    showHeader: false
+  },
+  '/auth/callback': {
+    name: 'auth-callback',
+    animationDuration: 0,
+    showDataPreloader: false,
+    loadingText: '',
+    showHeader: false
+  },
+  '/creator-of-orders': {
+    name: 'creator-of-orders',
+    animationDuration: 1200,
+    showDataPreloader: false,
+    loadingText: 'Loading...',
+    showHeader: false
   }
 } as const;
 

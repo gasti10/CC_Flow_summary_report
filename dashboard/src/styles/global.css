@@ -2,31 +2,92 @@
 @import '@fontsource/roboto/400.css';
 @import '@fontsource/roboto/700.css';
 
-/* Variables CSS globales */
+/* Variables CSS globales - Tema Profesional Moderno */
 :root {
-  --primary-color: #145a32;
-  --secondary-color: #4caf50;
-  --accent-color: #c1c536;
-  --danger-color: #cb4335;
-  --background-gradient: linear-gradient(135deg, #feb47b 0%, #86a8e7 50%, #91eae4 100%);
-  --container-bg: rgba(255, 255, 255, 0.95);
-  --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  --border-radius: 16px;
-  --transition: all 0.3s ease;
+  /* Colores principales */
+  --primary-color: #1e3a8a;
+  --primary-light: #3b82f6;
+  --primary-dark: #1e40af;
+  --secondary-color: #059669;
+  --secondary-light: #10b981;
+  --accent-color: #f59e0b;
+  --accent-light: #fbbf24;
+  
+  /* Colores neutros */
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  
+  /* Colores semánticos */
+  --success-color: #10b981;
+  --success-light: #d1fae5;
+  --warning-color: #f59e0b;
+  --warning-light: #fef3c7;
+  --error-color: #ef4444;
+  --error-light: #fee2e2;
+  --info-color: #3b82f6;
+  --info-light: #dbeafe;
+  
+  /* Gradientes modernos */
+  --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  --gradient-error: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  --gradient-surface: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  --gradient-background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f0fdf4 100%);
+  
+  /* Sombras modernas */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* Bordes y radios */
+  --border-radius-sm: 6px;
+  --border-radius: 12px;
+  --border-radius-md: 16px;
+  --border-radius-lg: 20px;
+  --border-radius-xl: 24px;
+  
+  /* Transiciones */
+  --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Espaciado */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
   
   /* Colores para categorías */
-  --drafting-color: #3498db;
-  --factory-color: #e67e22;
-  --site-color: #27ae60;
-  --management-color: #9b59b6;
-  --supervision-color: #f39c12;
-  --default-color: #95a5a6;
+  --drafting-color: #3b82f6;
+  --factory-color: #f59e0b;
+  --site-color: #10b981;
+  --management-color: #8b5cf6;
+  --supervision-color: #ef4444;
+  --default-color: #6b7280;
   
-  /* Colores de estado */
-  --success-color: #27ae60;
-  --warning-color: #f39c12;
-  --info-color: #3498db;
-  --error-color: #e74c3c;
+  /* Colores de métricas */
+  --cut-color: #3b82f6;
+  --cut-light: #dbeafe;
+  --manufactured-color: #10b981;
+  --manufactured-light: #d1fae5;
 }
 
 /* Reset y configuración base */
@@ -44,16 +105,16 @@ html {
 
 body {
   font-family: 'Roboto', sans-serif;
-  background-color: #f9f9f9;
+  background: var(--gradient-background);
   margin: 0;
   padding: 0;
-  color: #145a32;
+  color: var(--gray-800);
   overflow-x: hidden;
   width: 100%;
   min-width: 100%;
-  background: linear-gradient(to bottom,#feb47b, #86a8e7, #91eae4);
   background-attachment: fixed;
   background-size: cover;
+  min-height: 100vh;
 }
 
 @keyframes gradientBG {

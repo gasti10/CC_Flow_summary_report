@@ -6,10 +6,16 @@ import './App.css'
 import ProgressiveLoader from './components/Common/ProgressiveLoader'
 import ProjectSummary from './components/ProjectSummary/ProjectSummary'
 import OrderDelivery from './components/OrderDelivery/OrderDelivery'
+import { Analytics } from './components/Analytics'
 import DataPreloader from './components/Common/DataPreloader'
 import LogoMenu from './components/Common/LogoMenu'
 import { getRouteConfig } from './config/routeConfig'
 import { useState, useEffect } from 'react'
+import { AuthProvider } from './context/AuthContext'
+import Login from './components/Auth/Login'
+import AuthCallback from './components/Auth/AuthCallback'
+import ProtectedRoute from './components/Auth/ProtectedRoute'
+import CreatorOfOrders from './components/CreatorOfOrders/CreatorOfOrders'
 
 // Configurar QueryClient con optimizaciones
 const queryClient = new QueryClient({
@@ -70,12 +76,25 @@ function AppContent() {
       label: 'Order Delivery',
       path: '/order-delivery',
       icon: '🚛'
+    },
+    {
+      id: 'analytics',
+      label: 'New Analytics',
+      path: '/analytics',
+      icon: '📈'
     }
   ];
 
   // Efecto para manejar la animación de entrada dramática
   useEffect(() => {
     const { animationDuration } = currentRouteConfig;
+    
+    // Saltar animaciones para rutas de autenticación
+    if (animationDuration === 0) {
+      setIsLoading(false);
+      setShowContent(true);
+      return;
+    }
     
     // Calcular tiempos de animación basados en la duración configurada
     const phase1Time = animationDuration * 0.25;
@@ -133,6 +152,7 @@ function AppContent() {
           <>
             <ProgressiveLoader>
               <Routes>
+                {/* Rutas públicas */}
                 <Route path="/" element={
                   <>
                     {currentRouteConfig.showHeader && (
@@ -153,6 +173,21 @@ function AppContent() {
                   </>
                 } />
                 <Route path="/order-delivery" element={<OrderDelivery />} />
+                <Route path="/analytics" element={<Analytics />} />
+                
+                {/* Rutas de autenticación */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
+                
+                {/* Rutas protegidas */}
+                <Route 
+                  path="/creator-of-orders" 
+                  element={
+                    <ProtectedRoute>
+                      <CreatorOfOrders />
+                    </ProtectedRoute>
+                  } 
+                />
               </Routes>
             </ProgressiveLoader>
           </>
@@ -165,11 +200,13 @@ function AppContent() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Router>
-        <AppContent />
-      </Router>
-      
-      <ReactQueryDevtools initialIsOpen={false} />
+      <AuthProvider>
+        <Router>
+          <AppContent />
+        </Router>
+        
+        <ReactQueryDevtools initialIsOpen={false} />
+      </AuthProvider>
     </QueryClientProvider>
   )
 }

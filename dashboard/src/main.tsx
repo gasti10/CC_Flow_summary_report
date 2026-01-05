@@ -2,7 +2,8 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 
-// Importar estilos en orden correcto
+// Importar estilos
+import './styles/tailwind.css'
 import './styles/global.css'
 import './styles/layout-optimizations.css'
 import './styles/mobile-optimizations.css'

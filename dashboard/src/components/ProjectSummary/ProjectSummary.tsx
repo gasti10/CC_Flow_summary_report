@@ -7,6 +7,7 @@ import {
   useProjectSheets
 } from '../../hooks/useProjectData'
 import { useUrlParams } from '../../hooks/useUrlParams'
+import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 
 import SectionLoader from '../Common/SectionLoader'
 import ProjectSelectorComponent from '../Common/ProjectSelector'
@@ -37,6 +38,9 @@ const ProjectSummary: React.FC = () => {
   
   // Ref para rastrear si ya se procesó el parámetro de URL inicial
   const hasProcessedInitialParam = useRef(false)
+
+  // Set dynamic document title
+  useDocumentTitle('CC Project Dashboard')
   
   // Cargar items en background (no bloquear renderizado)
   useItemsData()

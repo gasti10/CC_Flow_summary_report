@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useDocumentTitle } from '../../hooks/useDocumentTitle'
+import { getLogoPath, getFaviconPath } from '../../utils/assetUtils'
 import AppSheetAPI from '../../services/appsheetApi'
 import './OrderDelivery.css'
 
@@ -32,6 +34,9 @@ const OrderDelivery: React.FC = () => {
 
   const appSheetAPI = new AppSheetAPI()
 
+  // Set dynamic document title
+  useDocumentTitle('CC Delivery')
+
   // Determine watermark count based on screen size
   useEffect(() => {
     const updateWatermarkCount = () => {
@@ -48,21 +53,6 @@ const OrderDelivery: React.FC = () => {
     window.addEventListener('resize', updateWatermarkCount)
     return () => window.removeEventListener('resize', updateWatermarkCount)
   }, [])
-
-  // Get logo paths dynamically
-  const getLogoPath = () => {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return '/CC-logo-NEW_1.webp';
-    }
-    return '/CC_Flow_summary_report/CC-logo-NEW_1.webp';
-  };
-
-  const getFaviconPath = () => {
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      return '/favicon.png';
-    }
-    return '/CC_Flow_summary_report/favicon.png';
-  };
 
   // Validate Order ID format (XX-00)
   const validateOrderIdFormat = (id: string): boolean => {
