@@ -36,13 +36,6 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     loadingText: '',
     showHeader: false
   },
-  '/auth/callback': {
-    name: 'auth-callback',
-    animationDuration: 0,
-    showDataPreloader: false,
-    loadingText: '',
-    showHeader: false
-  },
   '/creator-of-orders': {
     name: 'creator-of-orders',
     animationDuration: 1200,

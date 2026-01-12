@@ -13,7 +13,6 @@ import { getRouteConfig } from './config/routeConfig'
 import { useState, useEffect } from 'react'
 import { AuthProvider } from './context/AuthContext'
 import Login from './components/Auth/Login'
-import AuthCallback from './components/Auth/AuthCallback'
 import ProtectedRoute from './components/Auth/ProtectedRoute'
 import CreatorOfOrders from './components/CreatorOfOrders/CreatorOfOrders'
 
@@ -79,7 +78,7 @@ function AppContent() {
     },
     {
       id: 'analytics',
-      label: 'New Analytics',
+      label: 'CC Analytics',
       path: '/analytics',
       icon: '📈'
     }
@@ -177,7 +176,6 @@ function AppContent() {
                 
                 {/* Rutas de autenticación */}
                 <Route path="/login" element={<Login />} />
-                <Route path="/auth/callback" element={<AuthCallback />} />
                 
                 {/* Rutas protegidas */}
                 <Route 

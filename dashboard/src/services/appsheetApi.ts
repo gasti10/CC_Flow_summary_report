@@ -12,6 +12,7 @@ import type {
   MaterialsData,
   EnrichedItemRequest,
 } from '../types/appsheet'
+import { supabaseApi } from './supabaseApi'
 
 interface AppSheetConfig {
   appId: string
@@ -193,33 +194,113 @@ class AppSheetAPI {
     })
   }
 
-  // Obtener todos los proyectos (datos completos para cache)
-  async getAllProjects(): Promise<Project[]> {
-    const cacheKey = 'all-projects'
-    const cached = this.getCachedData<Project[]>(cacheKey)
+  // Obtener todos los proyectos (estrategia híbrida: Supabase rápido + AppSheet completo)
+  async getAllProjects(options?: { forceAppSheet?: boolean }): Promise<Project[]> {
+    const CACHE_MAIN = 'all-projects'
+    const CACHE_APPSHEET = 'all-projects-appsheet'
+    const CACHE_SUPABASE = 'all-projects-supabase'
+    
+    // Si forceAppSheet, priorizar datos de AppSheet (desde cache o petición)
+    if (options?.forceAppSheet) {
+      // Verificar cache de AppSheet primero (instantáneo si ya respondió)
+      const cachedAppSheet = this.getCachedData<Project[]>(CACHE_APPSHEET)
+      if (cachedAppSheet && cachedAppSheet.length > 0) {
+        console.log('✅ Using cached AppSheet data (instant, no request)')
+        // Asegurar que all-projects tenga estos datos completos
+        this.setCachedData(CACHE_MAIN, cachedAppSheet)
+        return cachedAppSheet
+      }
+      
+      // Si no hay cache, hacer petición a AppSheet
+      console.log('🔄 Force fetching from AppSheet (no cache available)...')
+      try {
+        const response = await this.makeRequest<Project>('projects_dashboard_summary_slice', 'Find', [], {})
+        const projects: Project[] = response
+        this.setCachedData(CACHE_APPSHEET, projects)
+        this.setCachedData(CACHE_MAIN, projects)
+        console.log(`✅ Synced ${projects.length} projects from AppSheet`)
+        return projects
+      } catch (error) {
+        console.error('Error fetching from AppSheet:', error)
+        // Fallback: intentar usar cache principal si existe
+        const mainCache = this.getCachedData<Project[]>(CACHE_MAIN)
+        if (mainCache) return mainCache
+        return []
+      }
+    }
+    
+    // Comportamiento normal: verificar cache principal primero
+    const cached = this.getCachedData<Project[]>(CACHE_MAIN)
     if (cached) {
       console.log('✅ Using cached projects data')
       return cached
     }
 
-    try {
-      console.log('🔄 Fetching projects data from API...')
-      // Usar Selector para obtener todos los campos necesarios
-      const response = await this.makeRequest<Project>('projects_dashboard_summary_slice', 'Find', [], {})
-      const projects: Project[] = response
-      
-      // Cache por 15 minutos para proyectos
-      this.cache.set(cacheKey, {
-        data: projects,
-        timestamp: Date.now()
-      })
-      console.log(`✅ Cached ${projects.length} projects`)
-      
-      return projects
-    } catch (error) {
-      console.error('Error fetching all projects:', error)
+    // Iniciar ambas peticiones en paralelo
+    const supabasePromise = supabaseApi.getAllProjects().catch((error) => {
+      console.log('⚠️ Supabase getAllProjects failed:', error)
       return []
+    })
+    
+    const appsheetPromise = (async () => {
+      try {
+        console.log('🔄 Fetching projects from AppSheet API...')
+        const response = await this.makeRequest<Project>('projects_dashboard_summary_slice', 'Find', [], {})
+        const projects: Project[] = response
+        
+        // Actualizar cache de AppSheet
+        this.setCachedData(CACHE_APPSHEET, projects)
+        
+        // SIEMPRE actualizar cache principal con datos de AppSheet (completos)
+        this.setCachedData(CACHE_MAIN, projects)
+        
+        console.log(`✅ Cached ${projects.length} projects from AppSheet (complete data)`)
+        return projects
+      } catch (error) {
+        console.error('Error fetching projects from AppSheet:', error)
+        return []
+      }
+    })()
+
+    // Usar respuesta de Supabase si llega primero
+    try {
+      const supabaseProjects = await supabasePromise
+      
+      if (supabaseProjects && supabaseProjects.length > 0) {
+        console.log(`✅ Using ${supabaseProjects.length} projects from Supabase (fast response)`)
+        
+        // Actualizar cache de Supabase
+        this.setCachedData(CACHE_SUPABASE, supabaseProjects)
+        
+        // Solo actualizar cache principal SI está vacía
+        const mainCache = this.getCachedData<Project[]>(CACHE_MAIN)
+        if (!mainCache || mainCache.length === 0) {
+          this.setCachedData(CACHE_MAIN, supabaseProjects)
+        }
+        
+        // Continuar actualizando en background con AppSheet
+        appsheetPromise.catch(() => {
+          console.log('⚠️ Background AppSheet update failed')
+        })
+        
+        return supabaseProjects
+      }
+    } catch (error) {
+      console.log('⚠️ Supabase failed, waiting for AppSheet...', error)
     }
+
+    // Si Supabase falla, esperar AppSheet
+    try {
+      const appsheetProjects = await appsheetPromise
+      if (appsheetProjects && appsheetProjects.length > 0) {
+        console.log(`✅ Using ${appsheetProjects.length} projects from AppSheet (fallback)`)
+        return appsheetProjects
+      }
+    } catch (error) {
+      console.error('Error fetching projects from both sources:', error)
+    }
+
+    return []
   }
 
   // Obtener datos del proyecto desde el cache de getAllProjects (más rápido)
@@ -530,6 +611,49 @@ class AppSheetAPI {
       return processedSheets
     } catch (error) {
       console.error('Error fetching sheets:', error)
+      return []
+    }
+  }
+
+  // Obtener sheets simples pensado para Creator of Orders
+  async getSheetsByProject(projectName: string): Promise<Array<{
+    'Sheet ID': string
+    Dimension: string
+    Colour: string
+    'Quantity in Factory': number
+    'Quantity in Store': number
+    'Off Cut': string | boolean
+    Comment: string
+  }>> {
+    try {
+      console.log(`🔄 Fetching sheets from AppSheet for project: ${projectName}...`)
+      
+      // Obtener TODAS las sheets del proyecto (sin filtro de Off Cut)
+      const sheetsFilter = `Filter(Sheets, [Project]=${JSON.stringify(projectName)})`
+      
+      const sheetsResponse = await this.makeRequest<Sheet>('Sheets', 'Find', [], {
+        Selector: sheetsFilter
+      })
+
+      if (sheetsResponse.length === 0) {
+        console.log(`✅ No sheets found for project: ${projectName}`)
+        return []
+      }
+
+      // Mapear solo los campos necesarios para Step 2
+      const simpleSheets = sheetsResponse.map(sheet => ({
+        'Sheet ID': sheet['Sheet ID'] || '',
+        Dimension: sheet.Dimension || '',
+        Colour: sheet.Colour || '',
+        'Quantity in Factory': Number(sheet['Quantity in Factory']) || 0,
+        'Quantity in Store': Number(sheet['Quantity in Store']) || 0,
+        'Off Cut': sheet['Off Cut'] == 'Y' ? true : false,
+        Comment: sheet.Comment || ''
+      }))
+
+      return simpleSheets
+    } catch (error) {
+      console.error(`Error fetching sheets for project ${projectName}:`, error)
       return []
     }
   }

@@ -7,6 +7,8 @@ import type {
   OrderSummary,
   ProjectFilters
 } from '../types/supabase'
+import type { Project } from '../types/appsheet'
+import { supabaseClient } from './supabaseClient'
 
 interface SupabaseConfig {
   url: string
@@ -236,6 +238,146 @@ class SupabaseAPI {
     const data = await response.json()
     this.setCachedData(cacheKey, data)
     return data
+  }
+
+  // Obtener todos los proyectos desde Supabase (rápido, datos básicos)
+  async getAllProjects(): Promise<Project[]> {
+    const CACHE_SUPABASE = 'all-projects-supabase'
+    const CACHE_MAIN = 'all-projects'
+    
+    // Verificar cache de Supabase primero
+    const cached = this.getCachedData<Project[]>(CACHE_SUPABASE)
+    if (cached) {
+      console.log('✅ Using cached projects data from Supabase')
+      return cached
+    }
+
+    try {
+      console.log('🔄 Fetching projects from Supabase...')
+      // Query all columns but exclude results where Number is null
+      const { data, error } = await supabaseClient
+        .from('Projects')
+        .select('*')
+        .order('Name')
+        .not('Number', 'is', null)
+
+      if (error) throw error
+
+      // Mapear datos de Supabase al formato Project de AppSheet
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const projects: Project[] = (data || []).map((row: any) => ({
+        _RowNumber: undefined,
+        Name: row.Name || '',
+        Number: row.Number?.toString() || '',
+        Status: row.Status || '',
+        'Project ID': row['Project ID'] || '',
+        'Start Date': row['Start Date'] || '',
+        'Expected Completion Date': row['Expected Completion Date'] || '',
+        'Finalization Date': row['Finalization Date'] || '',
+        PM: row.PM || '',
+        'CC/Subcontractor': row['CC/Subcontractor'] || '',
+        'Site Supervisor': row['Site Supervisor'] || '',
+        'EBA/Non-EBA': row['EBA/Non-EBA'] || '',
+        Contact: row.Contact || '',
+        'Expected Square Meters': row['Expected Square Meters'] 
+          ? Number(row['Expected Square Meters']) 
+          : undefined,
+        'Deliveries Allowed': row['Deliveries Allowed'] 
+          ? Number(row['Deliveries Allowed']) 
+          : undefined,
+        'Allowed SQM to buy': row['Allowed SQM to buy'] 
+          ? Number(row['Allowed SQM to buy']) 
+          : undefined,
+        // Campos calculados de AppSheet (requieren datos de AppSheet)
+        // Estos se actualizarán en background cuando AppSheet responda
+        'Real Cut Square Meters': undefined,
+        'Real Cut Linear Meters': undefined,
+        'Total Orders': undefined,
+        'Total Materials': undefined,
+        'Total Sheets': undefined,
+        'Total Allowances': undefined,
+        'Total Deliveries': undefined,
+        'Total Inventory': undefined,
+        'Related Items Requests': undefined,
+        'Related Delivery_Dockets': undefined,
+        'Related People Allowances': undefined
+      }))
+
+      // Actualizar cache de Supabase
+      this.setCachedData(CACHE_SUPABASE, projects)
+      
+      // Solo actualizar cache principal SI está vacía
+      const mainCache = this.getCachedData<Project[]>(CACHE_MAIN)
+      if (!mainCache || mainCache.length === 0) {
+        this.setCachedData(CACHE_MAIN, projects)
+      }
+      
+      console.log(`✅ Cached ${projects.length} projects from Supabase`)
+      return projects
+    } catch (error) {
+      console.error('Error fetching projects from Supabase:', error)
+      return []
+    }
+  }
+
+  // Obtener órdenes de corte por proyecto desde la tabla 'Orders cut'
+  async getOrdersCutByProject(projectName: string): Promise<Array<{ 'Order ID': string }>> {
+    const cacheKey = `orders-cut-${projectName}`
+    const cached = this.getCachedData<Array<{ 'Order ID': string }>>(cacheKey)
+    if (cached) {
+      console.log(`✅ Using cached orders for project: ${projectName}`)
+      return cached
+    }
+
+    try {
+      console.log(`🔄 Fetching orders from Supabase for project: ${projectName}...`)
+      
+      // La tabla se llama 'Orders cut' (con espacio)
+      // Ordenar por Creation Date descendente (más reciente primero)
+      const { data, error } = await supabaseClient
+        .from('Orders cut')
+        .select('"Order ID", "Creation Date"')
+        .eq('Project', projectName)
+        .order('"Creation Date"', { ascending: false })
+
+      if (error) throw error
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const orders = (data || []).map((order: any) => ({
+        'Order ID': order['Order ID'] || ''
+      }))
+
+      this.setCachedData(cacheKey, orders)
+      console.log(`✅ Cached ${orders.length} orders for project: ${projectName} (sorted by Creation Date)`)
+      return orders
+    } catch (error) {
+      console.error(`Error fetching orders from Supabase for project ${projectName}:`, error)
+      return []
+    }
+  }
+
+  // Verificar si un Order ID ya existe en la tabla 'Orders cut'
+  async checkOrderIdExists(orderId: string): Promise<boolean> {
+    if (!orderId || !orderId.trim()) return false
+    
+    try {
+      const { data, error } = await supabaseClient
+        .from('Orders cut')
+        .select('"Order ID"')
+        .eq('Order ID', orderId.trim())
+        .limit(1)
+        .maybeSingle()
+
+      if (error) throw error
+      
+      // Si data es null, el Order ID no existe (válido)
+      // Si data existe, el Order ID ya existe (inválido)
+      return data !== null
+    } catch (error) {
+      console.error(`Error checking Order ID existence: ${orderId}`, error)
+      // En caso de error, asumimos que no existe para no bloquear al usuario
+      return false
+    }
   }
 
   // Limpiar cache

@@ -6,7 +6,11 @@ export interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
-  signInWithMagicLink: (email: string) => Promise<{ error: AuthError | null }>
+  sendOtp: (email: string) => Promise<{ error: AuthError | null }>
+  verifyOtp: (email: string, token: string) => Promise<{ 
+    data: { session: Session | null; user: User | null } | null
+    error: AuthError | null 
+  }>
   signOut: () => Promise<void>
 }
 

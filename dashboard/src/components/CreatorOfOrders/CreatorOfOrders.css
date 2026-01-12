@@ -1,24 +1,73 @@
+/* Estilos principales del Creator of Orders - Minimalista inspirado en Mode */
+
+/* Paleta de colores Mode-inspired con toques verdes */
+:root {
+  --mode-white: #ffffff;
+  --mode-gray-50: #f9fafb;
+  --mode-gray-100: #f3f4f6;
+  --mode-gray-200: #e5e7eb;
+  --mode-gray-300: #d1d5db;
+  --mode-gray-400: #9ca3af;
+  --mode-gray-500: #6b7280;
+  --mode-gray-600: #4b5563;
+  --mode-gray-700: #374151;
+  --mode-gray-800: #1f2937;
+  --mode-gray-900: #111827;
+  --mode-green-dark: #043F2E;
+  --mode-green-50: #f0fdf4;
+  --mode-green-100: #dcfce7;
+  --mode-green-200: #bbf7d0;
+  --mode-green-300: #86efac;
+  --mode-green-400: #4ade80;
+  --mode-green-500: #22c55e;
+  --mode-green-600: #16a34a;
+  --mode-green-700: #15803d;
+  --mode-green-800: #166534;
+  --mode-green-900: #14532d;
+  --mode-blue-50: #eff6ff;
+  --mode-blue-100: #dbeafe;
+  --mode-blue-500: #3b82f6;
+  --mode-blue-600: #2563eb;
+  --mode-blue-700: #1d4ed8;
+  --mode-red-500: #ef4444;
+  --mode-red-600: #dc2626;
+}
+
 .creator-of-orders {
   min-height: 100vh;
-  padding: 2rem;
-  background: var(--background-gradient, linear-gradient(135deg, #feb47b 0%, #86a8e7 50%, #91eae4 100%));
+  padding: 0;
+  background: var(--mode-gray-50);
+  background: linear-gradient(135deg, var(--mode-gray-50) 0%, #f0f9f5 100%);
 }
 
 .creator-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
-  padding: 1.5rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  margin-bottom: 0;
+  padding: 1.5rem 2rem;
+  background: var(--mode-white);
+  border-bottom: 2px solid var(--mode-green-dark, #043F2E);
+  box-shadow: none;
+}
+
+.creator-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.creator-logo {
+  height: 48px;
+  width: auto;
 }
 
 .creator-header h1 {
   margin: 0;
-  font-size: 2rem;
-  color: #1a202c;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--mode-gray-900);
+  letter-spacing: -0.02em;
 }
 
 .user-info {
@@ -28,33 +77,290 @@
 }
 
 .user-info span {
-  color: #4a5568;
-  font-weight: 500;
+  color: var(--mode-gray-600);
+  font-weight: 400;
+  font-size: 0.875rem;
 }
 
 .logout-button {
   padding: 0.5rem 1rem;
-  background: #e53e3e;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
+  background: var(--mode-white);
+  color: var(--mode-gray-700);
+  border: 1px solid var(--mode-gray-300);
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.875rem;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.15s ease;
 }
 
 .logout-button:hover {
-  background: #c53030;
+  background: var(--mode-gray-50);
+  border-color: var(--mode-gray-400);
+  color: var(--mode-gray-900);
 }
 
 .creator-content {
   padding: 2rem;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background: var(--mode-white);
+  max-width: 1400px;
+  margin: 0 auto;
+  border-left: 3px solid var(--mode-green-dark, #043F2E);
+  border-right: 3px solid var(--mode-green-dark, #043F2E);
 }
 
-.creator-content p {
-  color: #4a5568;
-  font-size: 1.125rem;
+/* Para Step 2, usar más espacio */
+.creator-content.step2-full-width {
+  max-width: 95%;
+  padding: 2rem 1.5rem;
+}
+
+.wizard-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Para Step 2, usar más espacio */
+.wizard-container.step2-full-width {
+  max-width: 100%;
+}
+
+/* Wizard Progress - Minimalista */
+.wizard-progress {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 3rem;
+  padding: 0;
+}
+
+.wizard-progress-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.wizard-progress-item:first-child {
+  flex: 0 0 auto;
+}
+
+.wizard-progress-item:last-child {
+  flex: 0 0 auto;
+}
+
+/* Líneas de conexión - Minimalistas */
+.wizard-progress-line-before,
+.wizard-progress-line-after {
+  flex: 1;
+  height: 1px;
+  background: var(--mode-gray-200);
+  position: relative;
+}
+
+.wizard-progress-line-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--mode-green-600);
+  transition: width 0.4s ease;
+}
+
+.wizard-progress-line-fill.completed {
+  width: 100%;
+}
+
+.wizard-progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 2;
+}
+
+.wizard-progress-step-number {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  background: var(--mode-white);
+  border: 1.5px solid var(--mode-gray-300);
+  color: var(--mode-gray-500);
+  flex-shrink: 0;
+}
+
+.wizard-progress-step.active .wizard-progress-step-number {
+  background: var(--mode-green-600);
+  border-color: var(--mode-green-600);
+  color: var(--mode-white);
+  box-shadow: none;
+}
+
+.wizard-progress-step.completed .wizard-progress-step-number {
+  background: var(--mode-green-600);
+  border-color: var(--mode-green-600);
+  color: var(--mode-white);
+}
+
+.wizard-progress-step-label {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  text-align: center;
+  color: var(--mode-gray-500);
+  transition: color 0.2s ease;
+  white-space: nowrap;
+  margin-top: 0.5rem;
+}
+
+.wizard-progress-step.active .wizard-progress-step-label {
+  color: var(--mode-gray-900);
+  font-weight: 500;
+}
+
+.wizard-progress-step.completed .wizard-progress-step-label {
+  color: var(--mode-gray-600);
+}
+
+/* Wizard Steps Container */
+.wizard-steps-container {
+  min-height: 400px;
+}
+
+/* Step Container Base - Minimalista */
+.step-container {
+  padding: 0;
+}
+
+.step-title {
+  margin: 0 0 0.5rem 0;
+  color: var(--mode-gray-900);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.step-description {
+  margin: 0 0 2rem 0;
+  color: var(--mode-gray-600);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+/* Wizard Navigation - Minimalista */
+.wizard-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 2rem;
+  border-top: 1px solid var(--mode-gray-200);
+  margin-top: 3rem;
+}
+
+.wizard-nav-button {
+  padding: 0.625rem 1.25rem;
+  border: 1px solid;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wizard-nav-button-prev {
+  background: var(--mode-white);
+  color: var(--mode-gray-700);
+  border-color: var(--mode-gray-300);
+}
+
+.wizard-nav-button-prev:hover:not(:disabled) {
+  background: var(--mode-gray-50);
+  border-color: var(--mode-gray-400);
+  color: var(--mode-gray-900);
+}
+
+.wizard-nav-button-next {
+  background: var(--mode-green-600);
+  color: var(--mode-white);
+  border-color: var(--mode-green-600);
+}
+
+.wizard-nav-button-next:hover:not(:disabled) {
+  background: var(--mode-green-700);
+  border-color: var(--mode-green-700);
+}
+
+.wizard-nav-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: var(--mode-gray-100);
+  border-color: var(--mode-gray-200);
+  color: var(--mode-gray-400);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .wizard-progress {
+    padding: 0;
+  }
+
+  .wizard-progress-step-label {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .creator-of-orders {
+    padding: 1rem;
+  }
+
+  .creator-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .creator-header-left {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .creator-logo {
+    height: 36px;
+  }
+
+  .creator-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .creator-content {
+    padding: 1rem;
+  }
+
+  .wizard-progress {
+    margin-bottom: 1rem;
+  }
+
+  .wizard-progress-step-number {
+    width: 32px;
+    height: 32px;
+    font-size: 0.875rem;
+  }
+
+  .wizard-progress-step-label {
+    display: none;
+  }
+
+  .wizard-navigation {
+    flex-direction: column-reverse;
+    gap: 1rem;
+  }
+
+  .wizard-nav-button {
+    width: 100%;
+  }
 }

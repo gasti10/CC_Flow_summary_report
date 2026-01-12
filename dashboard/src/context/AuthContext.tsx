@@ -34,27 +34,27 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return () => subscription.unsubscribe()
   }, [])
 
-  const signInWithMagicLink = async (email: string) => {
-    // Construir la URL de redirección según el entorno
-    let redirectUrl: string
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      // Desarrollo
-      redirectUrl = window.location.origin + '/#/auth/callback'
-    } else {
-      // Producción (GitHub Pages)
-      redirectUrl = 'https://gasti10.github.io/CC_Flow_summary_report/#/auth/callback'
-    }
-    
+  const sendOtp = async (email: string) => {
     const { error } = await supabaseClient.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: redirectUrl,
         // set this to false if you do not want the user to be automatically signed up
-        shouldCreateUser: false,
+        shouldCreateUser: true,
+        // NO incluir emailRedirectTo para OTP
       },
     })
 
     return { error }
+  }
+
+  const verifyOtp = async (email: string, token: string) => {
+    const { data, error } = await supabaseClient.auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
+    })
+
+    return { data, error }
   }
 
   const signOut = async () => {
@@ -67,7 +67,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     user,
     session,
     loading,
-    signInWithMagicLink,
+    sendOtp,
+    verifyOtp,
     signOut,
   }
 
