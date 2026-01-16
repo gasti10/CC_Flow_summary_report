@@ -7,10 +7,20 @@ import { useAuth } from '../../../hooks/useAuth'
 import { useLastOrder } from '../../../hooks/useLastOrder'
 import { useOrderIdValidation } from '../../../hooks/useOrderIdValidation'
 import AppSheetAPI from '../../../services/appsheetApi'
+import { supabaseApi } from '../../../services/supabaseApi'
 import LoadingSpinner from '../../Common/LoadingSpinner'
 import './Step1Order.css'
 
 const appSheetApi = new AppSheetAPI()
+
+interface OrderCut {
+  'Order ID': string
+  Status?: string
+  Priority?: string
+  'Creation Date'?: string
+  Responsable?: string
+  Colour?: string
+}
 
 // Opciones para Status
 const statusOptions = [
@@ -53,7 +63,6 @@ const getProgressBarColor = (percentage: number): string => {
 export function Step1Order() {
   const { formData, updateFormData, validation } = useWizard()
   const { user } = useAuth()
-  const [showContact, setShowContact] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const queryClient = useQueryClient()
   const [projectSearchTerm, setProjectSearchTerm] = useState('')
@@ -72,6 +81,14 @@ export function Step1Order() {
     if (!formData.project || !projects) return null
     return projects.find(p => p.Name === formData.project) || null
   }, [formData.project, projects])
+
+  // Obtener órdenes del proyecto seleccionado
+  const { data: projectOrders, isLoading: ordersLoading } = useQuery<OrderCut[]>({
+    queryKey: ['orders-by-project', formData.project],
+    queryFn: () => supabaseApi.getOrdersCutByProject(formData.project || ''),
+    enabled: !!formData.project,
+    staleTime: 5 * 60 * 1000
+  })
 
   // Filtrar proyectos basado en búsqueda
   const filteredProjects = useMemo(() => {
@@ -98,29 +115,22 @@ export function Step1Order() {
   const projectProgress = useMemo(() => {
     if (!selectedProject) return null
     const expected = Number(selectedProject['Expected Square Meters']) || 0
-    const allowed = Number(selectedProject['Allowed SQM to buy']) || 0
     const realCut = Number(selectedProject['Real Cut Square Meters']) || 0
     
-    // Si no hay expected ni allowed, no mostramos la barra
-    if (expected === 0 && allowed === 0) return null
+    // Si no hay expected, no mostramos la barra
+    if (expected === 0) return null
     
-    // Usar allowed como referencia si existe (siempre es mayor que expected)
-    const reference = allowed > 0 ? allowed : expected
+    // Usar expected como referencia
+    const reference = expected
     const percentage = reference > 0 ? (realCut / reference) * 100 : 0
-    
-    // Calcular porcentaje del expected dentro del allowed (para mostrar marca)
-    const expectedPercentageOfAllowed = allowed > 0 ? (expected / allowed) * 100 : 100
     
     return {
       expected,
-      allowed,
       realCut,
       reference,
       percentage: Math.min(percentage, 100), // Cap at 100% for display
       actualPercentage: percentage,
-      expectedPercentageOfAllowed,
       color: getProgressBarColor(realCut > 0 && expected > 0 ? (realCut / expected) * 100 : 0),
-      hasAllowed: allowed > 0,
       hasRealCut: realCut > 0
     }
   }, [selectedProject])
@@ -135,6 +145,20 @@ export function Step1Order() {
     formData.orderId,
     500 // debounce de 500ms
   )
+
+  // Actualizar el estado de validación en el wizard cuando cambie
+  const { setOrderIdIsValid } = useWizard()
+  
+  useEffect(() => {
+    setOrderIdIsValid(orderIdValid)
+  }, [orderIdValid, setOrderIdIsValid])
+
+  // Resetear la validación cuando el Order ID cambie
+  useEffect(() => {
+    if (!formData.orderId || formData.orderId.trim().length === 0) {
+      setOrderIdIsValid(null)
+    }
+  }, [formData.orderId, setOrderIdIsValid])
 
   // Auto-completar responsable con el email del usuario (parte antes del @)
   useEffect(() => {
@@ -320,7 +344,14 @@ export function Step1Order() {
               {stepValidation.errors.includes('The Order ID is required') && (
                 <span className="form-error">Required</span>
               )}
-              {orderIdValid === false && (
+              {stepValidation.errors.includes('Order ID already exists. Please use a different Order ID.') && (
+                <span className="form-error">This Order ID already exists.</span>
+              )}
+              {stepValidation.errors.includes('Please wait while we verify the Order ID availability') && (
+                <span className="form-error">Please wait while we verify the Order ID availability</span>
+              )}
+              {/* Fallback para mostrar error si orderIdValid es false pero no está en stepValidation.errors */}
+              {orderIdValid === false && !stepValidation.errors.some(e => e.includes('Order ID already exists')) && (
                 <span className="form-error">This Order ID already exists</span>
               )}
             </div>
@@ -418,7 +449,7 @@ export function Step1Order() {
                   <span className="info-icon">ℹ️</span>
                   Project Information
                 </h3>
-                <span className={`header-status-badge status-${selectedProject.Status?.toLowerCase().replace(' ', '-')}`}>
+                <span className={`header-status-badge status-${selectedProject.Status?.toLowerCase().replace(/\s+/g, '-')}`}>
                   {selectedProject.Status || 'N/A'}
                 </span>
               </div>
@@ -435,14 +466,6 @@ export function Step1Order() {
                     )}
                   </div>
                   <div className="progress-bar-container">
-                    {/* Marca del Expected (si hay allowed) */}
-                    {projectProgress.hasAllowed && (
-                      <div 
-                        className="progress-expected-marker"
-                        style={{ left: `${projectProgress.expectedPercentageOfAllowed}%` }}
-                        title={`Expected: ${projectProgress.expected} m²`}
-                      />
-                    )}
                     {/* Barra de progreso del Real Cut */}
                     <div 
                       className="progress-bar-fill"
@@ -474,12 +497,6 @@ export function Step1Order() {
                       <span className="stat-label">Expected:</span>
                       <span className="stat-value">{projectProgress.expected.toLocaleString()} m²</span>
                     </div>
-                    {projectProgress.hasAllowed && (
-                      <div className="progress-stat-row">
-                        <span className="stat-label">Allowed:</span>
-                        <span className="stat-value allowed">{projectProgress.allowed.toLocaleString()} m²</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -493,52 +510,84 @@ export function Step1Order() {
                   <span className="info-label">Site Supervisor</span>
                   <span className="info-value">{selectedProject['Site Supervisor'] || 'N/A'}</span>
                 </div>
-                <div className="info-item">
-                  <span className="info-label">CC/Subcontractor</span>
-                  <span className="info-value">{selectedProject['CC/Subcontractor'] || 'N/A'}</span>
-                </div>
-                <div className="info-item">
-                  <span className="info-label">EBA/Non-EBA</span>
-                  <span className="info-value">{selectedProject['EBA/Non-EBA'] || 'N/A'}</span>
-                </div>
                 {selectedProject['Total Orders'] !== undefined && Number(selectedProject['Total Orders']) > 0 && (
                   <div className="info-item">
                     <span className="info-label">Total Orders</span>
                     <span className="info-value highlight">{selectedProject['Total Orders']}</span>
                   </div>
                 )}
-                {selectedProject['Start Date'] && (
-                  <div className="info-item">
-                    <span className="info-label">Start Date</span>
-                    <span className="info-value">{formatDateDDMMYYYY(selectedProject['Start Date'])}</span>
+              </div>
+
+              {/* Project Orders Section */}
+              <div className="project-orders-section">
+                <h4 className="orders-section-title">
+                  <span className="orders-icon">📋</span>
+                  Project Orders
+                  {projectOrders && projectOrders.length > 0 && (
+                    <span className="orders-count">({projectOrders.length})</span>
+                  )}
+                </h4>
+                {ordersLoading ? (
+                  <div className="orders-loading">
+                    <LoadingSpinner />
+                    <span>Loading orders...</span>
                   </div>
-                )}
-                {selectedProject['Expected Completion Date'] && (
-                  <div className="info-item">
-                    <span className="info-label">Expected Completion</span>
-                    <span className="info-value">{formatDateDDMMYYYY(selectedProject['Expected Completion Date'])}</span>
+                ) : projectOrders && projectOrders.length > 0 ? (
+                  <div className="orders-list">
+                    {projectOrders
+                      .sort((a, b) => {
+                        const dateA = new Date(a['Creation Date'] || 0)
+                        const dateB = new Date(b['Creation Date'] || 0)
+                        return dateB.getTime() - dateA.getTime()
+                      })
+                      .slice(0, 10)
+                      .map((order) => (
+                        <div
+                          key={order['Order ID']}
+                          className={`order-item ${order['Order ID'] === formData.orderId ? 'current-order' : ''}`}
+                        >
+                          <div className="order-item-header">
+                            <span className="order-id">{order['Order ID']}</span>
+                            <span className={`order-status status-${order.Status?.toLowerCase().replace(/\s+/g, '-')}`}>
+                              {order.Status || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="order-item-details">
+                            {order.Priority && (
+                              <span className={`order-priority priority-${order.Priority.toLowerCase()}`}>
+                                {order.Priority}
+                              </span>
+                            )}
+                            {order.Colour && (
+                              <span className="order-colour">
+                                Colour: {order.Colour}
+                              </span>
+                            )}
+                            {order['Creation Date'] && (
+                              <span className="order-date">
+                                Created: {formatDateDDMMYYYY(order['Creation Date'])}
+                              </span>
+                            )}
+                            {order.Responsable && (
+                              <span className="order-responsable">
+                                Responsable: {order.Responsable}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    {projectOrders.length > 10 && (
+                      <div className="orders-footer">
+                        Showing 10 of {projectOrders.length} orders
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="orders-empty">
+                    <p>No orders found for this project</p>
                   </div>
                 )}
               </div>
-              
-              {/* Contact Section with Toggle */}
-              {selectedProject.Contact && (
-                <div className="project-contact-section">
-                  <button 
-                    className="contact-toggle-btn"
-                    onClick={() => setShowContact(!showContact)}
-                    type="button"
-                  >
-                    <span>📞 Contact Information</span>
-                    <span className="toggle-icon">{showContact ? '▼' : '▶'}</span>
-                  </button>
-                  {showContact && (
-                    <div className="contact-content">
-                      <pre className="contact-text">{selectedProject.Contact}</pre>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           ) : (
             <div className="project-info-placeholder">
@@ -548,6 +597,17 @@ export function Step1Order() {
           )}
         </div>
       </div>
+
+      {stepValidation.errors.length > 0 && (
+        <div className="step-validation-errors">
+          <p className="validation-title">Please correct the following errors:</p>
+          <ul>
+            {stepValidation.errors.map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

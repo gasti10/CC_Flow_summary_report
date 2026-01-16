@@ -321,7 +321,13 @@ class SupabaseAPI {
   }
 
   // Obtener órdenes de corte por proyecto desde la tabla 'Orders cut'
-  async getOrdersCutByProject(projectName: string): Promise<Array<{ 'Order ID': string }>> {
+  async getOrdersCutByProject(projectName: string): Promise<Array<{
+    'Order ID': string
+    Status?: string
+    Priority?: string
+    'Creation Date'?: string
+    Responsable?: string
+  }>> {
     const cacheKey = `orders-cut-${projectName}`
     const cached = this.getCachedData<Array<{ 'Order ID': string }>>(cacheKey)
     if (cached) {
@@ -336,7 +342,7 @@ class SupabaseAPI {
       // Ordenar por Creation Date descendente (más reciente primero)
       const { data, error } = await supabaseClient
         .from('Orders cut')
-        .select('"Order ID", "Creation Date"')
+        .select('"Order ID", "Creation Date", "Status", "Priority", "Responsable", "Colour"')
         .eq('Project', projectName)
         .order('"Creation Date"', { ascending: false })
 
@@ -344,7 +350,12 @@ class SupabaseAPI {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const orders = (data || []).map((order: any) => ({
-        'Order ID': order['Order ID'] || ''
+        'Order ID': order['Order ID'] || '',
+        Status: order['Status'] || '',
+        Priority: order['Priority'] || '',
+        Colour: order['Colour'] || '',
+        'Creation Date': order['Creation Date'] || '',
+        Responsable: order['Responsable'] || ''
       }))
 
       this.setCachedData(cacheKey, orders)
@@ -377,6 +388,129 @@ class SupabaseAPI {
       console.error(`Error checking Order ID existence: ${orderId}`, error)
       // En caso de error, asumimos que no existe para no bloquear al usuario
       return false
+    }
+  }
+
+  // Verificar paneles existentes en Supabase por nombre
+  async checkExistingPanels(panelNames: string[]): Promise<Array<{
+    Name: string
+    Order: string | null
+    Status: string | null
+  }>> {
+    if (panelNames.length === 0) return []
+
+    const cacheKey = this.getCacheKey('existing-panels', { names: panelNames.sort().join(',') })
+    const cached = this.getCachedData<Array<{ Name: string; Order: string | null; Status: string | null }>>(cacheKey)
+    if (cached) return cached
+
+    try {
+      const response = await supabaseClient
+        .from('Panels')
+        .select('Name, Order, Status')
+        .in('Name', panelNames)
+
+      if (response.error) {
+        throw new Error(`Supabase error: ${response.error.message}`)
+      }
+
+      const data = response.data || []
+      this.setCachedData(cacheKey, data)
+      return data
+    } catch (error) {
+      console.error('Error checking existing panels:', error)
+      throw error
+    }
+  }
+
+  // Crear orden de corte completa en Supabase (incluye panels)
+  async createOrderCut(
+    order: {
+      'Order ID': string
+      Project: string
+      Responsable: string
+      Status: string
+      Colour: string
+      Notification: boolean
+      'Creation Date': string
+    },
+    panels: Array<{
+      Name: string
+      Project: string
+      Status: string
+      Area: number
+      'Cut Distance': number
+      Order: string
+      'Creation Date': string
+      Comment: string
+      Image: string
+      Priority: string
+      'Nest Number': string
+      Sheet: string
+    }>
+  ): Promise<void> {
+    try {
+      // 1. Crear la orden
+      console.log(`🔄 Creating order cut in Supabase: ${order['Order ID']}`)
+      const { error: orderError } = await supabaseClient
+        .from('Orders cut')
+        .insert([order])
+
+      if (orderError) {
+        throw new Error(`Supabase error creating order: ${orderError.message}`)
+      }
+
+      console.log(`✅ Order cut created in Supabase`)
+
+      // 2. Crear panels
+      if (panels.length > 0) {
+        await this.createPanels(panels)
+      } else {
+        console.warn('⚠️ No panels to create for this order')
+      }
+    } catch (error) {
+      console.error('Error creating order cut in Supabase:', error)
+      throw error
+    }
+  }
+
+  // Crear paneles en Supabase (batch)
+  async createPanels(panels: Array<{
+    Name: string
+    Project: string
+    Status: string
+    Area: number
+    'Cut Distance': number
+    Order: string
+    'Creation Date': string
+    Comment: string
+    Image: string
+    Priority: string
+    'Nest Number': string
+    Sheet: string
+  }>): Promise<void> {
+    if (panels.length === 0) {
+      console.warn('⚠️ No panels to create')
+      return
+    }
+
+    try {
+      // Insertar en lotes si hay muchos paneles (Supabase tiene límite de 1000 por defecto)
+      const batchSize = 1000
+      for (let i = 0; i < panels.length; i += batchSize) {
+        const batch = panels.slice(i, i + batchSize)
+        const { error } = await supabaseClient
+          .from('Panels')
+          .insert(batch)
+
+        if (error) {
+          throw new Error(`Supabase error inserting panels batch ${Math.floor(i / batchSize) + 1}: ${error.message}`)
+        }
+      }
+
+      console.log(`✅ ${panels.length} panels created in Supabase`)
+    } catch (error) {
+      console.error('Error creating panels in Supabase:', error)
+      throw error
     }
   }
 

@@ -103,6 +103,76 @@
   color: #c53030;
 }
 
+.step-warning-message {
+  margin: 1rem 0;
+  padding: 1rem;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 8px;
+  color: #9a3412;
+}
+
+.step-warning-internal {
+  background: #fee2e2;
+  border-color: #fc8181;
+  color: #991b1b;
+}
+
+.step-warning-database {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #92400e;
+}
+
+.warning-title {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.warning-description {
+  font-size: 0.875rem;
+  margin: 0 0 0.75rem 0;
+  opacity: 0.9;
+}
+
+.step-warning-message ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.warning-more {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  opacity: 0.8;
+}
+
+.existing-panels-list {
+  margin-top: 0.75rem;
+}
+
+.existing-panel-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.625rem 0.75rem;
+  background: white;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.existing-panel-name {
+  font-weight: 600;
+  color: #dc2626;
+  font-size: 0.875rem;
+}
+
+.existing-panel-info {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
 .step3-preview {
   margin-top: 2rem;
   padding: 1.5rem;
@@ -175,10 +245,60 @@
   background: #f7fafc;
 }
 
+.preview-table tbody tr.panel-duplicate-row {
+  background: #fef2f2;
+}
+
+.preview-table tbody tr.panel-duplicate-row:hover {
+  background: #fee2e2;
+}
+
 .col-name {
   font-weight: 600;
   color: #1a202c;
   text-align: center;
+}
+
+.panel-name-duplicate {
+  color: #b91c1c;
+}
+
+.panel-duplicate-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+
+.panel-name-exists {
+  color: #dc2626;
+}
+
+.panel-exists-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 600;
+}
+
+.preview-table tbody tr.panel-exists-row {
+  background: #fffbeb;
+}
+
+.preview-table tbody tr.panel-exists-row:hover {
+  background: #fef3c7;
 }
 
 .col-number {
@@ -214,6 +334,8 @@
   padding-top: 1.5rem;
   border-top: 1px solid #e2e8f0;
   display: flex;
+  justify-content: center;
+  align-items: center;
   gap: 2rem;
   flex-wrap: wrap;
 }

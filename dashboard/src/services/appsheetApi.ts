@@ -8,6 +8,7 @@ import type {
   SheetInventory,
   PeopleAllowance,
   DeliveryDocket,
+  Document,
   AppSheetResponse,
   MaterialsData,
   EnrichedItemRequest,
@@ -83,7 +84,10 @@ class AppSheetAPI {
       })
       
       if (filterConditions.length > 0) {
-        const filterExpression = `Filter(${tableName}, AND(${filterConditions.join(', ')}))`
+        // Si hay un solo criterio, no usar AND()
+        const filterExpression = filterConditions.length === 1
+          ? `Filter(${tableName}, ${filterConditions[0]})`
+          : `Filter(${tableName}, AND(${filterConditions.join(', ')}))`
         requestProperties = {
           ...requestProperties,
           Selector: filterExpression
@@ -94,7 +98,7 @@ class AppSheetAPI {
     
     // Handle custom AppSheet Actions
     let requestBody: Record<string, unknown>
-    if (action !== 'Find' && action !== 'Update' && action !== 'Add' && action !== 'Delete') {
+    if (action !== 'Find' && action !== 'Edit' && action !== 'Add' && action !== 'Delete') {
       // Custom action structure as per AppSheet documentation
       requestBody = {
         Action: action,
@@ -747,6 +751,323 @@ class AppSheetAPI {
     } catch (error) {
       console.error(`Error marking order ${orderId} as delivered:`, error)
       return []
+    }
+  }
+
+  // Get documents by project
+  async getDocumentsByProject(projectName: string): Promise<Document[]> {
+    try {
+      console.log(`🔄 Fetching documents for project: ${projectName}...`)
+      
+      // Construir el filtro manualmente (sin AND porque es un solo criterio)
+      const documentsFilter = `Filter(Documents, [Project]=${JSON.stringify(projectName)})`
+      
+      const response = await this.makeRequest<Document>('Documents', 'Find', [], {
+        Selector: documentsFilter
+      })
+
+      if (response && response.length > 0) {
+        console.log(`✅ Found ${response.length} documents for project ${projectName}`)
+        return response
+      } else {
+        console.log(`ℹ️ No documents found for project ${projectName}`)
+        return []
+      }
+    } catch (error) {
+      console.error(`Error fetching documents for project ${projectName}:`, error)
+      return []
+    }
+  }
+
+  // Add a document to the Documents table
+  async addDocument(document: {
+    file: File
+    'Project': string
+    'Name': string
+    'Orders': string
+    'Comments'?: string
+    'Category'?: string
+  }): Promise<Document[]> {
+    try {
+      console.log(`🔄 Adding document to AppSheet...`)
+      
+      // Importar el servicio de upload dinámicamente para evitar dependencias circulares
+      const { uploadDocumentToDrive } = await import('./uploadService')
+      
+      // 1. Subir archivo a Google Drive
+      console.log(`📤 Uploading file to Google Drive...`)
+      const filePath = await uploadDocumentToDrive(
+        document.file,
+        document['Project'],
+        document['Orders'],
+        document['Name']
+      )
+      
+      console.log(`✅ File uploaded to Drive: ${filePath}`)
+      
+      // 2. Crear registro en AppSheet con la ruta del archivo
+      console.log(`💾 Saving document record in AppSheet...`)
+      const response = await this.makeRequest<Document>('Documents', 'Add', [{
+        'Project': document['Project'],
+        'Name': document['Name'],
+        'File': filePath,
+        'Orders': document['Orders'],
+        'Comments': document['Comments'] || '',
+        'Category': document['Category'] || '',
+      }])
+
+      if (response && response.length > 0) {
+        console.log(`✅ Document added successfully`)
+        return response
+      } else {
+        console.error(`❌ Failed to add document - empty response`)
+        return []
+      }
+    } catch (error) {
+      console.error(`Error adding document:`, error)
+      throw error
+    }
+  }
+
+  // Update document to link it to an order
+  async linkDocumentToOrder(documentId: string, orderId: string): Promise<Document[]> {
+    try {
+      console.log(`🔄 Linking document ${documentId} to order ${orderId}...`)
+      
+      // First, get the current document
+      const currentDoc = await this.makeRequest<Document>('Documents', 'Find', [{
+        'Document ID': documentId
+      }])
+
+      if (!currentDoc || currentDoc.length === 0) {
+        throw new Error(`Document with ID ${documentId} not found`)
+      }
+
+      const doc = currentDoc[0]
+      const currentOrders = doc['Orders'] || ''
+      
+      // Parse the current orders - Orders is stored as comma-separated string
+      let ordersList: string[] = []
+      
+      if (currentOrders) {
+        if (typeof currentOrders === 'string') {
+          // Parse comma-separated string into array
+          ordersList = currentOrders
+            .split(',')
+            .map((id: string) => id.trim())
+            .filter((id: string) => id.length > 0)
+        } else if (Array.isArray(currentOrders)) {
+          // If it comes as array, convert to string array
+          ordersList = (currentOrders as unknown[])
+            .map((id: unknown) => String(id).trim())
+            .filter((id: string) => id.length > 0)
+        }
+      }
+      
+      // Ensure orderId is clean
+      const cleanOrderId = orderId.trim()
+      
+      // Add the new order ID if it doesn't already exist
+      if (cleanOrderId && !ordersList.includes(cleanOrderId)) {
+        ordersList.push(cleanOrderId)
+      }
+      
+      // Convert back to comma-separated string (as Orders field is text type, not EnumList Ref)
+      const updatedOrders = ordersList.join(',')
+      
+      // Update the document - AppSheet Edit requires key fields
+      // Orders is a text field storing comma-separated values, not an EnumList Ref
+      const editPayload = {
+        'Document ID': documentId,
+        'Orders': updatedOrders, // Send as comma-separated string
+        'Comments': doc['Comments'] || '',
+        'Category': doc['Category'] || ''
+      }
+      
+      const response = await this.makeRequest<Document>('Documents', 'Edit', [editPayload])
+
+      if (response && response.length > 0) {
+        console.log(`✅ Document ${documentId} linked to order ${orderId} successfully`)
+        return response
+      } else {
+        console.error(`❌ Failed to link document - empty response`)
+        return []
+      }
+    } catch (error) {
+      console.error(`Error linking document to order:`, error)
+      throw error
+    }
+  }
+
+  // Crear stages en AppSheet (batch)
+  async createStages(stages: Array<{
+    Order: string
+    Action: string
+    'Quality Control': boolean
+  }>): Promise<unknown[]> {
+    if (stages.length === 0) {
+      console.warn('⚠️ No stages to create')
+      return []
+    }
+
+    try {
+      console.log(`🔄 Creating ${stages.length} stages in AppSheet...`)
+      const response = await this.makeRequest<unknown>('Stages Order', 'Add', stages)
+
+      if (response && response.length > 0) {
+        console.log(`✅ ${response.length} stages created successfully in AppSheet`)
+        return response
+      } else {
+        console.error(`❌ Failed to create stages - empty response`)
+        return []
+      }
+    } catch (error) {
+      console.error('Error creating stages in AppSheet:', error)
+      throw error
+    }
+  }
+
+  // Crear paneles en AppSheet (batch)
+  async createPanels(panels: Array<{
+    Name: string
+    Project: string
+    Status: string
+    Area: number
+    'Cut Distance': number
+    Order: string
+    'Creation Date': string
+    Comment: string
+    Image: string
+    Priority: string
+    'Nest Number': string
+    Sheet: string
+  }>): Promise<unknown[]> {
+    if (panels.length === 0) {
+      console.warn('⚠️ No panels to create')
+      return []
+    }
+
+    try {
+      console.log(`🔄 Creating ${panels.length} panels in AppSheet...`)
+      const response = await this.makeRequest<unknown>('Panels', 'Add', panels)
+
+      if (response && response.length > 0) {
+        console.log(`✅ ${response.length} panels created successfully in AppSheet`)
+        return response
+      } else {
+        console.error(`❌ Failed to create panels - empty response`)
+        return []
+      }
+    } catch (error) {
+      console.error('Error creating panels in AppSheet:', error)
+      throw error
+    }
+  }
+
+  // Crear solo la orden de corte en AppSheet (sin stages ni panels)
+  async addOrderCut(order: {
+    'Order ID': string
+    Project: string
+    Responsable: string
+    Status: string
+    Colour: string
+    Notification: boolean
+    'Creation Date': string
+  }): Promise<unknown[]> {
+    try {
+      console.log(`🔄 Creating order cut in AppSheet: ${order['Order ID']}`)
+      const response = await this.makeRequest<unknown>('Orders cut', 'Add', [order])
+
+      if (!response || response.length === 0) {
+        throw new Error('Failed to create order cut in AppSheet - empty response')
+      }
+
+      console.log(`✅ Order cut created successfully in AppSheet`)
+      return response
+    } catch (error) {
+      console.error('Error creating order cut in AppSheet:', error)
+      throw error
+    }
+  }
+
+  // Crear orden de corte completa en AppSheet (incluye stages y panels)
+  async createOrderCut(
+    order: {
+      'Order ID': string
+      Project: string
+      Responsable: string
+      Status: string
+      Colour: string
+      Notification: boolean
+      'Creation Date': string
+    },
+    stages: Array<{
+      Order: string
+      Action: string
+      'Quality Control': boolean
+    }>,
+    panels: Array<{
+      Name: string
+      Project: string
+      Status: string
+      Area: number
+      'Cut Distance': number
+      Order: string
+      'Creation Date': string
+      Comment: string
+      Image: string
+      Priority: string
+      'Nest Number': string
+      Sheet: string
+    }>
+  ): Promise<{
+    order: unknown[]
+    stages: unknown[]
+    panels: unknown[]
+  }> {
+    try {
+      console.log(`🔄 Creating order cut in AppSheet: ${order['Order ID']}`)
+
+      // 1. Crear la orden
+      console.log(`📝 Creating order...`)
+      const orderResponse = await this.makeRequest<unknown>('Orders cut', 'Add', [order])
+
+      if (!orderResponse || orderResponse.length === 0) {
+        throw new Error('Failed to create order in AppSheet - empty response')
+      }
+
+      console.log(`✅ Order created successfully in AppSheet`)
+
+      // 2. Crear stages
+      console.log(`📝 Creating stages...`)
+      let stagesResponse: unknown[] = []
+      try {
+        stagesResponse = await this.createStages(stages)
+      } catch (error) {
+        console.error('⚠️ Error creating stages, but continuing:', error)
+        // Continuar aunque falle stages
+      }
+
+      // 3. Crear panels
+      console.log(`📝 Creating panels...`)
+      let panelsResponse: unknown[] = []
+      try {
+        panelsResponse = await this.createPanels(panels)
+      } catch (error) {
+        console.error('⚠️ Error creating panels, but continuing:', error)
+        // Continuar aunque falle panels
+      }
+
+      console.log(`✅ Order cut creation completed in AppSheet`)
+
+      return {
+        order: orderResponse,
+        stages: stagesResponse,
+        panels: panelsResponse
+      }
+    } catch (error) {
+      console.error('Error creating order cut in AppSheet:', error)
+      throw error
     }
   }
 }

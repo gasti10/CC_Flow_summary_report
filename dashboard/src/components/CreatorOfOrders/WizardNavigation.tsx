@@ -4,7 +4,7 @@ import { useWizard } from './useWizard'
 import './CreatorOfOrders.css'
 
 export function WizardNavigation() {
-  const { currentStep, previousStep, nextStep, validateStep, isLoading } = useWizard()
+  const { currentStep, previousStep, nextStep, validateStep, isLoading, validation } = useWizard()
 
   const handleNext = () => {
     if (validateStep(currentStep)) {
@@ -17,7 +17,9 @@ export function WizardNavigation() {
   }
 
   const isFirstStep = currentStep === 1
-  const isLastStep = currentStep === 4
+  const isLastStep = currentStep === 5
+  const isCurrentStepValid = validation[`step${currentStep}`]?.isValid ?? false
+  const disableNext = isLoading || !isCurrentStepValid
 
   return (
     <div className="wizard-navigation">
@@ -34,7 +36,7 @@ export function WizardNavigation() {
         <button
           type="button"
           onClick={handleNext}
-          disabled={isLoading}
+          disabled={disableNext}
           className="wizard-nav-button wizard-nav-button-next"
         >
           Next

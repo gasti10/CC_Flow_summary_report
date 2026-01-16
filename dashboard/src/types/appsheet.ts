@@ -133,6 +133,19 @@ export interface DeliveryDocket {
   'Related Panels': string
 }
 
+export interface Document {
+  _RowNumber?: string
+  'Document ID': string
+  'Project': string
+  'Name': string
+  'File': string
+  'Created at': string
+  'Orders': string
+  'Comments': string
+  'Image': string
+  'Category': string
+}
+
 export interface VerticalAccess {
   _RowNumber: string
   'Access ID': string

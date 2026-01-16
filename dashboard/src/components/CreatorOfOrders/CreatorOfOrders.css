@@ -302,6 +302,13 @@
   color: var(--mode-gray-400);
 }
 
+.wizard-nav-button-next:disabled {
+  opacity: 1;
+  background: #f8d7da;
+  border-color: #f5c2c7;
+  color: #842029;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .wizard-progress {

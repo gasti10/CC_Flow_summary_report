@@ -134,4 +134,35 @@ export const getLastDayOfLastMonth = (): string => {
   const date = new Date();
   date.setDate(0); // Último día del mes anterior
   return date.toISOString().split('T')[0];
-}; 
+};
+
+/**
+ * Obtiene la fecha/hora actual en timezone de Brisbane, Australia
+ * Formato: "yyyy-MM-dd HH:mm:ss"
+ * @returns Fecha y hora en formato "yyyy-MM-dd HH:mm:ss" en timezone de Brisbane
+ */
+export function getBrisbaneDateTime(): string {
+  const now = new Date();
+  
+  // Convertir a timezone de Brisbane usando Intl.DateTimeFormat
+  const formatter = new Intl.DateTimeFormat('en-AU', {
+    timeZone: 'Australia/Brisbane',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  
+  const parts = formatter.formatToParts(now);
+  const year = parts.find(p => p.type === 'year')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const day = parts.find(p => p.type === 'day')?.value;
+  const hour = parts.find(p => p.type === 'hour')?.value;
+  const minute = parts.find(p => p.type === 'minute')?.value;
+  const second = parts.find(p => p.type === 'second')?.value;
+  
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+} 

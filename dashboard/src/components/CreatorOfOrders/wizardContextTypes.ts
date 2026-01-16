@@ -14,6 +14,7 @@ export interface WizardContextType {
   isLoading: boolean
   error: string | null
   success: boolean
+  orderIdIsValid: boolean | null // null = no validado, true = válido (no existe), false = inválido (existe)
 
   // Acciones
   updateFormData: (data: Partial<OrderFormData>) => void
@@ -25,6 +26,7 @@ export interface WizardContextType {
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   setSuccess: (success: boolean) => void
+  setOrderIdIsValid: (isValid: boolean | null) => void
 }
 
 export const WizardContext = createContext<WizardContextType | undefined>(undefined)

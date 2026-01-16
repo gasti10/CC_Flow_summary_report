@@ -5,9 +5,10 @@ import './CreatorOfOrders.css'
 
 const steps = [
   { number: 1, label: 'Order Information' },
-  { number: 2, label: 'Sheets Selection' },
-  { number: 3, label: 'Panels Import' },
-  { number: 4, label: 'Review & Create' }
+  { number: 2, label: 'Panels Import' },
+  { number: 3, label: 'Sheets Selection' },
+  { number: 4, label: 'Upload Documents' },
+  { number: 5, label: 'Review & Create' }
 ]
 
 export function WizardProgress() {

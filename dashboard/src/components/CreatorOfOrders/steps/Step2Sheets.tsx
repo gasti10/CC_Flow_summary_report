@@ -1,6 +1,6 @@
-// Step 2: Sheets Selection
+// Step 3: Sheets Selection
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useWizard } from '../useWizard'
@@ -11,21 +11,187 @@ import './Step2Sheets.css'
 
 const appSheetApi = new AppSheetAPI()
 
+type DeducedSheet = {
+  dimension: string
+  qty: number
+}
+
+type SheetRow =
+  | { type: 'header'; key: string; label: string }
+  | { type: 'subheader'; key: string; label: string }
+  | { type: 'sheet'; key: string; sheet: SimpleSheet }
+
+const getBestSheetOption = (options: SimpleSheet[]): SimpleSheet | null => {
+  if (options.length === 0) return null
+  return options.reduce((best, current) => {
+    const bestQty = Number(best['Quantity in Factory']) || 0
+    const currentQty = Number(current['Quantity in Factory']) || 0
+    return currentQty > bestQty ? current : best
+  }, options[0])
+}
+
 export function Step2Sheets() {
   const { formData, updateFormData, validation } = useWizard()
-  const [offCutFilter, setOffCutFilter] = useState<string>('all') // 'all', 'yes', 'no'
+  const [offCutFilter, setOffCutFilter] = useState<string>('all')
   const [dimensionFilter, setDimensionFilter] = useState<string>('all')
   const [colourFilter, setColourFilter] = useState<string>('all')
+  const [focusedDimension, setFocusedDimension] = useState<string | null>(null)
+  const ignoredDimensions = useMemo(
+    () => new Set(formData.ignoredSheetDimensions || []),
+    [formData.ignoredSheetDimensions]
+  )
 
-  // Obtener sheets del proyecto usando el nuevo método
   const { data: sheets, isLoading: sheetsLoading } = useQuery({
     queryKey: ['sheets-by-project', formData.project],
     queryFn: () => appSheetApi.getSheetsByProject(formData.project || ''),
     enabled: !!formData.project,
-    staleTime: 0 // Sin cache, siempre obtener datos frescos
+    staleTime: 0
   })
 
-  // Obtener valores únicos para los filtros
+  const deducedSheets = useMemo<DeducedSheet[]>(() => {
+    const map = new Map<string, Set<string>>()
+
+    formData.panels.forEach((panel) => {
+      const dimension = panel.sheetName?.trim()
+      if (!dimension) return
+      const nest = panel.nestNumber?.trim()
+      if (!map.has(dimension)) {
+        map.set(dimension, new Set())
+      }
+      if (nest) {
+        map.get(dimension)?.add(nest)
+      } else {
+        map.get(dimension)?.add(`${panel.name}-${map.get(dimension)?.size || 0}`)
+      }
+    })
+
+    return Array.from(map.entries())
+      .map(([dimension, nests]) => ({
+        dimension,
+        qty: nests.size
+      }))
+      .sort((a, b) => a.dimension.localeCompare(b.dimension))
+  }, [formData.panels])
+
+  const visibleDeducedSheets = useMemo(
+    () => deducedSheets.filter((sheet) => !ignoredDimensions.has(sheet.dimension)),
+    [deducedSheets, ignoredDimensions]
+  )
+
+  const sheetsByDimension = useMemo(() => {
+    const map = new Map<string, SimpleSheet[]>()
+    if (!sheets) return map
+
+    sheets.forEach((sheet) => {
+      if (!sheet.Dimension) return
+      if (!map.has(sheet.Dimension)) {
+        map.set(sheet.Dimension, [])
+      }
+      map.get(sheet.Dimension)?.push(sheet)
+    })
+
+    return map
+  }, [sheets])
+
+  const suggestedSelections = useMemo(() => {
+    return visibleDeducedSheets
+      .map((deduced) => {
+        const options = sheetsByDimension.get(deduced.dimension) || []
+        if (options.length === 0) return null
+        const best = getBestSheetOption(options)
+        if (!best) return null
+        return {
+          dimension: deduced.dimension,
+          sheet: best,
+          qty: deduced.qty,
+          isSuggested: options.length > 1
+        }
+      })
+      .filter(Boolean) as Array<{
+      dimension: string
+      sheet: SimpleSheet
+      qty: number
+      isSuggested: boolean
+    }>
+  }, [visibleDeducedSheets, sheetsByDimension])
+
+  useEffect(() => {
+    // Si no hay detecciones, no hacer nada - dejar que el usuario seleccione manualmente
+    if (visibleDeducedSheets.length === 0) {
+      return
+    }
+
+    const nextSelected: SelectedSheet[] = []
+    const deducedDimensions = new Set(
+      visibleDeducedSheets.map((sheet) => sheet.dimension)
+    )
+
+    const suggestedByDimension = new Map(
+      suggestedSelections.map((selection) => [selection.dimension, selection])
+    )
+
+    visibleDeducedSheets.forEach((deduced) => {
+      const existing = formData.selectedSheets.find(
+        (sheet) => sheet.dimension === deduced.dimension
+      )
+
+      if (existing) {
+        nextSelected.push({
+          ...existing,
+          qty: existing.qty > 0 ? existing.qty : deduced.qty
+        })
+        return
+      }
+
+      const suggested = suggestedByDimension.get(deduced.dimension)
+      if (suggested) {
+        const sheet = suggested.sheet
+        nextSelected.push({
+          sheetId: sheet['Sheet ID'],
+          dimension: sheet.Dimension || deduced.dimension,
+          colour: sheet.Colour || '',
+          qty: suggested.qty,
+          sheetData: sheet
+        })
+      }
+    })
+
+    // Preservar selecciones manuales que NO corresponden a dimensiones detectadas
+    const preservedSelections = formData.selectedSheets.filter(
+      (sheet) => !deducedDimensions.has(sheet.dimension)
+    )
+
+    nextSelected.push(...preservedSelections)
+
+    const normalizedCurrent = formData.selectedSheets.map((sheet) => ({
+      sheetId: sheet.sheetId,
+      dimension: sheet.dimension,
+      colour: sheet.colour,
+      qty: sheet.qty
+    }))
+    const normalizedNext = nextSelected.map((sheet) => ({
+      sheetId: sheet.sheetId,
+      dimension: sheet.dimension,
+      colour: sheet.colour,
+      qty: sheet.qty
+    }))
+
+    if (JSON.stringify(normalizedCurrent) !== JSON.stringify(normalizedNext)) {
+      updateFormData({ selectedSheets: nextSelected })
+    }
+  }, [visibleDeducedSheets, sheetsByDimension, suggestedSelections, formData.selectedSheets, updateFormData])
+
+  useEffect(() => {
+    if (!formData.ignoredSheetDimensions?.length) return
+    const detected = new Set(deducedSheets.map((sheet) => sheet.dimension))
+    const filtered = formData.ignoredSheetDimensions.filter((dimension) =>
+      detected.has(dimension)
+    )
+    if (filtered.length !== formData.ignoredSheetDimensions.length) {
+      updateFormData({ ignoredSheetDimensions: filtered })
+    }
+  }, [deducedSheets, formData.ignoredSheetDimensions, updateFormData])
+
   const uniqueDimensions = useMemo(() => {
     if (!sheets) return []
     const dimensions = new Set(sheets.map(s => s.Dimension).filter(Boolean))
@@ -38,24 +204,20 @@ export function Step2Sheets() {
     return Array.from(colours).sort()
   }, [sheets])
 
-  // Filtrar sheets
   const filteredSheets = useMemo(() => {
     if (!sheets) return []
 
     return sheets.filter((sheet) => {
-      // Filtro OffCut
       if (offCutFilter !== 'all') {
         const isOffCut = sheet['Off Cut'] === true || sheet['Off Cut'] === 'true' || sheet['Off Cut'] === 'Yes'
         if (offCutFilter === 'yes' && !isOffCut) return false
         if (offCutFilter === 'no' && isOffCut) return false
       }
 
-      // Filtro Dimension
       if (dimensionFilter !== 'all' && sheet.Dimension !== dimensionFilter) {
         return false
       }
 
-      // Filtro Colour
       if (colourFilter !== 'all' && sheet.Colour !== colourFilter) {
         return false
       }
@@ -64,77 +226,109 @@ export function Step2Sheets() {
     })
   }, [sheets, offCutFilter, dimensionFilter, colourFilter])
 
-  // Agrupar sheets: primero por OffCut, luego por Colour
-  const groupedSheets = useMemo(() => {
+  const groupedRows = useMemo<SheetRow[]>(() => {
     if (!filteredSheets.length) return []
 
-    // Agrupar por OffCut primero
-    const byOffCut = filteredSheets.reduce((acc, sheet) => {
-      const isOffCut = sheet['Off Cut'] === true || sheet['Off Cut'] === 'true' || sheet['Off Cut'] === 'Yes'
-      const key = isOffCut ? 'offcut' : 'regular'
-      
-      if (!acc[key]) acc[key] = []
-      acc[key].push(sheet)
-      return acc
-    }, {} as Record<string, SimpleSheet[]>)
+    const rows: SheetRow[] = []
+    const detectedSet = new Set(deducedSheets.map((sheet) => sheet.dimension))
+    const usedSheetIds = new Set<string>()
 
-    // Dentro de cada grupo de OffCut, agrupar por Colour
-    const result: Array<{
-      groupKey: string
-      groupLabel: string
-      sheets: SimpleSheet[]
-    }> = []
+    visibleDeducedSheets.forEach((deduced) => {
+      const sheetsForDimension = filteredSheets.filter(
+        (sheet) => sheet.Dimension === deduced.dimension
+      )
+      if (sheetsForDimension.length === 0) return
 
-    // Primero mostrar las regulares (no offcut)
-    if (byOffCut['regular']) {
-      const byColour = byOffCut['regular'].reduce((acc, sheet) => {
+      rows.push({
+        type: 'header',
+        key: `detected-${deduced.dimension}`,
+        label: `Detected - ${deduced.dimension}`
+      })
+
+      const byColour = sheetsForDimension.reduce((acc, sheet) => {
         const colour = sheet.Colour || 'No Colour'
         if (!acc[colour]) acc[colour] = []
         acc[colour].push(sheet)
         return acc
       }, {} as Record<string, SimpleSheet[]>)
 
-      Object.keys(byColour).sort().forEach(colour => {
-        // Ordenar por Quantity in Factory (mayor a menor)
+      Object.keys(byColour).sort().forEach((colour) => {
+        rows.push({
+          type: 'subheader',
+          key: `detected-${deduced.dimension}-${colour}`,
+          label: colour
+        })
+
         const sortedSheets = byColour[colour].sort((a, b) => {
           return b['Quantity in Factory'] - a['Quantity in Factory']
         })
-        
-        result.push({
-          groupKey: `regular-${colour}`,
-          groupLabel: `Regular - ${colour}`,
-          sheets: sortedSheets
+
+        sortedSheets.forEach((sheet) => {
+          rows.push({
+            type: 'sheet',
+            key: sheet['Sheet ID'],
+            sheet
+          })
+          usedSheetIds.add(sheet['Sheet ID'])
         })
       })
-    }
+    })
 
-    // Luego mostrar las offcut
-    if (byOffCut['offcut']) {
-      const byColour = byOffCut['offcut'].reduce((acc, sheet) => {
-        const colour = sheet.Colour || 'No Colour'
-        if (!acc[colour]) acc[colour] = []
-        acc[colour].push(sheet)
+    const remainingSheets = filteredSheets.filter(
+      (sheet) => !usedSheetIds.has(sheet['Sheet ID'])
+    )
+
+    if (remainingSheets.length > 0) {
+      rows.push({
+        type: 'header',
+        key: 'other-sheets',
+        label: 'Other sheets'
+      })
+
+      const byOffCut = remainingSheets.reduce((acc, sheet) => {
+        const isOffCut = sheet['Off Cut'] === true || sheet['Off Cut'] === 'true' || sheet['Off Cut'] === 'Yes'
+        const key = isOffCut ? 'offcut' : 'regular'
+        if (!acc[key]) acc[key] = []
+        acc[key].push(sheet)
         return acc
       }, {} as Record<string, SimpleSheet[]>)
 
-      Object.keys(byColour).sort().forEach(colour => {
-        // Ordenar por Quantity in Factory (mayor a menor)
-        const sortedSheets = byColour[colour].sort((a, b) => {
-          return b['Quantity in Factory'] - a['Quantity in Factory']
+      const buildOtherGroups = (groupKey: string, labelPrefix: string) => {
+        const byColour = byOffCut[groupKey]?.reduce((acc, sheet) => {
+          const colour = sheet.Colour || 'No Colour'
+          if (!acc[colour]) acc[colour] = []
+          acc[colour].push(sheet)
+          return acc
+        }, {} as Record<string, SimpleSheet[]>) || {}
+
+        Object.keys(byColour).sort().forEach((colour) => {
+          rows.push({
+            type: 'subheader',
+            key: `${labelPrefix}-${colour}`,
+            label: `${labelPrefix} - ${colour}`
+          })
+
+          const sortedSheets = byColour[colour].sort((a, b) => {
+            return b['Quantity in Factory'] - a['Quantity in Factory']
+          })
+
+          sortedSheets.forEach((sheet) => {
+            rows.push({
+              type: 'sheet',
+              key: sheet['Sheet ID'],
+              sheet
+            })
+          })
         })
-        
-        result.push({
-          groupKey: `offcut-${colour}`,
-          groupLabel: `Off Cut - ${colour}`,
-          sheets: sortedSheets
-        })
-      })
+      }
+
+      buildOtherGroups('regular', 'Regular')
+      buildOtherGroups('offcut', 'Off Cut')
     }
 
-    return result
-  }, [filteredSheets])
+    return rows
+  }, [visibleDeducedSheets, filteredSheets])
 
-  // Manejar selección/deselección de sheet
   const handleSheetToggle = (sheet: SimpleSheet) => {
     const existingIndex = formData.selectedSheets.findIndex(
       (s) => s.sheetId === sheet['Sheet ID']
@@ -143,28 +337,26 @@ export function Step2Sheets() {
     let newSelectedSheets: SelectedSheet[]
 
     if (existingIndex >= 0) {
-      // Deseleccionar
       newSelectedSheets = formData.selectedSheets.filter(
         (s) => s.sheetId !== sheet['Sheet ID']
       )
     } else {
-      // Seleccionar
-      newSelectedSheets = [
-        ...formData.selectedSheets,
-        {
-          sheetId: sheet['Sheet ID'],
-          dimension: sheet.Dimension || '',
-          colour: sheet.Colour || '',
-          qty: 1,
-          sheetData: sheet
-        }
-      ]
+      const deduced = deducedSheets.find(d => d.dimension === sheet.Dimension)
+      newSelectedSheets = formData.selectedSheets.filter(
+        (s) => s.dimension !== sheet.Dimension
+      )
+      newSelectedSheets.push({
+        sheetId: sheet['Sheet ID'],
+        dimension: sheet.Dimension || '',
+        colour: sheet.Colour || '',
+        qty: deduced?.qty || 1,
+        sheetData: sheet
+      })
     }
 
     updateFormData({ selectedSheets: newSelectedSheets })
   }
 
-  // Manejar cambio de cantidad
   const handleQtyChange = (sheetId: string, qty: number) => {
     const newSelectedSheets = formData.selectedSheets.map((s) =>
       s.sheetId === sheetId ? { ...s, qty: Math.max(1, qty) } : s
@@ -172,29 +364,94 @@ export function Step2Sheets() {
     updateFormData({ selectedSheets: newSelectedSheets })
   }
 
-  // Verificar si una sheet está seleccionada
   const isSheetSelected = (sheetId: string) => {
     return formData.selectedSheets.some((s) => s.sheetId === sheetId)
   }
 
-  // Obtener cantidad de una sheet seleccionada
   const getSelectedQty = (sheetId: string) => {
     const selected = formData.selectedSheets.find((s) => s.sheetId === sheetId)
     return selected?.qty || 0
   }
 
-  // Verificar si Order Qty excede Qty Factory
   const exceedsFactoryQty = (sheetId: string, factoryQty: number) => {
     const selectedQty = getSelectedQty(sheetId)
     return selectedQty > factoryQty
   }
 
-  const stepValidation = validation.step2
+  const missingSelections = visibleDeducedSheets.filter(
+    (deduced) => !formData.selectedSheets.some((s) => s.dimension === deduced.dimension)
+  )
+  const matchedDimensions = useMemo(
+    () => new Set(visibleDeducedSheets.map((sheet) => sheet.dimension)),
+    [visibleDeducedSheets]
+  )
+  const suggestedSheetIds = useMemo(() => {
+    return new Set(
+      suggestedSelections
+        .filter((selection) => selection.isSuggested)
+        .map((selection) => selection.sheet['Sheet ID'])
+    )
+  }, [suggestedSelections])
+  const detectedChips = useMemo(() => {
+    return visibleDeducedSheets.map((deduced) => {
+      const selected = formData.selectedSheets.find(
+        (sheet) => sheet.dimension === deduced.dimension
+      )
+      const suggested = suggestedSelections.find(
+        (selection) => selection.dimension === deduced.dimension
+      )
+      return {
+        dimension: deduced.dimension,
+        qty: deduced.qty,
+        colour: selected?.colour || '',
+        isSelected: Boolean(selected),
+        isSuggested:
+          Boolean(selected) &&
+          Boolean(suggested?.isSuggested) &&
+          selected?.sheetId === suggested?.sheet['Sheet ID']
+      }
+    })
+  }, [visibleDeducedSheets, formData.selectedSheets, suggestedSelections])
+
+  const pendingDetectedChips = useMemo(
+    () => detectedChips.filter((chip) => !chip.isSelected),
+    [detectedChips]
+  )
+
+  const handleChipSelect = (dimension: string) => {
+    setOffCutFilter('all')
+    setColourFilter('all')
+    setDimensionFilter(dimension)
+    setFocusedDimension(dimension)
+  }
+
+  const handleChipRemove = (dimension: string) => {
+    updateFormData({
+      selectedSheets: formData.selectedSheets.filter((sheet) => sheet.dimension !== dimension),
+      ignoredSheetDimensions: Array.from(
+        new Set([...(formData.ignoredSheetDimensions || []), dimension])
+      )
+    })
+    if (focusedDimension === dimension) {
+      setFocusedDimension(null)
+      setDimensionFilter('all')
+    }
+  }
+
+  const stepValidation = validation.step3
 
   if (!formData.project) {
     return (
       <div className="step-container step-error">
         <p>Please select a project in Step 1</p>
+      </div>
+    )
+  }
+
+  if (formData.panels.length === 0) {
+    return (
+      <div className="step-container step-error">
+        <p>Please import panels in Step 2 first</p>
       </div>
     )
   }
@@ -212,10 +469,65 @@ export function Step2Sheets() {
     <div className="step-container step2-sheets">
       <h2 className="step-title">Sheet Selection</h2>
       <p className="step-description">
-        Select the sheets that will be used for this order.
+        We detected the sheets from the nesting CSV. Please select the colour for each sheet size.
       </p>
 
-      {/* Filtros */}
+      {pendingDetectedChips.length > 0 && (
+        <div className="detected-sheets-banner">
+          <div className="detected-banner-header">
+            <div>
+              <h3>Detected Sheets</h3>
+              <p>Quickly focus the table by selecting a chip.</p>
+            </div>
+          </div>
+          <div className="detected-chips">
+            {pendingDetectedChips.map((chip) => (
+              <div
+                key={chip.dimension}
+                className={`detected-chip ${chip.isSelected ? 'chip-selected' : 'chip-missing'} ${chip.isSuggested ? 'chip-suggested' : ''}`}
+              >
+                <button
+                  type="button"
+                  className="chip-remove"
+                  aria-label={`Remove ${chip.dimension}`}
+                  onClick={() => handleChipRemove(chip.dimension)}
+                >
+                  ×
+                </button>
+                <div className="chip-top">
+                  <span className="chip-dimension">{chip.dimension}</span>
+                  <span className="chip-qty">qty {chip.qty}</span>
+                </div>
+                <div className="chip-colour">
+                  {chip.colour ? chip.colour : 'colour ?'}
+                  {chip.isSuggested && <span className="chip-suggested-badge">Suggested</span>}
+                </div>
+                <button
+                  type="button"
+                  className="chip-action"
+                  onClick={() => handleChipSelect(chip.dimension)}
+                >
+                  {chip.colour ? 'Change colour' : 'Select colour'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {missingSelections.length > 0 && (
+        <div className="sheet-warning">
+          <p>Please select a colour for:</p>
+          <ul className="sheet-warning-list">
+            {missingSelections.map((sheet) => (
+              <li key={sheet.dimension}>
+                {sheet.dimension} (qty {sheet.qty})
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="step2-filters">
         <div className="filter-group">
           <label htmlFor="offcut-filter" className="filter-label">Off Cut</label>
@@ -284,79 +596,94 @@ export function Step2Sheets() {
                   </tr>
                 </thead>
                 <tbody>
-                  {groupedSheets.map((group) => (
-                    <React.Fragment key={group.groupKey}>
-                      {/* Header del grupo */}
-                      <tr className="group-header">
-                        <td colSpan={8} className="group-header-cell" style={{ textAlign: 'center' }}>
-                          <span className="group-label">{group.groupLabel}</span>
-                          <span className="group-count">({group.sheets.length} sheets)</span>
+                  {groupedRows.map((row) => {
+                    if (row.type === 'header') {
+                      return (
+                        <tr key={row.key} className="group-header">
+                          <td colSpan={8} className="group-header-cell" style={{ textAlign: 'center' }}>
+                            <span className="group-label">{row.label}</span>
+                          </td>
+                        </tr>
+                      )
+                    }
+
+                    if (row.type === 'subheader') {
+                      return (
+                        <tr key={row.key} className="group-subheader">
+                          <td colSpan={8} className="group-subheader-cell" style={{ textAlign: 'center' }}>
+                            <span className="group-subheader-label">{row.label}</span>
+                          </td>
+                        </tr>
+                      )
+                    }
+
+                    const sheet = row.sheet
+                    const isSelected = isSheetSelected(sheet['Sheet ID'])
+                    const qty = getSelectedQty(sheet['Sheet ID'])
+                    const hasNoFactoryQty = sheet['Quantity in Factory'] <= 0
+                    const exceedsQty = isSelected && exceedsFactoryQty(sheet['Sheet ID'], sheet['Quantity in Factory'])
+                    const isDimensionMatch = matchedDimensions.has(sheet.Dimension || '')
+                    const isFocused = focusedDimension && sheet.Dimension === focusedDimension
+                    const isSuggested = suggestedSheetIds.has(sheet['Sheet ID'])
+
+                    return (
+                      <tr
+                        key={row.key}
+                        className={`${isSelected ? 'selected' : ''} ${hasNoFactoryQty ? 'low-stock' : ''} ${exceedsQty ? 'exceeds-qty' : ''} ${isDimensionMatch ? 'dimension-match' : ''} ${isFocused ? 'focused-dimension' : ''}`}
+                      >
+                        <td className="col-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => handleSheetToggle(sheet)}
+                            className="sheet-checkbox"
+                          />
+                        </td>
+                        <td className="col-order-qty">
+                          {isSelected ? (
+                            <div className="qty-input-wrapper">
+                              <input
+                                type="number"
+                                min="1"
+                                value={qty}
+                                onChange={(e) =>
+                                  handleQtyChange(
+                                    sheet['Sheet ID'],
+                                    parseInt(e.target.value, 10) || 1
+                                  )
+                                }
+                                className={`qty-input ${exceedsQty ? 'exceeds-qty-input' : ''}`}
+                              />
+                              {exceedsQty && (
+                                <span className="qty-warning-icon" title={`Order Qty (${qty}) exceeds Factory Qty (${sheet['Quantity in Factory']})`}>
+                                  ⚠️
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="qty-placeholder">-</span>
+                          )}
+                        </td>
+                        <td className="col-dimension">{sheet.Dimension}</td>
+                        <td className="col-colour">
+                          {sheet.Colour}
+                          {isSuggested && <span className="suggested-badge">Suggested</span>}
+                        </td>
+                        <td className={`col-qty-factory ${hasNoFactoryQty ? 'zero-qty' : ''}`}>
+                          {sheet['Quantity in Factory']}
+                        </td>
+                        <td className="col-qty-store">{sheet['Quantity in Store']}</td>
+                        <td className="col-offcut">
+                          {sheet['Off Cut'] ? 'Yes' : 'No'}
+                        </td>
+                        <td className="col-comment">
+                          <span className="comment-text" title={sheet.Comment || undefined}>
+                            {sheet.Comment || '-'}
+                          </span>
                         </td>
                       </tr>
-                      {/* Filas del grupo */}
-                      {group.sheets.map((sheet) => {
-                        const isSelected = isSheetSelected(sheet['Sheet ID'])
-                        const qty = getSelectedQty(sheet['Sheet ID'])
-                        const hasNoFactoryQty = sheet['Quantity in Factory'] <= 0
-                        const exceedsQty = isSelected && exceedsFactoryQty(sheet['Sheet ID'], sheet['Quantity in Factory'])
-
-                        return (
-                          <tr
-                            key={sheet['Sheet ID']}
-                            className={`${isSelected ? 'selected' : ''} ${hasNoFactoryQty ? 'low-stock' : ''} ${exceedsQty ? 'exceeds-qty' : ''}`}
-                          >
-                            <td className="col-checkbox">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => handleSheetToggle(sheet)}
-                                className="sheet-checkbox"
-                              />
-                            </td>
-                            <td className="col-order-qty">
-                              {isSelected ? (
-                                <div className="qty-input-wrapper">
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={qty}
-                                    onChange={(e) =>
-                                      handleQtyChange(
-                                        sheet['Sheet ID'],
-                                        parseInt(e.target.value, 10) || 1
-                                      )
-                                    }
-                                    className={`qty-input ${exceedsQty ? 'exceeds-qty-input' : ''}`}
-                                  />
-                                  {exceedsQty && (
-                                    <span className="qty-warning-icon" title={`Order Qty (${qty}) exceeds Factory Qty (${sheet['Quantity in Factory']})`}>
-                                      ⚠️
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="qty-placeholder">-</span>
-                              )}
-                            </td>
-                            <td className="col-dimension">{sheet.Dimension}</td>
-                            <td className="col-colour">{sheet.Colour}</td>
-                            <td className={`col-qty-factory ${hasNoFactoryQty ? 'zero-qty' : ''}`}>
-                              {sheet['Quantity in Factory']}
-                            </td>
-                            <td className="col-qty-store">{sheet['Quantity in Store']}</td>
-                            <td className="col-offcut">
-                              {sheet['Off Cut'] ? 'Yes' : 'No'}
-                            </td>
-                            <td className="col-comment">
-                              <span className="comment-text" title={sheet.Comment || undefined}>
-                                {sheet.Comment || '-'}
-                              </span>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </React.Fragment>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -371,7 +698,6 @@ export function Step2Sheets() {
             </div>
             <div className="summary-items">
               {formData.selectedSheets.map((sheet) => {
-                // Buscar la sheet original para obtener Qty Factory
                 const originalSheet = sheets?.find(s => s['Sheet ID'] === sheet.sheetId)
                 const factoryQty = originalSheet?.['Quantity in Factory'] || 0
                 const exceedsQty = sheet.qty > factoryQty

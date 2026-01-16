@@ -3,6 +3,31 @@
   margin: 0 auto;
 }
 
+.step-validation-errors {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+}
+
+.step-validation-errors .validation-title {
+  margin: 0 0 0.5rem 0;
+  font-weight: 600;
+  color: #991b1b;
+  font-size: 0.9375rem;
+}
+
+.step-validation-errors ul {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #991b1b;
+}
+
+.step-validation-errors li {
+  margin: 0.25rem 0;
+}
+
 /* Main 2-column layout - Minimalista */
 .step1-layout {
   display: grid;
@@ -754,6 +779,180 @@
   justify-content: center;
   min-height: 300px;
   gap: 1rem;
+}
+
+/* Project Orders Section */
+.project-orders-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--mode-gray-200, #e5e7eb);
+}
+
+.orders-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--mode-gray-900, #111827);
+  margin: 0 0 1rem 0;
+}
+
+.orders-icon {
+  font-size: 1.1rem;
+}
+
+.orders-count {
+  font-weight: 400;
+  color: var(--mode-gray-600, #4b5563);
+  font-size: 0.9rem;
+}
+
+.orders-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  color: var(--mode-gray-600, #4b5563);
+  font-size: 0.9rem;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.order-item {
+  padding: 0.75rem;
+  background: var(--mode-white, #ffffff);
+  border: 1px solid var(--mode-gray-200, #e5e7eb);
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.order-item:hover {
+  border-color: var(--mode-gray-300, #d1d5db);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.order-item.current-order {
+  border-color: var(--mode-green-600, #16a34a);
+  background: var(--mode-green-50, #f0fdf4);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+}
+
+.order-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.order-id {
+  font-weight: 600;
+  color: var(--mode-gray-900, #111827);
+  font-size: 0.95rem;
+}
+
+.order-status {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.order-status.status-ready-to-cut {
+  background: var(--mode-blue-100, #dbeafe);
+  color: var(--mode-blue-800, #1e40af);
+}
+
+.order-status.status-cutting {
+  background: var(--mode-yellow-100, #fef3c7);
+  color: var(--mode-yellow-800, #92400e);
+}
+
+.order-status.status-manufacturing {
+  background: var(--mode-purple-100, #e9d5ff);
+  color: var(--mode-purple-800, #6b21a8);
+}
+
+.order-status.status-ready-to-manufacturing {
+  background: var(--mode-blue-100, #dbeafe);
+  color: var(--mode-blue-800, #1e40af);
+}
+
+.order-status.status-packing {
+  background: var(--mode-teal-100, #ccfbf1);
+  color: var(--mode-teal-800, #115e59);
+}
+
+.order-status.status-delivering {
+  background: var(--mode-orange-100, #fed7aa);
+  color: var(--mode-orange-800, #9a3412);
+}
+
+.order-status.status-delivered {
+  background: var(--mode-green-100, #dcfce7);
+  color: var(--mode-green-800, #166534);
+}
+
+.order-item-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--mode-gray-600, #4b5563);
+}
+
+.order-priority {
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.order-priority.priority-normal {
+  background: var(--mode-green-100, #dcfce7);
+  color: var(--mode-green-800, #166534);
+}
+
+.order-priority.priority-high {
+  background: var(--mode-yellow-100, #fef3c7);
+  color: var(--mode-yellow-800, #92400e);
+}
+
+.order-priority.priority-urgent {
+  background: var(--mode-red-100, #fee2e2);
+  color: var(--mode-red-800, #991b1b);
+}
+
+.order-date,
+.order-responsable {
+  font-size: 0.8rem;
+}
+
+.order-colour {
+  font-size: 0.8rem;
+}
+
+.orders-footer {
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--mode-gray-500, #6b7280);
+  background: var(--mode-gray-50, #f9fafb);
+  border-radius: 4px;
+}
+
+.orders-empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--mode-gray-500, #6b7280);
+  font-style: italic;
 }
 
 /* Responsive */

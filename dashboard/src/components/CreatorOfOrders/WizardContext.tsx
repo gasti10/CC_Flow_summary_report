@@ -22,9 +22,12 @@ const initialFormData: OrderFormData = {
   selectedSheets: [],
   sheets: '',
   colour: '',
+  ignoredSheetDimensions: [],
   panels: [],
   csvFile: null,
-  orderComment: ''
+  orderComment: '',
+  documents: [],
+  selectedExistingDocuments: []
 }
 
 // Estado inicial de validación
@@ -32,7 +35,8 @@ const initialValidation: ValidationState = {
   step1: { isValid: false, errors: [] },
   step2: { isValid: false, errors: [] },
   step3: { isValid: false, errors: [] },
-  step4: { isValid: false, errors: [] }
+  step4: { isValid: true, errors: [] }, // Step 4 (Documents) es opcional
+  step5: { isValid: false, errors: [] }
 }
 
 interface WizardProviderProps {
@@ -46,6 +50,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [orderIdIsValid, setOrderIdIsValid] = useState<boolean | null>(null) // null = no validado, true = válido (no existe), false = inválido (existe)
 
   // Validar un step específico
   const validateStep = useCallback((step: number, data?: OrderFormData): boolean => {
@@ -55,12 +60,34 @@ export function WizardProvider({ children }: WizardProviderProps) {
     switch (step) {
       case 1:
         if (!dataToValidate.project) errors.push('Project is required')
-        if (!dataToValidate.orderId) errors.push('Order ID is required')
+        if (!dataToValidate.orderId) {
+          errors.push('Order ID is required')
+        } else if (orderIdIsValid === false) {
+          errors.push('Order ID already exists. Please use a different Order ID.')
+        } else if (orderIdIsValid === null && dataToValidate.orderId.trim().length > 0) {
+          // Si está validando, no permitir avanzar
+          errors.push('Please wait while we verify the Order ID availability')
+        }
         if (!dataToValidate.responsable) errors.push('Responsable is required')
         if (!dataToValidate.expectedTo) errors.push('Expected to is required')
         break
         
       case 2:
+        if (dataToValidate.panels.length === 0) {
+          errors.push('Must import at least one valid panel')
+        } else {
+          const duplicatePanels = dataToValidate.panels.filter(panel => panel.isDuplicate)
+          if (duplicatePanels.length > 0) {
+            errors.push('Please fix duplicate panel names in the CSV')
+          }
+          const existingPanels = dataToValidate.panels.filter(panel => panel.existsInDatabase)
+          if (existingPanels.length > 0) {
+            errors.push('Some panel names already exist in the database. Please rename them.')
+          }
+        }
+        break
+        
+      case 3:
         if (dataToValidate.selectedSheets.length === 0) {
           errors.push('Must select at least one sheet')
         } else {
@@ -69,17 +96,40 @@ export function WizardProvider({ children }: WizardProviderProps) {
           if (invalidSheets.length > 0) {
             errors.push('All selected sheets must have a quantity greater than 0')
           }
-        }
-        break
-        
-      case 3:
-        if (dataToValidate.panels.length === 0) {
-          errors.push('Must import at least one valid panel')
+          const sheetsWithoutColour = dataToValidate.selectedSheets.filter(s => !s.colour || s.colour.trim() === '')
+          if (sheetsWithoutColour.length > 0) {
+            errors.push('All sheets must have a colour')
+          }
+          const ignored = new Set(dataToValidate.ignoredSheetDimensions || [])
+          const detectedDimensions = new Set(
+            dataToValidate.panels
+              .map(panel => panel.sheetName?.trim())
+              .filter(Boolean)
+              .filter((dimension) => !ignored.has(dimension))
+          )
+          if (dataToValidate.selectedSheets.length < detectedDimensions.size) {
+            errors.push('Please select a colour for every detected sheet size')
+          }
         }
         break
         
       case 4:
-        // Validación final - verificar que todo esté completo
+        // Step 4: Documents (opcional)
+        if (dataToValidate.documents.length > 0) {
+          const invalidDocs = dataToValidate.documents.filter(doc => !doc.name || doc.name.trim() === '')
+          if (invalidDocs.length > 0) {
+            errors.push('All documents must have a name')
+          }
+          // Validar que todos los documentos tengan categoría
+          const docsWithoutCategory = dataToValidate.documents.filter(doc => !doc.category || doc.category.trim() === '')
+          if (docsWithoutCategory.length > 0) {
+            errors.push('All documents must have a category')
+          }
+        }
+        break
+        
+      case 5:
+        // Step 5: Review (validación final)
         if (!dataToValidate.project) errors.push('Project is required')
         if (!dataToValidate.orderId) errors.push('Order ID is required')
         if (dataToValidate.selectedSheets.length === 0) errors.push('Must select at least one sheet')
@@ -95,7 +145,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
     }))
     
     return isValid
-  }, [formData])
+  }, [formData, orderIdIsValid])
 
   // Actualizar datos del formulario
   const updateFormData = useCallback((data: Partial<OrderFormData>) => {
@@ -122,15 +172,15 @@ export function WizardProvider({ children }: WizardProviderProps) {
     })
   }, [])
 
-  // Re-validar el step actual cuando cambien los datos del formulario o el step
+  // Re-validar el step actual cuando cambien los datos del formulario, el step o la validación del Order ID
   useEffect(() => {
     validateStep(currentStep, formData)
-  }, [formData, currentStep, validateStep])
+  }, [formData, currentStep, orderIdIsValid, validateStep])
 
   // Avanzar al siguiente step
   const nextStep = useCallback(() => {
     if (validateStep(currentStep)) {
-      if (currentStep < 4) {
+      if (currentStep < 5) {
         setCurrentStep(prev => prev + 1)
       }
     }
@@ -145,7 +195,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
 
   // Ir a un step específico
   const goToStep = useCallback((step: number) => {
-    if (step >= 1 && step <= 4) {
+    if (step >= 1 && step <= 5) {
       setCurrentStep(step)
     }
   }, [])
@@ -158,6 +208,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
     setIsLoading(false)
     setError(null)
     setSuccess(false)
+    setOrderIdIsValid(null)
   }, [])
 
   const value: WizardContextType = {
@@ -167,6 +218,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
     isLoading,
     error,
     success,
+    orderIdIsValid,
     updateFormData,
     validateStep,
     nextStep,
@@ -175,7 +227,8 @@ export function WizardProvider({ children }: WizardProviderProps) {
     resetWizard,
     setLoading: setIsLoading,
     setError,
-    setSuccess
+    setSuccess,
+    setOrderIdIsValid
   }
 
   return (

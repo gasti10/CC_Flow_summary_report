@@ -1,14 +1,13 @@
-// Step 3: Panels Import (CSV)
+// Step 2: Panels Import (CSV)
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import Papa from 'papaparse'
 import { useWizard } from '../useWizard'
+import { supabaseApi } from '../../../services/supabaseApi'
 import type { ProcessedPanel } from '../types/wizard.types'
 import './Step3Panels.css'
 
-interface CSVRow {
-  [key: string]: string
-}
+type CSVRow = Array<string | number | null | undefined>
 
 export function Step3Panels() {
   const { formData, updateFormData, validation } = useWizard()
@@ -30,13 +29,30 @@ export function Step3Panels() {
     setProcessingError(null)
 
     Papa.parse(file, {
-      header: true,
+      header: false,
       skipEmptyLines: true,
-      complete: (results) => {
+      complete: async (results) => {
         try {
           const processedPanels = processCSVData(results.data as CSVRow[])
+          
+          // Verificar duplicados en Supabase
+          const panelNames = processedPanels.map(p => p.name)
+          const existingPanels = await supabaseApi.checkExistingPanels(panelNames)
+          const existingNamesSet = new Set(existingPanels.map(p => p.Name))
+          const existingPanelsMap = new Map(
+            existingPanels.map(p => [p.Name, { Order: p.Order, Status: p.Status }])
+          )
+          
+          // Marcar paneles que ya existen en la base de datos
+          const panelsWithDuplicates = processedPanels.map(panel => ({
+            ...panel,
+            existsInDatabase: existingNamesSet.has(panel.name),
+            existingOrder: existingPanelsMap.get(panel.name)?.Order || null,
+            existingStatus: existingPanelsMap.get(panel.name)?.Status || null
+          }))
+          
           updateFormData({
-            panels: processedPanels,
+            panels: panelsWithDuplicates,
             csvFile: file
           })
           setProcessingError(null)
@@ -59,60 +75,79 @@ export function Step3Panels() {
 
   // Procesar datos del CSV
   const processCSVData = (rows: CSVRow[]): ProcessedPanel[] => {
+    if (!rows || rows.length === 0) {
+      throw new Error('CSV file is empty or invalid.')
+    }
+
+    const [headerRow, ...dataRows] = rows
+    const headers = (headerRow || []).map((cell) =>
+      (cell ?? '').toString().trim()
+    )
+
+    const sheetNameIndex = findColumnIndex(headers, [
+      'SheetName',
+      'Sheet Name',
+      'Sheet'
+    ])
+    const nestNumberIndex = findColumnIndex(headers, [
+      'NestNumber',
+      'Nest Number',
+      'Nest'
+    ])
+    const partGroups = getPartColumnGroups(headers)
+
+    if (partGroups.length === 0) {
+      throw new Error(
+        'No part columns found. Please make sure the CSV includes PartName columns.'
+      )
+    }
+
+    if (sheetNameIndex === -1) {
+      throw new Error(
+        'SheetName column not found. Please include SheetName or Sheet Name.'
+      )
+    }
+
+    if (nestNumberIndex === -1) {
+      throw new Error(
+        'NestNumber column not found. Please include NestNumber or Nest Number.'
+      )
+    }
+
     const processed: ProcessedPanel[] = []
 
-    for (const row of rows) {
-      // Buscar columnas posibles para Name/PartName/Value
-      const name =
-        row.Name || row.PartName || row.Value || row['Part Name'] || ''
+    for (const row of dataRows) {
+      const sheetName = getCellValue(row, sheetNameIndex)
+      const nestNumber = getCellValue(row, nestNumberIndex)
 
-      // Buscar columnas posibles para Area/PartArea
-      const areaStr =
-        row.Area || row.PartArea || row['Part Area'] || '0'
-      const area = parseFloat(areaStr) || 0
+      for (const group of partGroups) {
+        const rawName = getCellValue(row, group.nameIndex)
+        if (!rawName) continue
 
-      // Buscar columnas posibles para Cut Distance/Cut Length
-      const cutDistanceStr =
-        row['Cut Distance'] ||
-        row['Cut Length'] ||
-        row['CutDistance'] ||
-        row['CutLength'] ||
-        '0'
-      const cutDistance = parseFloat(cutDistanceStr) || 0
+        const nameUpper = rawName.toUpperCase()
+        if (
+          nameUpper.includes('OFFCUT') ||
+          nameUpper.includes('REMNANT') ||
+          nameUpper.includes('SCRAP')
+        ) {
+          continue
+        }
 
-      // Buscar SheetName
-      const sheetName = row.SheetName || row['Sheet Name'] || row.Sheet || ''
+        const area = parseNumber(getCellValue(row, group.areaIndex))
+        const cutDistance = parseNumber(getCellValue(row, group.cutLengthIndex))
+        const qty = Math.max(1, Math.floor(parseNumber(getCellValue(row, group.qtyIndex)) || 1))
 
-      // Buscar NestNumber
-      const nestNumber =
-        row.NestNumber || row['Nest Number'] || row.Nest || ''
-
-      // Excluir OFFCUTs y Remnants
-      const nameUpper = name.toUpperCase()
-      if (
-        nameUpper.includes('OFFCUT') ||
-        nameUpper.includes('REMNANT') ||
-        nameUpper.includes('SCRAP')
-      ) {
-        continue
+        for (let i = 0; i < qty; i += 1) {
+          processed.push({
+            name: rawName.trim(),
+            area,
+            cutDistance,
+            sheetName: sheetName.trim(),
+            nestNumber: nestNumber.trim(),
+            comment: ''
+          })
+        }
       }
-
-      // Validar que tenga nombre
-      if (!name || name.trim() === '') {
-        continue
-      }
-
-      // Generar comentario
-      const comment = generateComment(row, area, cutDistance)
-
-      processed.push({
-        name: name.trim(),
-        area,
-        cutDistance,
-        sheetName: sheetName.trim(),
-        nestNumber: nestNumber.trim(),
-        comment
-      })
     }
 
     if (processed.length === 0) {
@@ -121,22 +156,63 @@ export function Step3Panels() {
       )
     }
 
-    return processed
+    const nameCounts = processed.reduce((acc, panel) => {
+      acc.set(panel.name, (acc.get(panel.name) || 0) + 1)
+      return acc
+    }, new Map<string, number>())
+
+    return processed.map((panel) => ({
+      ...panel,
+      isDuplicate: (nameCounts.get(panel.name) || 0) > 1
+    }))
   }
 
-  // Generar comentario para el panel
-  const generateComment = (
-    row: CSVRow,
-    area: number,
-    cutDistance: number
-  ): string => {
-    const comments: string[] = []
+  const findColumnIndex = (headers: string[], candidates: string[]) => {
+    const lowered = headers.map((h) => h.toLowerCase().trim())
+    return candidates
+      .map((c) => lowered.indexOf(c.toLowerCase().trim()))
+      .find((idx) => idx !== -1) ?? -1
+  }
 
-    if (row.Comment) comments.push(row.Comment)
-    if (area > 0) comments.push(`Area: ${area.toFixed(2)}`)
-    if (cutDistance > 0) comments.push(`Cut: ${cutDistance.toFixed(2)}`)
+  const getPartColumnGroups = (headers: string[]) => {
+    const normalized = headers.map((h) => h.toLowerCase().replace(/\s+/g, ''))
+    const partNameIndexes = normalized
+      .map((value, index) => (value === 'partname' ? index : -1))
+      .filter((index) => index !== -1)
 
-    return comments.join(' | ')
+    return partNameIndexes.map((startIndex, position) => {
+      const endIndex =
+        position < partNameIndexes.length - 1
+          ? partNameIndexes[position + 1]
+          : headers.length
+
+      const slice = normalized.slice(startIndex + 1, endIndex)
+      const areaOffset = slice.findIndex((value) => value === 'partarea')
+      const cutOffset = slice.findIndex(
+        (value) => value === 'cutlength' || value === 'cutdistance'
+      )
+      const qtyOffset = slice.findIndex((value) => value === 'partqtyinnest')
+
+      return {
+        nameIndex: startIndex,
+        areaIndex: areaOffset >= 0 ? startIndex + 1 + areaOffset : -1,
+        cutLengthIndex: cutOffset >= 0 ? startIndex + 1 + cutOffset : -1,
+        qtyIndex: qtyOffset >= 0 ? startIndex + 1 + qtyOffset : -1
+      }
+    })
+  }
+
+  const getCellValue = (row: CSVRow, index: number) => {
+    if (index < 0 || index >= row.length) return ''
+    const value = row[index]
+    return (value ?? '').toString().trim()
+  }
+
+  const parseNumber = (value: string) => {
+    if (!value) return 0
+    const normalized = value.replace(/,/g, '').trim()
+    const parsed = Number(normalized)
+    return Number.isFinite(parsed) ? parsed : 0
   }
 
   // Limpiar archivo y paneles
@@ -148,15 +224,38 @@ export function Step3Panels() {
     }
   }
 
-  const stepValidation = validation.step3
+  const stepValidation = validation.step2
+  
+  // Duplicados internos del CSV
+  const duplicateNames = useMemo(() => {
+    const counts = formData.panels.reduce((acc, panel) => {
+      acc.set(panel.name, (acc.get(panel.name) || 0) + 1)
+      return acc
+    }, new Map<string, number>())
+    return Array.from(counts.entries())
+      .filter(([, count]) => count > 1)
+      .map(([name]) => name)
+      .sort()
+  }, [formData.panels])
+  
+  // Paneles que ya existen en la base de datos
+  const existingPanelsInDB = useMemo(() => {
+    return formData.panels
+      .filter(panel => panel.existsInDatabase)
+      .map(panel => ({
+        name: panel.name,
+        existingOrder: panel.existingOrder,
+        existingStatus: panel.existingStatus
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [formData.panels])
 
   return (
     <div className="step-container step3-panels">
       <h2 className="step-title">Import Panels from CSV</h2>
       <p className="step-description">
-        Upload a CSV file with the panels. The file must contain the following columns:
-        Name/PartName/Value, Area/PartArea, Cut Distance/Cut Length, SheetName,
-        NestNumber.
+        Upload the nesting CSV. We will extract panels from PartName columns and use
+        SheetName and NestNumber from the file.
       </p>
 
       <div className="step3-upload">
@@ -229,12 +328,61 @@ export function Step3Panels() {
         />
       </div>
 
+      {/* Duplicados internos del CSV */}
+      {duplicateNames.length > 0 && (
+        <div className="step-warning-message step-warning-internal">
+          <p className="warning-title">
+            ⚠️ Duplicate panel names detected in CSV
+          </p>
+          <p className="warning-description">
+            Please review the CSV before creating the order.
+          </p>
+          <ul>
+            {duplicateNames.slice(0, 10).map((name) => (
+              <li key={name}>{name}</li>
+            ))}
+          </ul>
+          {duplicateNames.length > 10 && (
+            <p className="warning-more">
+              ... and {duplicateNames.length - 10} more duplicates
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Paneles que ya existen en Supabase */}
+      {existingPanelsInDB.length > 0 && (
+        <div className="step-warning-message step-warning-database">
+          <p className="warning-title">
+            ⚠️ Panel names already exist in database
+          </p>
+          <p className="warning-description">
+            These panel names already exist in Supabase. Please rename them before creating the order.
+          </p>
+          <div className="existing-panels-list">
+            {existingPanelsInDB.slice(0, 10).map((panel) => (
+              <div key={panel.name} className="existing-panel-item">
+                <span className="existing-panel-name">{panel.name}</span>
+                <span className="existing-panel-info">
+                  Order: {panel.existingOrder || 'N/A'} | Status: {panel.existingStatus || 'N/A'}
+                </span>
+              </div>
+            ))}
+          </div>
+          {existingPanelsInDB.length > 10 && (
+            <p className="warning-more">
+              ... and {existingPanelsInDB.length - 10} more existing panels
+            </p>
+          )}
+        </div>
+      )}
+
       {formData.panels.length > 0 && (
         <div className="step3-preview">
           <div className="preview-header">
             <h3>Preview of Processed Panels</h3>
             <span className="preview-count">
-              {formData.panels.length} panel(es)
+              {formData.panels.length} panel(s)
             </span>
           </div>
 
@@ -252,8 +400,33 @@ export function Step3Panels() {
               </thead>
               <tbody>
                 {formData.panels.slice(0, 50).map((panel, index) => (
-                  <tr key={index}>
-                    <td className="col-name">{panel.name}</td>
+                  <tr 
+                    key={index} 
+                    className={
+                      panel.isDuplicate 
+                        ? 'panel-duplicate-row' 
+                        : panel.existsInDatabase 
+                        ? 'panel-exists-row' 
+                        : undefined
+                    }
+                  >
+                    <td className="col-name">
+                      <span className={
+                        panel.isDuplicate 
+                          ? 'panel-name-duplicate' 
+                          : panel.existsInDatabase 
+                          ? 'panel-name-exists' 
+                          : undefined
+                      }>
+                        {panel.name}
+                      </span>
+                      {panel.isDuplicate && (
+                        <span className="panel-duplicate-badge">Duplicate in CSV</span>
+                      )}
+                      {panel.existsInDatabase && (
+                        <span className="panel-exists-badge">Exists in DB</span>
+                      )}
+                    </td>
                     <td className="col-number">{panel.area.toFixed(2)}</td>
                     <td className="col-number">
                       {panel.cutDistance.toFixed(2)}
@@ -267,7 +440,7 @@ export function Step3Panels() {
             </table>
             {formData.panels.length > 50 && (
               <p className="preview-more">
-                ... y {formData.panels.length - 50} panel(es) más
+                ... and {formData.panels.length - 50} more panel(s)
               </p>
             )}
           </div>

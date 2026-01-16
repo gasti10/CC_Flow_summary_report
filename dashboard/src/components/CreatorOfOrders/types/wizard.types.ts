@@ -25,11 +25,16 @@ export interface OrderFormData {
   selectedSheets: SelectedSheet[]
   sheets: string // Formato: "Dimension - Colour" (ej: "850x1575 - Traffic White")
   colour: string // De la primera sheet seleccionada
+  ignoredSheetDimensions: string[]
   
   // Step 3: Panels Import
   panels: ProcessedPanel[]
   csvFile: File | null
   orderComment: string // Comentario general para la orden
+  
+  // Step 5: Documents Upload
+  documents: UploadedDocument[]
+  selectedExistingDocuments: SelectedExistingDocument[] // Documentos existentes seleccionados
   
   // Metadata
   creationDate?: string
@@ -52,6 +57,35 @@ export interface ProcessedPanel {
   sheetName: string
   nestNumber: string
   comment: string
+  isDuplicate?: boolean // Duplicado interno del CSV
+  existsInDatabase?: boolean // Ya existe en Supabase
+  existingOrder?: string | null // Order del panel existente
+  existingStatus?: string | null // Status del panel existente
+}
+
+// Documento subido
+export interface UploadedDocument {
+  id: string // ID temporal para la UI
+  file: File
+  name: string
+  comments: string
+  category: string // Categoría del documento
+  filePath?: string // Ruta del archivo después de subirlo
+  documentId?: string // Document ID de AppSheet después de crearlo
+  uploaded: boolean // Si ya fue subido a Drive
+  saved: boolean // Si ya fue guardado en AppSheet
+}
+
+// Documento existente de AppSheet seleccionado
+export interface SelectedExistingDocument {
+  id: string // ID temporal para la UI
+  documentId: string // Document ID de AppSheet
+  name: string
+  file: string // Ruta del archivo
+  comments: string
+  category: string // Categoría del documento
+  createdAt: string
+  linked: boolean // Si ya fue vinculado a la orden
 }
 
 // Estado de validación por step
@@ -69,6 +103,10 @@ export interface ValidationState {
     errors: string[]
   }
   step4: {
+    isValid: boolean
+    errors: string[]
+  }
+  step5: {
     isValid: boolean
     errors: string[]
   }
@@ -113,9 +151,11 @@ export interface OrderCreationData {
   panels: Array<{
     Name: string
     Project: string
+    Status: string
     Area: number
     'Cut Distance': number
     Order: string
+    Priority: string
     Sheet: string
     'Nest Number': string
     Comment: string
