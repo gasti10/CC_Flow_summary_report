@@ -6,7 +6,7 @@ import type {
   ValidationState,
 } from './types/wizard.types'
 import { WizardContext } from './wizardContextTypes'
-import type { WizardContextType } from './wizardContextTypes'
+import type { WizardContextType, CreationResult } from './wizardContextTypes'
 
 // Helper para obtener fecha de hoy en formato ISO
 const getTodayISO = () => new Date().toISOString().split('T')[0]
@@ -51,6 +51,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [orderIdIsValid, setOrderIdIsValid] = useState<boolean | null>(null) // null = no validado, true = válido (no existe), false = inválido (existe)
+  const [creationResult, setCreationResult] = useState<CreationResult | null>(null)
 
   // Validar un step específico
   const validateStep = useCallback((step: number, data?: OrderFormData): boolean => {
@@ -209,6 +210,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
     setError(null)
     setSuccess(false)
     setOrderIdIsValid(null)
+    setCreationResult(null)
   }, [])
 
   const value: WizardContextType = {
@@ -219,6 +221,7 @@ export function WizardProvider({ children }: WizardProviderProps) {
     error,
     success,
     orderIdIsValid,
+    creationResult,
     updateFormData,
     validateStep,
     nextStep,
@@ -228,7 +231,8 @@ export function WizardProvider({ children }: WizardProviderProps) {
     setLoading: setIsLoading,
     setError,
     setSuccess,
-    setOrderIdIsValid
+    setOrderIdIsValid,
+    setCreationResult
   }
 
   return (

@@ -7,7 +7,7 @@ import type { UploadedDocument, SelectedExistingDocument } from '../types/wizard
 import type { Document } from '../../../types/appsheet'
 import AppSheetAPI from '../../../services/appsheetApi'
 import LoadingSpinner from '../../Common/LoadingSpinner'
-import './Step5Documents.css'
+import './Step4Documents.css'
 
 const appsheetApi = new AppSheetAPI()
 
@@ -31,9 +31,11 @@ function generateTempId(): string {
   return `doc-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
+// Categorías que no se muestran en el step (no se utilizan para la orden)
+const EXCLUDED_DOCUMENT_CATEGORIES = new Set(['Cut List', 'Delivery Docket'])
 
-export function Step5Documents() {
-  const { formData, updateFormData, validation, setLoading, setError, isLoading } = useWizard()
+export function Step4Documents() {
+  const { formData, updateFormData, validation, setLoading, setError, isLoading, creationResult } = useWizard()
   const [uploadingDocs, setUploadingDocs] = useState<Set<string>>(new Set())
   const [uploadErrors, setUploadErrors] = useState<Map<string, string>>(new Map())
   const [linkingDocs, setLinkingDocs] = useState<Set<string>>(new Set())
@@ -44,12 +46,20 @@ export function Step5Documents() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Cargar documentos existentes del proyecto
-  const { data: existingDocuments, isLoading: loadingExisting } = useQuery<Document[]>({
+  const { data: existingDocumentsRaw, isLoading: loadingExisting } = useQuery<Document[]>({
     queryKey: ['documents-by-project', formData.project],
     queryFn: () => appsheetApi.getDocumentsByProject(formData.project || ''),
     enabled: !!formData.project,
     staleTime: 0 // Sin cache, siempre obtener datos frescos
   })
+
+  // Excluir documentos con categoría 'Cut List' y 'Delivery Docket' para la vista del step
+  const existingDocuments = useMemo(() => {
+    if (!existingDocumentsRaw?.length) return existingDocumentsRaw ?? []
+    return existingDocumentsRaw.filter(
+      (doc) => !EXCLUDED_DOCUMENT_CATEGORIES.has((doc['Category'] || '').trim())
+    )
+  }, [existingDocumentsRaw])
 
   // Función para filtrar documentos por búsqueda
   const matchesSearch = (doc: Document, query: string): boolean => {
@@ -113,20 +123,20 @@ export function Step5Documents() {
       })
   }, [existingDocuments, searchQuery])
 
-  // Obtener categorías únicas de los documentos existentes
+  // Categorías disponibles para nuevos documentos (incluye Cut List y Delivery Docket)
   const existingCategories = useMemo(() => {
-    if (!existingDocuments || existingDocuments.length === 0) {
+    if (!existingDocumentsRaw || existingDocumentsRaw.length === 0) {
       return []
     }
     const categories = new Set<string>()
-    existingDocuments.forEach(doc => {
+    existingDocumentsRaw.forEach(doc => {
       const category = doc['Category']
       if (category && category.trim()) {
         categories.add(category)
       }
     })
     return Array.from(categories).sort()
-  }, [existingDocuments])
+  }, [existingDocumentsRaw])
 
   // Toggle expandir/colapsar categoría
   const toggleCategory = (category: string) => {
@@ -432,44 +442,50 @@ export function Step5Documents() {
     }
   }, [])
 
-  const stepValidation = validation.step5
+  const stepValidation = validation.step4
   const hasDocuments = formData.documents.length > 0
   const hasUnuploaded = formData.documents.some(doc => !doc.uploaded || !doc.saved)
 
   return (
-    <div className="step-container step5-documents">
+    <div className="step-container step4-documents">
       <h2 className="step-title">Upload Documents</h2>
       <p className="step-description">
         Upload or select documents related to this order. Documents will be saved to CC Flow App and
         registered in Documents section.
       </p>
 
+      {creationResult?.success && creationResult.orderId && (
+        <div className="step4-order-banner" role="status">
+          Adding documents to order: <strong>{creationResult.orderId}</strong>
+        </div>
+      )}
+
       {/* Sección de documentos existentes */}
       {formData.project && (
-        <div className="step5-existing-documents">
-          <div className="step5-existing-header">
+        <div className="step4-existing-documents">
+          <div className="step4-existing-header">
             <div>
-              <h3 className="step5-section-title">Existing Documents</h3>
-              <p className="step5-section-description">
+              <h3 className="step4-section-title">Existing Documents</h3>
+              <p className="step4-section-description">
                 Select existing documents from this project to link to this order.
               </p>
             </div>
             {/* Buscador */}
-            <div className="step5-search-container">
-              <div className="step5-search-input-wrapper">
-                <span className="step5-search-icon">🔍</span>
+            <div className="step4-search-container">
+              <div className="step4-search-input-wrapper">
+                <span className="step4-search-icon">🔍</span>
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="step5-search-input"
+                  className="step4-search-input"
                   placeholder="Search documents..."
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="step5-search-clear"
+                    className="step4-search-clear"
                     aria-label="Clear search"
                   >
                     ✕
@@ -486,7 +502,7 @@ export function Step5Documents() {
             </div>
           ) : existingDocuments && existingDocuments.length > 0 ? (
             <>
-              <div className="step5-existing-list">
+              <div className="step4-existing-list">
                 {groupedDocuments.length === 0 ? (
                   <div className="step-empty">
                     <p>
@@ -594,7 +610,7 @@ export function Step5Documents() {
               </div>
 
               {formData.selectedExistingDocuments.length > 0 && (
-                <div className="step5-existing-actions">
+                <div className="step4-existing-actions">
                   <button
                     type="button"
                     onClick={handleLinkAllExisting}
@@ -626,9 +642,9 @@ export function Step5Documents() {
       )}
 
       {/* Área de carga de archivos */}
-      <div className="step5-upload-section">
-        <h3 className="step5-section-title">Upload New Documents</h3>
-      <div className="step5-upload-area">
+      <div className="step4-upload-section">
+        <h3 className="step4-section-title">Upload New Documents</h3>
+      <div className="step4-upload-area">
         <input
           ref={fileInputRef}
           type="file"
@@ -653,8 +669,8 @@ export function Step5Documents() {
 
       {/* Lista de documentos nuevos */}
       {hasDocuments && (
-        <div className="step5-documents-list">
-          <div className="step5-documents-header">
+        <div className="step4-documents-list">
+          <div className="step4-documents-header">
             <h3>Documents ({formData.documents.length})</h3>
             {hasUnuploaded && (
               <button
@@ -849,7 +865,7 @@ export function Step5Documents() {
       )}
 
       {/* Info adicional */}
-      <div className="step5-info">
+      <div className="step4-info">
         <p>
           <strong>Note:</strong> Documents are optional. You can skip this step or add documents
           later. All uploaded documents will be associated with this order.

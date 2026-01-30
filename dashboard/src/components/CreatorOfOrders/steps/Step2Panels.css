@@ -1,10 +1,10 @@
-.step3-panels {
+.step2-panels {
   max-width: 100%;
   margin: 0;
   width: 100%;
 }
 
-.step3-upload {
+.step2-upload {
   margin: 2rem 0;
   display: flex;
   gap: 1rem;
@@ -173,7 +173,7 @@
   color: #6b7280;
 }
 
-.step3-preview {
+.step2-preview {
   margin-top: 2rem;
   padding: 1.5rem;
   background: #f7fafc;
@@ -377,7 +377,7 @@
 }
 
 /* Sección de comentario para la orden */
-.step3-comment-section {
+.step2-comment-section {
   margin: 2rem 0;
 }
 

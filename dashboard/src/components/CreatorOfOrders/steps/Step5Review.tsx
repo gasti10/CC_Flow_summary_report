@@ -1,20 +1,57 @@
 // Step 5: Review & Create
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import confetti from 'canvas-confetti'
 import { useWizard } from '../useWizard'
 import { createOrder, type CreateOrderProgress } from '../../../services/orderCreationCutService'
-import './Step4Review.css'
+import './Step5Review.css'
 
-export function Step4Review() {
-  const { formData, validation, setLoading, setError, setSuccess, resetWizard, isLoading, goToStep } =
+const FIREWORK_COLORS = ['#16a34a', '#22c55e', '#15803d', '#fbbf24', '#fde047', '#ffffff']
+
+/** Runs confetti animation and returns timeout IDs for cleanup on unmount. */
+function runFireworkConfetti(): number[] {
+  const duration = 600
+  const bursts = 5
+  const burstInterval = duration / bursts
+  const timeoutIds: number[] = []
+
+  const fireBurst = (delay: number) => {
+    const id = window.setTimeout(() => {
+      confetti({
+        particleCount: 80,
+        spread: 360,
+        origin: { x: 0.5, y: 0.45 },
+        startVelocity: 38,
+        colors: FIREWORK_COLORS,
+        ticks: 120,
+        gravity: 0.9,
+        scalar: 0.95,
+        drift: 0,
+      })
+    }, delay)
+    timeoutIds.push(id)
+  }
+
+  for (let i = 0; i < bursts; i++) {
+    fireBurst(i * burstInterval)
+  }
+  return timeoutIds
+}
+
+type CreationResultState = {
+  success: boolean
+  orderId: string
+  errors: string[]
+  warnings: string[]
+}
+
+export function Step5Review() {
+  const { formData, validation, setLoading, setError, setSuccess, resetWizard, isLoading, goToStep, creationResult: contextCreationResult, setCreationResult: setContextCreationResult } =
     useWizard()
   const [showConfirm, setShowConfirm] = useState(false)
-  const [creationResult, setCreationResult] = useState<{
-    success: boolean
-    orderId: string
-    errors: string[]
-    warnings: string[]
-  } | null>(null)
+  const [localCreationResult, setLocalCreationResult] = useState<CreationResultState | null>(null)
+  // Si la orden ya fue creada (contexto), mostramos eso al volver de Step 4; si no, el resultado local de esta sesión
+  const creationResult = contextCreationResult ?? localCreationResult
   const [creationProgress, setCreationProgress] = useState<{
     currentStep: number
     totalSteps: number
@@ -28,6 +65,23 @@ export function Step4Review() {
 
   const [qualityControl, setQualityControl] = useState(false)
   const [notification, setNotification] = useState(true) // Por defecto true
+  const [copyOrderIdFeedback, setCopyOrderIdFeedback] = useState(false)
+  const fireworkFiredRef = useRef(false)
+
+  // Fireworks solo al crear en esta sesión; no al volver de Step 4 (contextCreationResult)
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (localCreationResult?.success && !fireworkFiredRef.current && !prefersReducedMotion) {
+      fireworkFiredRef.current = true
+      const timeoutIds = runFireworkConfetti()
+      return () => {
+        timeoutIds.forEach(id => window.clearTimeout(id))
+      }
+    }
+    if (!localCreationResult?.success) {
+      fireworkFiredRef.current = false
+    }
+  }, [localCreationResult?.success])
 
   const handleQualityControlChange = (checked: boolean) => {
     setQualityControl(checked)
@@ -37,6 +91,17 @@ export function Step4Review() {
 
   const handleNotificationChange = (checked: boolean) => {
     setNotification(checked)
+  }
+
+  const handleCopyOrderId = async () => {
+    if (!creationResult?.orderId) return
+    try {
+      await navigator.clipboard.writeText(creationResult.orderId)
+      setCopyOrderIdFeedback(true)
+      setTimeout(() => setCopyOrderIdFeedback(false), 2000)
+    } catch {
+      setCopyOrderIdFeedback(false)
+    }
   }
 
   const handleCreateOrder = async () => {
@@ -61,6 +126,7 @@ export function Step4Review() {
       { number: 4, label: 'Creating order in CC Flow 2026', status: 'pending' as const },
       { number: 5, label: 'Creating stages in CC Flow 2026 (3 stages)', status: 'pending' as const },
       { number: 6, label: `Creating panels in CC Flow 2026 (${formData.panels.length} panels)`, status: 'pending' as const },
+      { number: 7, label: 'Updating sheets inventory in CC Flow 2026', status: 'pending' as const },
     ]
 
     // Agregar pasos de documentos si hay pendientes
@@ -108,10 +174,11 @@ export function Step4Review() {
         })
       })
 
-      setCreationResult(result)
+      setLocalCreationResult(result)
       setCreationProgress(null) // Limpiar progreso al finalizar
 
       if (result.success) {
+        setContextCreationResult(result) // Persistir para que al volver de Step 4 se siga mostrando éxito
         setSuccess(true)
         // Si hay warnings, mostrarlos pero no bloquear el éxito
         if (result.warnings.length > 0) {
@@ -128,7 +195,7 @@ export function Step4Review() {
       const errorMessage =
         error instanceof Error ? error.message : 'Unknown error'
       setError(errorMessage)
-      setCreationResult({
+      setLocalCreationResult({
         success: false,
         orderId: formData.orderId,
         errors: [errorMessage],
@@ -143,7 +210,7 @@ export function Step4Review() {
 
   const handleReset = () => {
     resetWizard()
-    setCreationResult(null)
+    setLocalCreationResult(null)
     setShowConfirm(false)
   }
 
@@ -162,19 +229,51 @@ export function Step4Review() {
 
   if (creationResult?.success) {
     return (
-      <div className="step-container step4-review step-success">
-        <div className="success-content">
+      <div className="step-container step5-review step-success">
+        <div className="success-content success-content-enter">
           <div className="success-icon-wrapper">
-            <div className="success-icon">✅</div>
+            <svg
+              className="success-icon-svg"
+              viewBox="0 0 52 52"
+              aria-hidden
+            >
+              <circle
+                className="success-icon-circle"
+                cx="26"
+                cy="26"
+                r="24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+              <path
+                className="success-icon-check"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M14 27l8 8 16-20"
+              />
+            </svg>
           </div>
-          <h2 className="success-title">Order Created Successfully!</h2>
-          <p className="success-message">
-            Order <strong>{creationResult.orderId}</strong> has been created successfully for project <strong>{formData.project}</strong>.
+          <h2 className="success-title success-title-enter">Order Created Successfully!</h2>
+          <p className="success-message success-message-enter">
+            Your order <strong>{creationResult.orderId}</strong> for project <strong>{formData.project}</strong> has been created and is ready for processing.
           </p>
           <div className="success-order-info">
-            <div className="success-info-item">
+            <div className="success-info-item success-info-item-order-id">
               <span className="success-info-label">Order ID:</span>
               <span className="success-info-value">{creationResult.orderId}</span>
+              <button
+                type="button"
+                onClick={handleCopyOrderId}
+                className="success-copy-order-id-btn"
+                title="Copy Order ID"
+                aria-label={copyOrderIdFeedback ? 'Copied' : 'Copy Order ID to clipboard'}
+              >
+                {copyOrderIdFeedback ? 'Copied!' : 'Copy'}
+              </button>
             </div>
             <div className="success-info-item">
               <span className="success-info-label">Project:</span>
@@ -218,6 +317,9 @@ export function Step4Review() {
                   <p className="success-documents-message">
                     Consider adding documents such as cut lists, elevation, drawings or other relevant files.
                   </p>
+                  <p className="success-documents-linked-order">
+                    Documents will be linked to order: <strong>{creationResult.orderId}</strong>
+                  </p>
                   <button
                     type="button"
                     onClick={() => goToStep(4)}
@@ -239,6 +341,9 @@ export function Step4Review() {
                   </p>
                 </div>
                 
+                <p className="success-documents-linked-order">
+                  Documents will be linked to order: <strong>{creationResult.orderId}</strong>
+                </p>
                 <div className="success-documents-list">
                   {processedNewDocs.length > 0 && (
                     <div className="success-documents-group">
@@ -278,13 +383,19 @@ export function Step4Review() {
             )
           })()}
 
+          <p className="success-next-step">What would you like to do next?</p>
           <div className="success-actions">
             <button
               type="button"
               onClick={handleReset}
-              className="action-button action-button-primary"
+              className="action-button success-cta-button"
             >
-              Create New Order
+              <span className="success-cta-icon" aria-hidden>
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M8 3v10M3 8h10" />
+                </svg>
+              </span>
+              Create another order
             </button>
           </div>
         </div>
@@ -293,7 +404,7 @@ export function Step4Review() {
   }
 
   return (
-    <div className="step-container step4-review">
+    <div className="step-container step5-review">
       <h2 className="step-title">Review and Create Order</h2>
       <p className="step-description">
         Review all the information before creating the order.
@@ -337,24 +448,102 @@ export function Step4Review() {
         </div>
       )}
 
-      <div className="step4-sections">
+      <div className="step5-sections">
         {/* Información de la Orden */}
         <section className="review-section">
           <h3 className="section-title">Order Information</h3>
           
           {/* Campos principales destacados */}
           <div className="review-highlight-grid">
-            <div className="review-item-highlight">
+            <div className="review-item-highlight review-item-highlight-animated review-item-order-id" style={{ animationDelay: '0.1s' }}>
               <span className="review-label-highlight">Order ID</span>
               <span className="review-value-highlight">{formData.orderId}</span>
             </div>
-            <div className="review-item-highlight">
+            <div className="review-item-highlight review-item-highlight-animated review-item-project" style={{ animationDelay: '0.2s' }}>
               <span className="review-label-highlight">Project</span>
               <span className="review-value-highlight">{formData.project}</span>
             </div>
-            <div className="review-item-highlight">
+            <div className="review-item-highlight review-item-highlight-animated review-item-sheets" style={{ animationDelay: '0.3s' }}>
               <span className="review-label-highlight">Sheets</span>
               <span className="review-value-highlight">{formData.sheets || 'N/A'}</span>
+            </div>
+          </div>
+
+          {/* Controles: Notification y Quality Control */}
+          <div className="review-controls-inline">
+            <div 
+              className="review-control-item-inline review-control-notification review-control-animated" 
+              style={{ animationDelay: '0.4s' }}
+              onClick={() => handleNotificationChange(!notification)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleNotificationChange(!notification)
+                }
+              }}
+            >
+              <div className="control-header-inline">
+                <span className="control-label-inline">Notification</span>
+                <div 
+                  className="tooltip-container"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="tooltip-icon">ℹ️</span>
+                  <div className="tooltip-content">
+                    When enabled, a notification will be sent to the Factory workers about this order.
+                  </div>
+                </div>
+              </div>
+              <label 
+                className="toggle-switch toggle-switch-enhanced"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={notification}
+                  onChange={(e) => handleNotificationChange(e.target.checked)}
+                />
+                <span className="toggle-slider"></span>
+              </label>
+            </div>
+            <div 
+              className="review-control-item-inline review-control-quality review-control-animated" 
+              style={{ animationDelay: '0.5s' }}
+              onClick={() => handleQualityControlChange(!qualityControl)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  handleQualityControlChange(!qualityControl)
+                }
+              }}
+            >
+              <div className="control-header-inline">
+                <span className="control-label-inline">Quality Control</span>
+                <div 
+                  className="tooltip-container"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <span className="tooltip-icon">ℹ️</span>
+                  <div className="tooltip-content">
+                    When enabled, in the Manufacturing stage it will be mandatory to take a photo of each manufactured panel.
+                  </div>
+                </div>
+              </div>
+              <label 
+                className="toggle-switch toggle-switch-enhanced"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={qualityControl}
+                  onChange={(e) => handleQualityControlChange(e.target.checked)}
+                />
+                <span className="toggle-slider"></span>
+              </label>
             </div>
           </div>
 
@@ -382,28 +571,6 @@ export function Step4Review() {
               <span className="review-label">Colour:</span>
               <span className="review-value">{formData.colour || 'N/A'}</span>
             </div>
-            <div className="review-item">
-              <span className="review-label">Quality Control:</span>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={qualityControl}
-                  onChange={(e) => handleQualityControlChange(e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
-            </div>
-            <div className="review-item">
-              <span className="review-label">Notification:</span>
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={notification}
-                  onChange={(e) => handleNotificationChange(e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
-            </div>
             {formData.orderComment && (
               <div className="review-item review-item-full">
                 <span className="review-label">Order Comment:</span>
@@ -411,6 +578,7 @@ export function Step4Review() {
               </div>
             )}
           </div>
+
         </section>
 
         {/* Sheets Seleccionadas */}
@@ -560,7 +728,7 @@ export function Step4Review() {
         </div>
       )}
 
-      <div className="step4-actions">
+      <div className="step5-actions">
         {!showConfirm ? (
           <button
             type="button"
@@ -582,7 +750,7 @@ export function Step4Review() {
                 className="confirm-button confirm-button-cancel"
                 disabled={isLoading}
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 type="button"

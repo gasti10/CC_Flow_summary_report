@@ -1,6 +1,6 @@
 // Types para el wizard de creación de órdenes
 
-// Tipo para las sheets simplificadas (usado en Step 2)
+// Tipo para las sheets simplificadas (usado en Step 3 - Sheets Selection)
 export type SimpleSheet = {
   'Sheet ID': string
   Dimension: string
@@ -21,18 +21,18 @@ export interface OrderFormData {
   expectedTo: string // ISO date string
   priority: string
   
-  // Step 2: Sheets Selection (calculados internamente)
+  // Step 2: Panels Import
+  panels: ProcessedPanel[]
+  csvFile: File | null
+  orderComment: string // Comentario general para la orden
+  
+  // Step 3: Sheets Selection (calculados internamente)
   selectedSheets: SelectedSheet[]
   sheets: string // Formato: "Dimension - Colour" (ej: "850x1575 - Traffic White")
   colour: string // De la primera sheet seleccionada
   ignoredSheetDimensions: string[]
   
-  // Step 3: Panels Import
-  panels: ProcessedPanel[]
-  csvFile: File | null
-  orderComment: string // Comentario general para la orden
-  
-  // Step 5: Documents Upload
+  // Step 4: Documents Upload
   documents: UploadedDocument[]
   selectedExistingDocuments: SelectedExistingDocument[] // Documentos existentes seleccionados
   

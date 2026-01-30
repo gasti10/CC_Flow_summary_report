@@ -46,8 +46,8 @@ export async function createOrder(
   const pendingExistingDocuments = formData.selectedExistingDocuments.filter(doc => !doc.linked)
   const hasPendingDocuments = pendingNewDocuments.length > 0 || pendingExistingDocuments.length > 0
   
-  // Total de pasos: 6 básicos + documentos si hay
-  const baseSteps = 6
+  // Total de pasos: 7 básicos + documentos si hay
+  const baseSteps = 7
   const documentSteps = hasPendingDocuments 
     ? (pendingNewDocuments.length > 0 ? 1 : 0) + (pendingExistingDocuments.length > 0 ? 1 : 0)
     : 0
@@ -267,11 +267,56 @@ export async function createOrder(
       // Continuar aunque falle panels
     }
 
+    // Paso 7: Crear Sheets Inventory en AppSheet
+    onProgress?.({
+      step: 7,
+      totalSteps,
+      message: `Updating sheets inventory in CC Flow 2026 (${formData.selectedSheets.length} sheets)...`,
+      status: 'in-progress'
+    })
+
+    try {
+      if (formData.selectedSheets.length > 0) {
+        // Preparar registros de Sheets Inventory
+        const sheetsInventoryRecords = formData.selectedSheets.map(sheet => ({
+          'Sheet ID': sheet.sheetId,
+          order: formData.orderId,
+          qty: -sheet.qty, // Negativo porque representa salida/reducción
+          change_time: creationDate
+        }))
+
+        await appSheetApi.createSheetsInventory(sheetsInventoryRecords)
+        onProgress?.({
+          step: 7,
+          totalSteps,
+          message: `Sheets inventory updated in CC Flow 2026 (${formData.selectedSheets.length} sheets)`,
+          status: 'completed'
+        })
+      } else {
+        onProgress?.({
+          step: 7,
+          totalSteps,
+          message: 'No sheets to update in inventory',
+          status: 'completed'
+        })
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      warnings.push(`Failed to update sheets inventory in AppSheet: ${errorMessage}`)
+      onProgress?.({
+        step: 7,
+        totalSteps,
+        message: `Warning: ${errorMessage}`,
+        status: 'error'
+      })
+      // Continuar aunque falle sheets inventory
+    }
+
     // Procesar documentos si hay pendientes
     if (hasPendingDocuments) {
       let currentStep = baseSteps
 
-      // Paso 7: Subir documentos nuevos
+      // Paso 8: Subir documentos nuevos
       if (pendingNewDocuments.length > 0) {
         currentStep++
         onProgress?.({
@@ -313,7 +358,7 @@ export async function createOrder(
         })
       }
 
-      // Paso 8: Vincular documentos existentes
+      // Paso 9: Vincular documentos existentes
       if (pendingExistingDocuments.length > 0) {
         currentStep++
         onProgress?.({

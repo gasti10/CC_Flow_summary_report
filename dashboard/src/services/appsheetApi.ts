@@ -990,6 +990,44 @@ class AppSheetAPI {
     }
   }
 
+  // Crear registros de Sheets Inventory en AppSheet
+  async createSheetsInventory(inventoryRecords: Array<{
+    'Sheet ID': string
+    order: string
+    qty: number
+    change_time: string
+  }>): Promise<unknown[]> {
+    if (inventoryRecords.length === 0) {
+      console.warn('⚠️ No sheets inventory records to create')
+      return []
+    }
+
+    try {
+      console.log(`🔄 Creating ${inventoryRecords.length} sheets inventory records in AppSheet...`)
+      
+      // Preparar registros completos
+      const records = inventoryRecords.map(record => ({
+        sheet: record['Sheet ID'], // Mapear 'Sheet ID' del servicio a 'sheet' de AppSheet
+        order: record.order,
+        qty: record.qty, // Ya viene negativo desde el servicio
+        change_time: record.change_time
+      }))
+
+      const response = await this.makeRequest<unknown>('Sheets Inventory', 'Add', records)
+
+      if (response && response.length > 0) {
+        console.log(`✅ ${response.length} sheets inventory records created successfully in AppSheet`)
+        return response
+      } else {
+        console.error(`❌ Failed to create sheets inventory - empty response`)
+        return []
+      }
+    } catch (error) {
+      console.error('Error creating sheets inventory in AppSheet:', error)
+      throw error
+    }
+  }
+
   // Crear orden de corte completa en AppSheet (incluye stages y panels)
   async createOrderCut(
     order: {

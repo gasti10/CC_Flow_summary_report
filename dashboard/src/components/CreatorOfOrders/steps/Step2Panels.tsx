@@ -5,11 +5,11 @@ import Papa from 'papaparse'
 import { useWizard } from '../useWizard'
 import { supabaseApi } from '../../../services/supabaseApi'
 import type { ProcessedPanel } from '../types/wizard.types'
-import './Step3Panels.css'
+import './Step2Panels.css'
 
 type CSVRow = Array<string | number | null | undefined>
 
-export function Step3Panels() {
+export function Step2Panels() {
   const { formData, updateFormData, validation } = useWizard()
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingError, setProcessingError] = useState<string | null>(null)
@@ -251,14 +251,14 @@ export function Step3Panels() {
   }, [formData.panels])
 
   return (
-    <div className="step-container step3-panels">
+    <div className="step-container step2-panels">
       <h2 className="step-title">Import Panels from CSV</h2>
       <p className="step-description">
         Upload the nesting CSV. We will extract panels from PartName columns and use
         SheetName and NestNumber from the file.
       </p>
 
-      <div className="step3-upload">
+      <div className="step2-upload">
         <div className="upload-area">
           <input
             ref={fileInputRef}
@@ -314,7 +314,7 @@ export function Step3Panels() {
       )}
 
       {/* Campo de comentario para la orden */}
-      <div className="step3-comment-section">
+      <div className="step2-comment-section">
         <label htmlFor="order-comment" className="comment-label">
           Order Comment (Optional)
         </label>
@@ -378,7 +378,7 @@ export function Step3Panels() {
       )}
 
       {formData.panels.length > 0 && (
-        <div className="step3-preview">
+        <div className="step2-preview">
           <div className="preview-header">
             <h3>Preview of Processed Panels</h3>
             <span className="preview-count">

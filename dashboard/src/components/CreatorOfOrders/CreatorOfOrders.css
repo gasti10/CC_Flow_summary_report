@@ -109,7 +109,7 @@
   border-right: 3px solid var(--mode-green-dark, #043F2E);
 }
 
-/* Para Step 2, usar más espacio */
+/* Para Step 2 y 3 (Panels y Sheets), usar más espacio */
 .creator-content.step2-full-width {
   max-width: 95%;
   padding: 2rem 1.5rem;
@@ -120,7 +120,7 @@
   margin: 0 auto;
 }
 
-/* Para Step 2, usar más espacio */
+/* Para Step 2 y 3 (Panels y Sheets), usar más espacio */
 .wizard-container.step2-full-width {
   max-width: 100%;
 }

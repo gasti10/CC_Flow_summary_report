@@ -1,13 +1,12 @@
 // Step 3: Sheets Selection
 
 import { useState, useMemo, useEffect } from 'react'
-import React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useWizard } from '../useWizard'
 import AppSheetAPI from '../../../services/appsheetApi'
 import LoadingSpinner from '../../Common/LoadingSpinner'
 import type { SelectedSheet, SimpleSheet } from '../types/wizard.types'
-import './Step2Sheets.css'
+import './Step3Sheets.css'
 
 const appSheetApi = new AppSheetAPI()
 
@@ -21,6 +20,10 @@ type SheetRow =
   | { type: 'subheader'; key: string; label: string }
   | { type: 'sheet'; key: string; sheet: SimpleSheet }
 
+/** Normaliza dimensión para comparación: '4000 x 1250', '4000 X 1250', '4000x1250', '4000X1250' son iguales */
+const normalizeDimension = (s: string): string =>
+  (s || '').trim().replace(/\s+/g, '').toLowerCase()
+
 const getBestSheetOption = (options: SimpleSheet[]): SimpleSheet | null => {
   if (options.length === 0) return null
   return options.reduce((best, current) => {
@@ -30,14 +33,14 @@ const getBestSheetOption = (options: SimpleSheet[]): SimpleSheet | null => {
   }, options[0])
 }
 
-export function Step2Sheets() {
+export function Step3Sheets() {
   const { formData, updateFormData, validation } = useWizard()
   const [offCutFilter, setOffCutFilter] = useState<string>('all')
   const [dimensionFilter, setDimensionFilter] = useState<string>('all')
   const [colourFilter, setColourFilter] = useState<string>('all')
   const [focusedDimension, setFocusedDimension] = useState<string | null>(null)
-  const ignoredDimensions = useMemo(
-    () => new Set(formData.ignoredSheetDimensions || []),
+  const ignoredDimensionsNormalized = useMemo(
+    () => new Set((formData.ignoredSheetDimensions || []).map(normalizeDimension)),
     [formData.ignoredSheetDimensions]
   )
 
@@ -74,8 +77,13 @@ export function Step2Sheets() {
   }, [formData.panels])
 
   const visibleDeducedSheets = useMemo(
-    () => deducedSheets.filter((sheet) => !ignoredDimensions.has(sheet.dimension)),
-    [deducedSheets, ignoredDimensions]
+    () => deducedSheets.filter((sheet) => !ignoredDimensionsNormalized.has(normalizeDimension(sheet.dimension))),
+    [deducedSheets, ignoredDimensionsNormalized]
+  )
+
+  const matchedDimensionsNormalized = useMemo(
+    () => new Set(visibleDeducedSheets.map((sheet) => normalizeDimension(sheet.dimension))),
+    [visibleDeducedSheets]
   )
 
   const sheetsByDimension = useMemo(() => {
@@ -84,10 +92,11 @@ export function Step2Sheets() {
 
     sheets.forEach((sheet) => {
       if (!sheet.Dimension) return
-      if (!map.has(sheet.Dimension)) {
-        map.set(sheet.Dimension, [])
+      const key = normalizeDimension(sheet.Dimension)
+      if (!map.has(key)) {
+        map.set(key, [])
       }
-      map.get(sheet.Dimension)?.push(sheet)
+      map.get(key)!.push(sheet)
     })
 
     return map
@@ -96,7 +105,7 @@ export function Step2Sheets() {
   const suggestedSelections = useMemo(() => {
     return visibleDeducedSheets
       .map((deduced) => {
-        const options = sheetsByDimension.get(deduced.dimension) || []
+        const options = sheetsByDimension.get(normalizeDimension(deduced.dimension)) || []
         if (options.length === 0) return null
         const best = getBestSheetOption(options)
         if (!best) return null
@@ -122,8 +131,8 @@ export function Step2Sheets() {
     }
 
     const nextSelected: SelectedSheet[] = []
-    const deducedDimensions = new Set(
-      visibleDeducedSheets.map((sheet) => sheet.dimension)
+    const deducedDimensionsNormalized = new Set(
+      visibleDeducedSheets.map((sheet) => normalizeDimension(sheet.dimension))
     )
 
     const suggestedByDimension = new Map(
@@ -131,8 +140,9 @@ export function Step2Sheets() {
     )
 
     visibleDeducedSheets.forEach((deduced) => {
+      const deducedNorm = normalizeDimension(deduced.dimension)
       const existing = formData.selectedSheets.find(
-        (sheet) => sheet.dimension === deduced.dimension
+        (sheet) => normalizeDimension(sheet.dimension) === deducedNorm
       )
 
       if (existing) {
@@ -158,7 +168,7 @@ export function Step2Sheets() {
 
     // Preservar selecciones manuales que NO corresponden a dimensiones detectadas
     const preservedSelections = formData.selectedSheets.filter(
-      (sheet) => !deducedDimensions.has(sheet.dimension)
+      (sheet) => !deducedDimensionsNormalized.has(normalizeDimension(sheet.dimension))
     )
 
     nextSelected.push(...preservedSelections)
@@ -183,9 +193,9 @@ export function Step2Sheets() {
 
   useEffect(() => {
     if (!formData.ignoredSheetDimensions?.length) return
-    const detected = new Set(deducedSheets.map((sheet) => sheet.dimension))
+    const detectedNormalized = new Set(deducedSheets.map((sheet) => normalizeDimension(sheet.dimension)))
     const filtered = formData.ignoredSheetDimensions.filter((dimension) =>
-      detected.has(dimension)
+      detectedNormalized.has(normalizeDimension(dimension))
     )
     if (filtered.length !== formData.ignoredSheetDimensions.length) {
       updateFormData({ ignoredSheetDimensions: filtered })
@@ -194,7 +204,12 @@ export function Step2Sheets() {
 
   const uniqueDimensions = useMemo(() => {
     if (!sheets) return []
-    const dimensions = new Set(sheets.map(s => s.Dimension).filter(Boolean))
+    const dimensions = new Set(
+      sheets
+        .map((s) => s.Dimension)
+        .filter(Boolean)
+        .map((d) => normalizeDimension(d))
+    )
     return Array.from(dimensions).sort()
   }, [sheets])
 
@@ -214,7 +229,7 @@ export function Step2Sheets() {
         if (offCutFilter === 'no' && isOffCut) return false
       }
 
-      if (dimensionFilter !== 'all' && sheet.Dimension !== dimensionFilter) {
+      if (dimensionFilter !== 'all' && normalizeDimension(sheet.Dimension) !== normalizeDimension(dimensionFilter)) {
         return false
       }
 
@@ -230,12 +245,12 @@ export function Step2Sheets() {
     if (!filteredSheets.length) return []
 
     const rows: SheetRow[] = []
-    const detectedSet = new Set(deducedSheets.map((sheet) => sheet.dimension))
     const usedSheetIds = new Set<string>()
 
     visibleDeducedSheets.forEach((deduced) => {
+      const deducedNorm = normalizeDimension(deduced.dimension)
       const sheetsForDimension = filteredSheets.filter(
-        (sheet) => sheet.Dimension === deduced.dimension
+        (sheet) => normalizeDimension(sheet.Dimension) === deducedNorm
       )
       if (sheetsForDimension.length === 0) return
 
@@ -329,6 +344,23 @@ export function Step2Sheets() {
     return rows
   }, [visibleDeducedSheets, filteredSheets])
 
+  const ignoreDetectedDimension = (dimension: string) => {
+    const dimNorm = normalizeDimension(dimension)
+    updateFormData({
+      selectedSheets: formData.selectedSheets.filter(
+        (sheet) => normalizeDimension(sheet.dimension) !== dimNorm
+      ),
+      ignoredSheetDimensions: Array.from(
+        new Set([...(formData.ignoredSheetDimensions || []), dimension])
+      )
+    })
+
+    if (normalizeDimension(focusedDimension || '') === dimNorm) {
+      setFocusedDimension(null)
+      setDimensionFilter('all')
+    }
+  }
+
   const handleSheetToggle = (sheet: SimpleSheet) => {
     const existingIndex = formData.selectedSheets.findIndex(
       (s) => s.sheetId === sheet['Sheet ID']
@@ -337,13 +369,22 @@ export function Step2Sheets() {
     let newSelectedSheets: SelectedSheet[]
 
     if (existingIndex >= 0) {
-      newSelectedSheets = formData.selectedSheets.filter(
-        (s) => s.sheetId !== sheet['Sheet ID']
-      )
+      const dimension = sheet.Dimension?.trim() || ''
+      if (dimension && matchedDimensionsNormalized.has(normalizeDimension(dimension))) {
+        // Si la dimensión viene detectada por el CSV, al borrar también se ignora
+        const deducedDim = visibleDeducedSheets.find(
+          (d) => normalizeDimension(d.dimension) === normalizeDimension(dimension)
+        )
+        ignoreDetectedDimension(deducedDim?.dimension ?? dimension)
+        return
+      }
+
+      newSelectedSheets = formData.selectedSheets.filter((s) => s.sheetId !== sheet['Sheet ID'])
     } else {
-      const deduced = deducedSheets.find(d => d.dimension === sheet.Dimension)
+      const sheetNorm = normalizeDimension(sheet.Dimension || '')
+      const deduced = deducedSheets.find((d) => normalizeDimension(d.dimension) === sheetNorm)
       newSelectedSheets = formData.selectedSheets.filter(
-        (s) => s.dimension !== sheet.Dimension
+        (s) => normalizeDimension(s.dimension) !== sheetNorm
       )
       newSelectedSheets.push({
         sheetId: sheet['Sheet ID'],
@@ -379,11 +420,9 @@ export function Step2Sheets() {
   }
 
   const missingSelections = visibleDeducedSheets.filter(
-    (deduced) => !formData.selectedSheets.some((s) => s.dimension === deduced.dimension)
-  )
-  const matchedDimensions = useMemo(
-    () => new Set(visibleDeducedSheets.map((sheet) => sheet.dimension)),
-    [visibleDeducedSheets]
+    (deduced) => !formData.selectedSheets.some(
+      (s) => normalizeDimension(s.dimension) === normalizeDimension(deduced.dimension)
+    )
   )
   const suggestedSheetIds = useMemo(() => {
     return new Set(
@@ -394,11 +433,12 @@ export function Step2Sheets() {
   }, [suggestedSelections])
   const detectedChips = useMemo(() => {
     return visibleDeducedSheets.map((deduced) => {
+      const deducedNorm = normalizeDimension(deduced.dimension)
       const selected = formData.selectedSheets.find(
-        (sheet) => sheet.dimension === deduced.dimension
+        (sheet) => normalizeDimension(sheet.dimension) === deducedNorm
       )
       const suggested = suggestedSelections.find(
-        (selection) => selection.dimension === deduced.dimension
+        (selection) => normalizeDimension(selection.dimension) === deducedNorm
       )
       return {
         dimension: deduced.dimension,
@@ -426,16 +466,7 @@ export function Step2Sheets() {
   }
 
   const handleChipRemove = (dimension: string) => {
-    updateFormData({
-      selectedSheets: formData.selectedSheets.filter((sheet) => sheet.dimension !== dimension),
-      ignoredSheetDimensions: Array.from(
-        new Set([...(formData.ignoredSheetDimensions || []), dimension])
-      )
-    })
-    if (focusedDimension === dimension) {
-      setFocusedDimension(null)
-      setDimensionFilter('all')
-    }
+    ignoreDetectedDimension(dimension)
   }
 
   const stepValidation = validation.step3
@@ -466,7 +497,7 @@ export function Step2Sheets() {
   }
 
   return (
-    <div className="step-container step2-sheets">
+    <div className="step-container step3-sheets">
       <h2 className="step-title">Sheet Selection</h2>
       <p className="step-description">
         We detected the sheets from the nesting CSV. Please select the colour for each sheet size.
@@ -528,7 +559,7 @@ export function Step2Sheets() {
         </div>
       )}
 
-      <div className="step2-filters">
+      <div className="step3-filters">
         <div className="filter-group">
           <label htmlFor="offcut-filter" className="filter-label">Off Cut</label>
           <select
@@ -574,15 +605,15 @@ export function Step2Sheets() {
         </div>
       </div>
 
-      <div className="step2-content-layout">
-        <div className="step2-main-content">
+      <div className="step3-content-layout">
+        <div className="step3-main-content">
           {filteredSheets.length === 0 ? (
             <div className="step-empty">
               <p>No sheets found for this project.</p>
             </div>
           ) : (
-            <div className="step2-table-container">
-              <table className="step2-table">
+            <div className="step3-table-container">
+              <table className="step3-table">
                 <thead>
                   <tr>
                     <th className="col-checkbox">Select</th>
@@ -622,8 +653,8 @@ export function Step2Sheets() {
                     const qty = getSelectedQty(sheet['Sheet ID'])
                     const hasNoFactoryQty = sheet['Quantity in Factory'] <= 0
                     const exceedsQty = isSelected && exceedsFactoryQty(sheet['Sheet ID'], sheet['Quantity in Factory'])
-                    const isDimensionMatch = matchedDimensions.has(sheet.Dimension || '')
-                    const isFocused = focusedDimension && sheet.Dimension === focusedDimension
+                    const isDimensionMatch = matchedDimensionsNormalized.has(normalizeDimension(sheet.Dimension || ''))
+                    const isFocused = focusedDimension && normalizeDimension(sheet.Dimension || '') === normalizeDimension(focusedDimension)
                     const isSuggested = suggestedSheetIds.has(sheet['Sheet ID'])
 
                     return (
@@ -691,7 +722,7 @@ export function Step2Sheets() {
         </div>
 
         {formData.selectedSheets.length > 0 && (
-          <div className="step2-summary-sidebar">
+          <div className="step3-summary-sidebar">
             <div className="summary-header">
               <h3>Selected Sheets</h3>
               <span className="summary-badge">{formData.selectedSheets.length}</span>
@@ -734,15 +765,18 @@ export function Step2Sheets() {
                         )}
                       </div>
                       <button
-                        onClick={() => handleSheetToggle({
-                          'Sheet ID': sheet.sheetId,
-                          Dimension: sheet.dimension,
-                          Colour: sheet.colour,
-                          'Quantity in Factory': 0,
-                          'Quantity in Store': 0,
-                          'Off Cut': false,
-                          Comment: ''
-                        })}
+                        onClick={() => {
+                          const deducedDim = visibleDeducedSheets.find(
+                            (d) => normalizeDimension(d.dimension) === normalizeDimension(sheet.dimension)
+                          )
+                          if (deducedDim) {
+                            ignoreDetectedDimension(deducedDim.dimension)
+                          } else {
+                            updateFormData({
+                              selectedSheets: formData.selectedSheets.filter((s) => s.sheetId !== sheet.sheetId)
+                            })
+                          }
+                        }}
                         className="summary-remove-btn"
                         title="Remove"
                       >

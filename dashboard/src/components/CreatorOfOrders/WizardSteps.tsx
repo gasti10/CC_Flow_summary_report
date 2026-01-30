@@ -2,10 +2,10 @@
 
 import { useWizard } from './useWizard'
 import { Step1Order } from './steps/Step1Order'
-import { Step2Sheets } from './steps/Step2Sheets'
-import { Step3Panels } from './steps/Step3Panels'
-import { Step4Review } from './steps/Step4Review'
-import { Step5Documents } from './steps/Step5Documents'
+import { Step2Panels } from './steps/Step2Panels'
+import { Step3Sheets } from './steps/Step3Sheets'
+import { Step4Documents } from './steps/Step4Documents'
+import { Step5Review } from './steps/Step5Review'
 
 export function WizardSteps() {
   const { currentStep } = useWizard()
@@ -14,13 +14,13 @@ export function WizardSteps() {
     case 1:
       return <Step1Order />
     case 2:
-      return <Step3Panels />
+      return <Step2Panels />
     case 3:
-      return <Step2Sheets />
+      return <Step3Sheets />
     case 4:
-      return <Step5Documents />
+      return <Step4Documents />
     case 5:
-      return <Step4Review />
+      return <Step5Review />
     default:
       return <Step1Order />
   }
