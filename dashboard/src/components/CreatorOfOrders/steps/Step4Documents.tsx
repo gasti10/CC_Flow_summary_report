@@ -34,6 +34,9 @@ function generateTempId(): string {
 // Categorías que no se muestran en el step (no se utilizan para la orden)
 const EXCLUDED_DOCUMENT_CATEGORIES = new Set(['Cut List', 'Delivery Docket'])
 
+// Categorías que siempre están disponibles al crear un nuevo documento
+const ALWAYS_AVAILABLE_CATEGORIES = ['Cut List', 'Elevations']
+
 export function Step4Documents() {
   const { formData, updateFormData, validation, setLoading, setError, isLoading, creationResult } = useWizard()
   const [uploadingDocs, setUploadingDocs] = useState<Set<string>>(new Set())
@@ -123,18 +126,17 @@ export function Step4Documents() {
       })
   }, [existingDocuments, searchQuery])
 
-  // Categorías disponibles para nuevos documentos (incluye Cut List y Delivery Docket)
+  // Categorías disponibles para nuevos documentos (siempre incluye Cut List y Elevations + las del proyecto)
   const existingCategories = useMemo(() => {
-    if (!existingDocumentsRaw || existingDocumentsRaw.length === 0) {
-      return []
+    const categories = new Set<string>(ALWAYS_AVAILABLE_CATEGORIES)
+    if (existingDocumentsRaw?.length) {
+      existingDocumentsRaw.forEach(doc => {
+        const category = doc['Category']
+        if (category && category.trim()) {
+          categories.add(category)
+        }
+      })
     }
-    const categories = new Set<string>()
-    existingDocumentsRaw.forEach(doc => {
-      const category = doc['Category']
-      if (category && category.trim()) {
-        categories.add(category)
-      }
-    })
     return Array.from(categories).sort()
   }, [existingDocumentsRaw])
 
