@@ -13,14 +13,13 @@ export function Step2Panels() {
   const { formData, updateFormData, validation } = useWizard()
   const [isProcessing, setIsProcessing] = useState(false)
   const [processingError, setProcessingError] = useState<string | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const stepContainerRef = useRef<HTMLDivElement>(null)
 
-  // Procesar archivo CSV
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    if (!file.name.endsWith('.csv')) {
+  // Procesar archivo CSV (compartido por input y por drop)
+  const processCsvFile = (file: File) => {
+    if (!file.name.toLowerCase().endsWith('.csv')) {
       setProcessingError('Please select a CSV file')
       return
     }
@@ -35,7 +34,6 @@ export function Step2Panels() {
         try {
           const processedPanels = processCSVData(results.data as CSVRow[])
           
-          // Verificar duplicados en Supabase
           const panelNames = processedPanels.map(p => p.name)
           const existingPanels = await supabaseApi.checkExistingPanels(panelNames)
           const existingNamesSet = new Set(existingPanels.map(p => p.Name))
@@ -43,7 +41,6 @@ export function Step2Panels() {
             existingPanels.map(p => [p.Name, { Order: p.Order, Status: p.Status }])
           )
           
-          // Marcar paneles que ya existen en la base de datos
           const panelsWithDuplicates = processedPanels.map(panel => ({
             ...panel,
             existsInDatabase: existingNamesSet.has(panel.name),
@@ -71,6 +68,51 @@ export function Step2Panels() {
         setIsProcessing(false)
       }
     })
+  }
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    processCsvFile(file)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  // Drag and drop
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer.types.includes('Files') && !isProcessing) {
+      e.dataTransfer.dropEffect = 'copy'
+      setIsDragOver(true)
+    }
+  }
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer.types.includes('Files') && !isProcessing) {
+      setIsDragOver(true)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!stepContainerRef.current?.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    if (isProcessing) return
+    const file = e.dataTransfer.files?.[0]
+    if (!file) return
+    processCsvFile(file)
   }
 
   // Procesar datos del CSV
@@ -251,7 +293,23 @@ export function Step2Panels() {
   }, [formData.panels])
 
   return (
-    <div className="step-container step2-panels">
+    <div
+      ref={stepContainerRef}
+      className={`step-container step2-panels${isDragOver ? ' step2-panels--drag-over' : ''}`}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragOver && (
+        <div className="step2-drag-overlay" aria-hidden>
+          <div className="step2-drag-overlay-content">
+            <span className="step2-drag-overlay-icon">📁</span>
+            <span className="step2-drag-overlay-title">Drop CSV here</span>
+            <span className="step2-drag-overlay-hint">Release to import panels</span>
+          </div>
+        </div>
+      )}
       <h2 className="step-title">Import Panels from CSV</h2>
       <p className="step-description">
         Upload the nesting CSV. We will extract panels from PartName columns and use
@@ -290,6 +348,7 @@ export function Step2Panels() {
               <>
                 <span className="upload-icon">📁</span>
                 <span>Click to select CSV file</span>
+                <span className="upload-hint">or drag and drop</span>
               </>
             )}
           </label>

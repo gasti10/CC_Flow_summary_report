@@ -106,6 +106,19 @@ export const getTodayDate = (): string => {
 };
 
 /**
+ * Fecha de hoy en YYYY-MM-DD según la zona horaria LOCAL del usuario.
+ * Para inputs type="date" y casos donde "hoy" debe ser el día local (ej. Brisbane),
+ * no el día en UTC (toISOString() puede dar el día anterior en zonas adelantadas).
+ */
+export const getTodayLocalDate = (): string => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+/**
  * Obtiene el primer día del mes actual
  * @returns Fecha en formato YYYY-MM-DD
  */

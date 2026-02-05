@@ -46,7 +46,10 @@ export function Step4Documents() {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [categorySearchTerms, setCategorySearchTerms] = useState<Map<string, string>>(new Map())
   const [showCategoryDropdowns, setShowCategoryDropdowns] = useState<Map<string, boolean>>(new Map())
+  const [isDragOver, setIsDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const stepContainerRef = useRef<HTMLDivElement>(null)
+  const documentsListRef = useRef<HTMLDivElement>(null)
 
   // Cargar documentos existentes del proyecto
   const { data: existingDocumentsRaw, isLoading: loadingExisting } = useQuery<Document[]>({
@@ -153,12 +156,12 @@ export function Step4Documents() {
     })
   }
 
-  // Agregar documento a la lista
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (!files || files.length === 0) return
+  // Agregar documentos a la lista (desde input o desde drop)
+  const addFilesAsDocuments = (files: FileList | File[]) => {
+    const fileArray = Array.isArray(files) ? files : Array.from(files)
+    if (fileArray.length === 0) return
 
-    const newDocuments: UploadedDocument[] = Array.from(files).map(file => ({
+    const newDocuments: UploadedDocument[] = fileArray.map(file => ({
       id: generateTempId(),
       file,
       name: file.name,
@@ -171,11 +174,55 @@ export function Step4Documents() {
     updateFormData({
       documents: [...formData.documents, ...newDocuments]
     })
+  }
 
-    // Limpiar el input para permitir seleccionar el mismo archivo de nuevo
+  // Agregar documento a la lista (desde input file)
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files
+    if (!files || files.length === 0) return
+    addFilesAsDocuments(files)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
+  }
+
+  // Drag and drop: permitir soltar
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer.types.includes('Files')) {
+      e.dataTransfer.dropEffect = 'copy'
+      setIsDragOver(true)
+    }
+  }
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragOver(true)
+    }
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!stepContainerRef.current?.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+    const files = e.dataTransfer.files
+    if (!files || files.length === 0) return
+    addFilesAsDocuments(files)
+    // Scroll suave a la lista de documentos para continuar con categoría
+    setTimeout(() => {
+      documentsListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 120)
   }
 
   // Eliminar documento de la lista
@@ -449,7 +496,24 @@ export function Step4Documents() {
   const hasUnuploaded = formData.documents.some(doc => !doc.uploaded || !doc.saved)
 
   return (
-    <div className="step-container step4-documents">
+    <div
+      ref={stepContainerRef}
+      className={`step-container step4-documents${isDragOver ? ' step4-documents--drag-over' : ''}`}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Overlay con blur cuando se arrastran archivos */}
+      {isDragOver && (
+        <div className="step4-drag-overlay" aria-hidden>
+          <div className="step4-drag-overlay-content">
+            <span className="step4-drag-overlay-icon">📄</span>
+            <span className="step4-drag-overlay-title">Drop files here</span>
+            <span className="step4-drag-overlay-hint">Release to add documents</span>
+          </div>
+        </div>
+      )}
       <h2 className="step-title">Upload Documents</h2>
       <p className="step-description">
         Upload or select documents related to this order. Documents will be saved to CC Flow App and
@@ -671,7 +735,7 @@ export function Step4Documents() {
 
       {/* Lista de documentos nuevos */}
       {hasDocuments && (
-        <div className="step4-documents-list">
+        <div ref={documentsListRef} className="step4-documents-list">
           <div className="step4-documents-header">
             <h3>Documents ({formData.documents.length})</h3>
             {hasUnuploaded && (

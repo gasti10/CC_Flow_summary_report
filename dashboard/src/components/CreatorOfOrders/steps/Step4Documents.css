@@ -2,6 +2,82 @@
   max-width: 100%;
   margin: 0;
   width: 100%;
+  position: relative;
+  min-height: 200px;
+}
+
+/* Zona de drop en todo el step: borde cuando se arrastran archivos */
+.step4-documents.step4-documents--drag-over {
+  outline: 3px dashed var(--mode-blue-500, #3b82f6);
+  outline-offset: -4px;
+  border-radius: 8px;
+}
+
+/* Overlay con fondo difuminado durante el drag */
+.step4-drag-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  border-radius: 8px;
+  background: rgba(59, 130, 246, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: step4-drag-overlay-in 0.2s ease-out;
+}
+
+@keyframes step4-drag-overlay-in {
+  from {
+    opacity: 0;
+    background: rgba(59, 130, 246, 0.04);
+  }
+  to {
+    opacity: 1;
+    background: rgba(59, 130, 246, 0.12);
+  }
+}
+
+.step4-drag-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem 3rem;
+  background: var(--mode-white, #fff);
+  border: 3px dashed var(--mode-blue-500, #3b82f6);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(37, 99, 235, 0.25);
+  animation: step4-drag-badge-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes step4-drag-badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 8px 32px rgba(37, 99, 235, 0.25);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 12px 40px rgba(37, 99, 235, 0.35);
+  }
+}
+
+.step4-drag-overlay-icon {
+  font-size: 3.5rem;
+  line-height: 1;
+}
+
+.step4-drag-overlay-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--mode-blue-700, #1d4ed8);
+}
+
+.step4-drag-overlay-hint {
+  font-size: 0.9rem;
+  color: var(--mode-gray-600, #4b5563);
 }
 
 .step4-order-banner {
@@ -111,6 +187,12 @@
 
 .step4-upload-area {
   margin: 1rem 0;
+}
+
+.step4-upload-area.drag-over .upload-label {
+  border-color: var(--mode-blue-500, #3b82f6);
+  background: var(--mode-blue-50, #eff6ff);
+  border-style: solid;
 }
 
 .step-loading {

@@ -8,6 +8,7 @@ import { useLastOrder } from '../../../hooks/useLastOrder'
 import { useOrderIdValidation } from '../../../hooks/useOrderIdValidation'
 import AppSheetAPI from '../../../services/appsheetApi'
 import { supabaseApi } from '../../../services/supabaseApi'
+import { getTodayLocalDate } from '../../../utils/dateUtils'
 import LoadingSpinner from '../../Common/LoadingSpinner'
 import './Step1Order.css'
 
@@ -432,7 +433,7 @@ export function Step1Order() {
               value={formData.expectedTo}
               onChange={(e) => handleChange('expectedTo', e.target.value)}
               className={`form-input input-centered ${stepValidation.errors.includes('The expected date is required') ? 'error' : ''}`}
-              min={new Date().toISOString().split('T')[0]}
+              min={getTodayLocalDate()}
             />
             {stepValidation.errors.includes('The expected date is required') && (
               <span className="form-error">The expected date is required</span>

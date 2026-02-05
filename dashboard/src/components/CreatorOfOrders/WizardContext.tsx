@@ -7,9 +7,7 @@ import type {
 } from './types/wizard.types'
 import { WizardContext } from './wizardContextTypes'
 import type { WizardContextType, CreationResult } from './wizardContextTypes'
-
-// Helper para obtener fecha de hoy en formato ISO
-const getTodayISO = () => new Date().toISOString().split('T')[0]
+import { getTodayLocalDate } from '../../utils/dateUtils'
 
 // Estado inicial del formulario
 const initialFormData: OrderFormData = {
@@ -17,7 +15,7 @@ const initialFormData: OrderFormData = {
   orderId: '',
   status: 'Ready to cut',
   responsable: '',
-  expectedTo: getTodayISO(),
+  expectedTo: getTodayLocalDate(),
   priority: 'Normal',
   selectedSheets: [],
   sheets: '',
