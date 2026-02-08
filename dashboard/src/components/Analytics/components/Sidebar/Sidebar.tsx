@@ -65,29 +65,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
         md:relative md:z-50
       `}>
         <div className="flex flex-col h-full">
-          {/* Logo and Toggle Button */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-400">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 flex items-center justify-center">
+          {/* Barra superior: cuando está colapsado, logo y botón en columna para no solaparse */}
+          <div className={`flex h-16 border-b border-gray-200 shrink-0 ${isOpen ? 'items-center justify-between px-4' : 'flex-col items-center justify-center gap-1 py-2'}`}>
+            <div className={`flex items-center min-w-0 ${isOpen ? 'gap-3' : 'justify-center'}`}>
+              <div className="w-8 h-8 flex items-center justify-center shrink-0">
                 <img src={getFaviconPath()} alt="CC Logo" className="w-8 h-8" />
               </div>
               {isOpen && (
-                <span className="text-xl font-bold text-gray-900 whitespace-nowrap">
+                <span className="text-sm font-semibold text-slate-800 tracking-tight truncate">
                   Cladding Creations
                 </span>
               )}
             </div>
             <button
               onClick={onToggle}
-              className={`p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 ${
-                showHintAnimation ? 'animate-sidebar-hint animate-sidebar-wiggle animate-sidebar-glow' : ''
-              }`}
+              className={`rounded-lg hover:bg-gray-100 transition-colors duration-200 shrink-0 text-gray-600 ${
+                isOpen ? 'p-2' : 'p-1.5'
+              } ${showHintAnimation ? 'animate-sidebar-hint animate-sidebar-wiggle animate-sidebar-glow' : ''}`}
               title={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
             >
               <svg 
-                className={`w-5 h-5 text-white transition-transform duration-200 ${
-                  isOpen ? 'rotate-180' : 'rotate-0'
-                }`} 
+                className={`text-gray-700 transition-transform duration-200 ${isOpen ? 'w-5 h-5 rotate-180' : 'w-4 h-4 rotate-0'}`}
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"

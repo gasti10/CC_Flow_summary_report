@@ -54,15 +54,6 @@ export const Analytics: React.FC = () => {
   
   // Set dynamic document title
   useDocumentTitle('CC Analytics Dashboard');
-  
-  // Auto-open sidebar
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSidebarOpen(true);
-    }, 1000); // 1 segundo
-    
-    return () => clearTimeout(timer);
-  }, []);
 
   const renderView = useCallback(() => {
     switch (currentView) {
@@ -92,8 +83,8 @@ export const Analytics: React.FC = () => {
         onToggle={handleSidebarToggle}
       />
       
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
+      {/* Main Content: padding izquierdo cuando el sidebar es fixed para que no tape el header */}
+      <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300 pl-16 md:pl-0">
         <Header 
           dateRange={dateRange}
           onDateRangeChange={setDateRange}

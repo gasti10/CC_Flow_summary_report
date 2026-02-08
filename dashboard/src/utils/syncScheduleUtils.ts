@@ -70,17 +70,22 @@ export const getNextSyncTime = (): string => {
   // Find next sync time today
   const nextTimeToday = todayTimes.find(time => time > currentTime);
   
-  if (nextTimeToday) {
+  if (nextTimeToday !== undefined) {
     return `Today at ${formatTime(nextTimeToday)} (Brisbane)`;
   }
 
-  // If no more times today, return tomorrow's first time
-  const tomorrowDay = (currentDay + 1) % 7;
-  const tomorrowTimes = getSyncTimesForDay(tomorrowDay);
-  const firstTimeTomorrow = tomorrowTimes[0];
-  
-  const dayName = getDayName(tomorrowDay);
-  return `${dayName} at ${formatTime(firstTimeTomorrow)} (Brisbane)`;
+  // No more times today: look forward day by day until we find a day with sync (e.g. Saturday evening → Sunday has none → use Monday)
+  for (let offset = 1; offset <= 7; offset++) {
+    const nextDay = (currentDay + offset) % 7;
+    const nextDayTimes = getSyncTimesForDay(nextDay);
+    const firstTime = nextDayTimes[0];
+    if (firstTime !== undefined) {
+      const dayName = getDayName(nextDay);
+      return `${dayName} at ${formatTime(firstTime)} (Brisbane)`;
+    }
+  }
+
+  return '— (Brisbane)';
 };
 
 /**
@@ -99,17 +104,22 @@ export const getLastSyncTime = (): string => {
   // Find last sync time today
   const lastTimeToday = [...todayTimes].reverse().find(time => time < currentTime);
   
-  if (lastTimeToday) {
+  if (lastTimeToday !== undefined) {
     return `Today at ${formatTime(lastTimeToday)} (Brisbane)`;
   }
 
-  // If no sync today, return yesterday's last time
-  const yesterdayDay = (currentDay - 1 + 7) % 7;
-  const yesterdayTimes = getSyncTimesForDay(yesterdayDay);
-  const lastTimeYesterday = yesterdayTimes[yesterdayTimes.length - 1];
-  
-  const dayName = getDayName(yesterdayDay);
-  return `${dayName} at ${formatTime(lastTimeYesterday)} (Brisbane)`;
+  // No sync today: look back day by day until we find a day with sync (e.g. Monday → Sunday has none → use Saturday)
+  for (let offset = 1; offset <= 7; offset++) {
+    const prevDay = (currentDay - offset + 7) % 7;
+    const prevTimes = getSyncTimesForDay(prevDay);
+    const lastTimePrev = prevTimes[prevTimes.length - 1];
+    if (lastTimePrev !== undefined) {
+      const dayName = getDayName(prevDay);
+      return `${dayName} at ${formatTime(lastTimePrev)} (Brisbane)`;
+    }
+  }
+
+  return '— (Brisbane)';
 };
 
 /**
@@ -117,6 +127,9 @@ export const getLastSyncTime = (): string => {
  * @param time - Time in decimal format (e.g: 14.58 = 2:35 PM)
  */
 const formatTime = (time: number): string => {
+  if (time === undefined || time === null || !Number.isFinite(time)) {
+    return '—';
+  }
   const hours = Math.floor(time);
   const minutes = Math.round((time % 1) * 60);
   const period = hours >= 12 ? 'PM' : 'AM';
