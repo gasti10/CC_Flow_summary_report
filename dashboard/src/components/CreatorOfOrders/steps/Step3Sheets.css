@@ -22,6 +22,7 @@
   gap: 1rem;
   margin: 1.5rem 0;
   flex-wrap: wrap;
+  align-items: flex-end;
 }
 
 .filter-group {
@@ -35,6 +36,7 @@
 .filter-label {
   font-size: 0.8125rem;
   font-weight: 500;
+  line-height: 1.25;
   color: var(--mode-gray-700, #374151);
 }
 
@@ -47,12 +49,92 @@
   background: var(--mode-white, #ffffff);
   color: var(--mode-gray-900, #111827);
   cursor: pointer;
+  box-sizing: border-box;
+  min-height: 2.5rem;
 }
 
 .filter-select:focus {
   outline: none;
   border-color: var(--mode-green-600, #16a34a);
   box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+}
+
+/* Refresh stock button in filters – aligned with filter selects */
+.step3-refresh-group {
+  flex: 0 0 auto;
+  min-width: auto;
+}
+
+/* Same vertical space as "Off Cut" / "Dimension" / "Colour" labels */
+.step3-refresh-group .filter-label {
+  min-height: 1.25em;
+  display: block;
+}
+
+/* Override global button styles (global.css) so this control aligns with .filter-select */
+.step3-sheets .step3-refresh-btn {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--mode-gray-800, #1f2937);
+  background: var(--mode-gray-100, #f3f4f6);
+  border: 1px solid var(--mode-gray-300, #d1d5db);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  box-sizing: border-box;
+  min-height: 2.5rem;
+  box-shadow: none;
+  transform: translateY(0);
+}
+
+.step3-sheets .step3-refresh-btn:hover:not(:disabled) {
+  color: var(--mode-white, #ffffff);
+  background: var(--mode-green-600, #16a34a);
+  border-color: var(--mode-green-700, #15803d);
+  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.35);
+  transform: translateY(-1px);
+}
+
+.step3-sheets .step3-refresh-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(22, 163, 74, 0.25);
+}
+
+.step3-sheets .step3-refresh-btn:focus-visible {
+  outline: none;
+  border-color: var(--mode-green-600, #16a34a);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25);
+}
+
+.step3-sheets .step3-refresh-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  color: var(--mode-gray-700, #374151);
+}
+
+.step3-refresh-spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--mode-gray-300, #d1d5db);
+  border-top-color: var(--mode-green-600, #16a34a);
+  border-radius: 50%;
+  animation: step3-spin 0.7s linear infinite;
+}
+
+@keyframes step3-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .step3-table-container {

@@ -514,11 +514,13 @@ export function Step4Documents() {
           </div>
         </div>
       )}
-      <h2 className="step-title">Upload Documents</h2>
-      <p className="step-description">
-        Upload or select documents related to this order. Documents will be saved to CC Flow App and
-        registered in Documents section.
-      </p>
+      <div className="page-heading">
+        <h2 className="page-heading-title">Upload Documents</h2>
+        <p className="page-heading-desc">
+          Upload or select documents related to this order. Documents will be saved to CC Flow App and
+          registered in Documents section.
+        </p>
+      </div>
 
       {creationResult?.success && creationResult.orderId && (
         <div className="step4-order-banner" role="status">

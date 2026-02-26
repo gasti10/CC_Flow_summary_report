@@ -42,6 +42,20 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     showDataPreloader: false,
     loadingText: 'Loading...',
     showHeader: false
+  },
+  '/work-order-planner': {
+    name: 'work-order-planner',
+    animationDuration: 1200,
+    showDataPreloader: false,
+    loadingText: 'Loading CC Work Order Planner...',
+    showHeader: false
+  },
+  '/work-order-planner/:orderId': {
+    name: 'work-order-planner-detail',
+    animationDuration: 0,
+    showDataPreloader: false,
+    loadingText: 'Loading CC Work Order Detail...',
+    showHeader: false
   }
 } as const;
 

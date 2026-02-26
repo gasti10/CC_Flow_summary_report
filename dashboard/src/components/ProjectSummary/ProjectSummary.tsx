@@ -107,8 +107,10 @@ const ProjectSummary: React.FC = () => {
 
   return (
     <div className="container accordion" id="accordion">
-      <h1>PROJECTS SUMMARY</h1>
-      
+      <div className="page-heading">
+        <h1 className="page-heading-title">PROJECT SUMMARY</h1>
+      </div>
+
       {/* Selector de proyectos */}
       <ProjectSelectorComponent 
         onProjectSelect={handleProjectSelect}

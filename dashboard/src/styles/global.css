@@ -155,6 +155,138 @@ body {
   }
 }
 
+/* ─── Page heading (reusable across dashboard views) ─── */
+/* Por defecto: centrado. Solo Work Order Planner mantiene alineación a la izquierda. */
+.page-heading {
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.page-heading-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gray-500);
+  margin-bottom: 0.35rem;
+}
+
+.page-heading-title {
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--gray-900);
+  margin: 0 0 0.5rem;
+}
+
+.page-heading-title::after {
+  content: '';
+  display: block;
+  width: 2.5rem;
+  height: 3px;
+  margin-top: 0.5rem;
+  margin-left: auto;
+  margin-right: auto;
+  background: linear-gradient(90deg, var(--secondary-color) 0%, var(--secondary-light) 100%);
+  border-radius: 2px;
+}
+
+.page-heading-desc {
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--gray-500);
+  margin: 0 auto;
+  max-width: 42rem;
+  text-align: center;
+}
+
+/* Excepción: Work Order Planner mantiene título y línea a la izquierda */
+.work-order-planner .page-heading {
+  text-align: left;
+}
+
+.work-order-planner .page-heading-title::after {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.work-order-planner .page-heading-desc {
+  text-align: left;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* En headers compactos: ocultar la línea bajo el título */
+.wod-header .page-heading-title::after,
+.creator-header .page-heading-title::after {
+  display: none !important;
+}
+
+/* Reset generic h1/h2 when using page-heading (so title stays modern) */
+h1.page-heading-title,
+h2.page-heading-title,
+.page-heading .page-heading-title {
+  text-transform: none !important;
+  letter-spacing: -0.02em !important;
+  border-bottom: none !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  text-align: center !important;
+  font-size: clamp(1.5rem, 4vw, 2.25rem) !important;
+  color: var(--gray-900) !important;
+  box-shadow: none !important;
+  background: none !important;
+}
+
+/* Título alineado a la izquierda solo dentro de Work Order Planner */
+.work-order-planner .page-heading .page-heading-title {
+  text-align: left !important;
+}
+
+/* ─── Card / Section headers (títulos de sección dentro de cards) ─── */
+.card-section-header {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.card-section-title {
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.card-section-title::after {
+  content: '';
+  display: block;
+  width: 2.5rem;
+  height: 3px;
+  margin-top: 0.5rem;
+  margin-left: auto;
+  margin-right: auto;
+  background: linear-gradient(90deg, var(--secondary-color) 0%, var(--secondary-light) 100%);
+  border-radius: 2px;
+}
+
+/* Reset h2 cuando es título de sección de card (sin uppercase ni borde global) */
+h2.card-section-title {
+  text-transform: none !important;
+  letter-spacing: -0.02em !important;
+  border-bottom: none !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  font-size: 1.35rem !important;
+  color: var(--gray-900) !important;
+  background: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  font-family: inherit !important;
+}
+
 /* Tipografía */
 h1 {
   font-size: 36pt;

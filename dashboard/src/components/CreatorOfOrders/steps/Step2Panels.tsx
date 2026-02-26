@@ -310,11 +310,13 @@ export function Step2Panels() {
           </div>
         </div>
       )}
-      <h2 className="step-title">Import Panels from CSV</h2>
-      <p className="step-description">
-        Upload the nesting CSV. We will extract panels from PartName columns and use
-        SheetName and NestNumber from the file.
-      </p>
+      <div className="page-heading">
+        <h2 className="page-heading-title">Import Panels from CSV</h2>
+        <p className="page-heading-desc">
+          Upload the nesting CSV. We will extract panels from PartName columns and use
+          SheetName and NestNumber from the file.
+        </p>
+      </div>
 
       <div className="step2-upload">
         <div className="upload-area">

@@ -1,12 +1,17 @@
 // Step 5: Review & Create
 
 import { useState, useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import confetti from 'canvas-confetti'
 import { useWizard } from '../useWizard'
 import { createOrder, type CreateOrderProgress } from '../../../services/orderCreationCutService'
+import { formatDateTime } from '../../../utils/dateUtils'
 import './Step5Review.css'
 
 const FIREWORK_COLORS = ['#16a34a', '#22c55e', '#15803d', '#fbbf24', '#fde047', '#ffffff']
+
+/** Deshabilitado por el momento hasta que esté soportado en backend/flujo. */
+const QUALITY_CONTROL_DISABLED = true
 
 /** Runs confetti animation and returns timeout IDs for cleanup on unmount. */
 function runFireworkConfetti(): number[] {
@@ -46,7 +51,8 @@ type CreationResultState = {
 }
 
 export function Step5Review() {
-  const { formData, validation, setLoading, setError, setSuccess, resetWizard, isLoading, goToStep, creationResult: contextCreationResult, setCreationResult: setContextCreationResult } =
+  const queryClient = useQueryClient()
+  const { formData, updateFormData, validation, setLoading, setError, setSuccess, resetWizard, isLoading, goToStep, creationResult: contextCreationResult, setCreationResult: setContextCreationResult } =
     useWizard()
   const [showConfirm, setShowConfirm] = useState(false)
   const [localCreationResult, setLocalCreationResult] = useState<CreationResultState | null>(null)
@@ -116,15 +122,15 @@ export function Step5Review() {
     // Calcular documentos pendientes
     const pendingNewDocuments = formData.documents.filter(doc => !doc.uploaded || !doc.saved)
     const pendingExistingDocuments = formData.selectedExistingDocuments.filter(doc => !doc.linked)
-    // const hasPendingDocuments = pendingNewDocuments.length > 0 || pendingExistingDocuments.length > 0
+    const isDraftOrder = formData.status === 'Draft' || formData.status === 'Pending Revision'
 
-    // Inicializar pasos de progreso
+    // Inicializar pasos de progreso (cuando es Draft no se crean stages; no mostrar que se van a crear)
     const baseSteps = [
       { number: 1, label: 'Preparing order data', status: 'pending' as const },
       { number: 2, label: 'Creating order in DB', status: 'pending' as const },
       { number: 3, label: `Creating panels in DB (${formData.panels.length} panels)`, status: 'pending' as const },
       { number: 4, label: 'Creating order in CC Flow 2026', status: 'pending' as const },
-      { number: 5, label: 'Creating stages in CC Flow 2026 (3 stages)', status: 'pending' as const },
+      { number: 5, label: isDraftOrder ? 'Stages skipped (Draft order)' : 'Creating stages in CC Flow 2026 (3 stages)', status: 'pending' as const },
       { number: 6, label: `Creating panels in CC Flow 2026 (${formData.panels.length} panels)`, status: 'pending' as const },
       { number: 7, label: 'Updating sheets inventory in CC Flow 2026', status: 'pending' as const },
     ]
@@ -405,10 +411,12 @@ export function Step5Review() {
 
   return (
     <div className="step-container step5-review">
-      <h2 className="step-title">Review and Create Order</h2>
-      <p className="step-description">
-        Review all the information before creating the order.
-      </p>
+      <div className="page-heading">
+        <h2 className="page-heading-title">Review and Create Order</h2>
+        <p className="page-heading-desc">
+          Review all the information before creating the order.
+        </p>
+      </div>
 
       {isLoading && creationProgress && (
         <div className="step-loading-overlay">
@@ -450,7 +458,7 @@ export function Step5Review() {
 
       <div className="step5-sections">
         {/* Información de la Orden */}
-        <section className="review-section">
+        <section className="review-section review-section-order">
           <h3 className="section-title">Order Information</h3>
           
           {/* Campos principales destacados */}
@@ -509,12 +517,13 @@ export function Step5Review() {
               </label>
             </div>
             <div 
-              className="review-control-item-inline review-control-quality review-control-animated" 
+              className={`review-control-item-inline review-control-quality review-control-animated${QUALITY_CONTROL_DISABLED ? ' review-control-disabled' : ''}`}
               style={{ animationDelay: '0.5s' }}
-              onClick={() => handleQualityControlChange(!qualityControl)}
+              onClick={() => !QUALITY_CONTROL_DISABLED && handleQualityControlChange(!qualityControl)}
               role="button"
-              tabIndex={0}
+              tabIndex={QUALITY_CONTROL_DISABLED ? -1 : 0}
               onKeyDown={(e) => {
+                if (QUALITY_CONTROL_DISABLED) return
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault()
                   handleQualityControlChange(!qualityControl)
@@ -540,6 +549,7 @@ export function Step5Review() {
                 <input
                   type="checkbox"
                   checked={qualityControl}
+                  disabled={QUALITY_CONTROL_DISABLED}
                   onChange={(e) => handleQualityControlChange(e.target.checked)}
                 />
                 <span className="toggle-slider"></span>
@@ -560,7 +570,7 @@ export function Step5Review() {
             <div className="review-item">
               <span className="review-label">Expected to:</span>
               <span className="review-value">
-                {new Date(formData.expectedTo).toLocaleDateString('es-ES')}
+                {formatDateTime(formData.expectedTo)}
               </span>
             </div>
             <div className="review-item">
@@ -571,18 +581,28 @@ export function Step5Review() {
               <span className="review-label">Colour:</span>
               <span className="review-value">{formData.colour || 'N/A'}</span>
             </div>
-            {formData.orderComment && (
+            <div
+              className="review-comment-block review-comment-animated"
+              style={{ animationDelay: '1s' }}
+            >
               <div className="review-item review-item-full">
-                <span className="review-label">Order Comment:</span>
-                <span className="review-value">{formData.orderComment}</span>
+                <label htmlFor="review-order-comment" className="review-label">Order Comment:</label>
+                <textarea
+                  id="review-order-comment"
+                  className="review-comment-textarea"
+                  value={formData.orderComment ?? ''}
+                  onChange={(e) => updateFormData({ orderComment: e.target.value })}
+                  placeholder="Add or edit comments or notes for this order..."
+                  rows={3}
+                />
               </div>
-            )}
+            </div>
           </div>
 
         </section>
 
         {/* Sheets Seleccionadas */}
-        <section className="review-section">
+        <section className="review-section review-section-sheets">
           <h3 className="section-title">
             Selected Sheets ({formData.selectedSheets.length})
           </h3>
@@ -613,7 +633,7 @@ export function Step5Review() {
         </section>
 
         {/* Resumen de Paneles */}
-        <section className="review-section">
+        <section className="review-section review-section-panels">
           <h3 className="section-title">
             Summary of Panels ({formData.panels.length})
           </h3>
@@ -638,7 +658,7 @@ export function Step5Review() {
         </section>
 
         {/* Documents Section */}
-        <section className="review-section">
+        <section className="review-section review-section-documents">
           <div className="review-section-header">
             <h3 className="section-title">
               Documents ({formData.documents.length + formData.selectedExistingDocuments.length})
@@ -708,12 +728,32 @@ export function Step5Review() {
           <p>
             <strong>Error creating order:</strong>
           </p>
-          {creationResult.errors && creationResult.errors.length > 0 && (
-            <ul>
-              {creationResult.errors.map((error, index) => (
-                <li key={index}>{error}</li>
-              ))}
-            </ul>
+          {creationResult.errors?.some((e) => e.includes('ORDER_ID_DUPLICATE')) ? (
+            <>
+              <p className="step-error-friendly">
+                This Order ID is already in use. Go to Order Information (Step 1) to choose a different Order ID or generate a new one.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ['orderIdValidation', formData.orderId] })
+                  queryClient.invalidateQueries({ queryKey: ['lastOrder', formData.project] })
+                  goToStep(1)
+                }}
+                className="confirm-button step-error-goto-step1"
+              >
+                Go to Order Information (Step 1)
+              </button>
+            </>
+          ) : (
+            creationResult.errors &&
+            creationResult.errors.length > 0 && (
+              <ul>
+                {creationResult.errors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            )
           )}
           {creationResult.warnings && creationResult.warnings.length > 0 && (
             <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #fecaca' }}>

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import { getLogoPath, getFaviconPath } from '../../utils/assetUtils'
 import AppSheetAPI from '../../services/appsheetApi'
+import { supabaseApi } from '../../services/supabaseApi'
 import './OrderDelivery.css'
 
 // Interface for order details
@@ -28,7 +29,8 @@ const OrderDelivery: React.FC = () => {
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error' | ''>('')
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null)
-  const [isValidFormat, setIsValidFormat] = useState<boolean | null>(null)
+  const [orderPreview, setOrderPreview] = useState<Awaited<ReturnType<typeof supabaseApi.getOrderById>>>(null)
+  const [isCheckingOrder, setIsCheckingOrder] = useState(false)
   const [showInfo, setShowInfo] = useState(false)
   const [watermarkCount, setWatermarkCount] = useState(12)
 
@@ -54,33 +56,40 @@ const OrderDelivery: React.FC = () => {
     return () => window.removeEventListener('resize', updateWatermarkCount)
   }, [])
 
-  // Validate Order ID format (XX-00)
-  const validateOrderIdFormat = (id: string): boolean => {
-    const orderIdRegex = /^[A-Z]{2,3}-\d+$/
-    return orderIdRegex.test(id)
-  }
-
   // Get Order_ID from URL parameter when component loads
   useEffect(() => {
-    // Try both uppercase and lowercase versions of the parameter
     const urlOrderId = searchParams.get('Order_ID') || searchParams.get('order_ID')
     if (urlOrderId) {
-      setOrderId(urlOrderId)
-      setIsValidFormat(validateOrderIdFormat(urlOrderId))
-      // Clear any previous messages and order details when URL parameter changes
+      setOrderId(urlOrderId.toUpperCase())
       setMessage('')
       setMessageType('')
       setOrderDetails(null)
+      setOrderPreview(null)
     }
   }, [searchParams])
 
-  // Validate format when orderId changes
+  // Check if order exists in Supabase when orderId changes (debounced)
   useEffect(() => {
-    if (orderId) {
-      setIsValidFormat(validateOrderIdFormat(orderId))
-    } else {
-      setIsValidFormat(null)
+    const trimmed = orderId.trim()
+    if (!trimmed) {
+      setOrderPreview(null)
+      setIsCheckingOrder(false)
+      return
     }
+
+    setIsCheckingOrder(true)
+    const timer = setTimeout(async () => {
+      try {
+        const order = await supabaseApi.getOrderById(trimmed)
+        setOrderPreview(order)
+      } catch {
+        setOrderPreview(null)
+      } finally {
+        setIsCheckingOrder(false)
+      }
+    }, 450)
+
+    return () => clearTimeout(timer)
   }, [orderId])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,8 +101,8 @@ const OrderDelivery: React.FC = () => {
       return
     }
 
-    if (!isValidFormat) {
-      setMessage('Order ID format must be XX-00 (e.g., FL-1, AB-123)')
+    if (!orderPreview) {
+      setMessage('Order not found. Please check the Order ID.')
       setMessageType('error')
       return
     }
@@ -129,7 +138,6 @@ const OrderDelivery: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const upperCaseValue = e.target.value.toUpperCase()
     setOrderId(upperCaseValue)
-    // Clear messages and order details when user starts typing
     if (message) {
       setMessage('')
       setMessageType('')
@@ -137,6 +145,7 @@ const OrderDelivery: React.FC = () => {
     if (orderDetails) {
       setOrderDetails(null)
     }
+    setOrderPreview(null)
   }
 
   return (
@@ -157,11 +166,9 @@ const OrderDelivery: React.FC = () => {
           </div>
         </div>
         
-        <div className="order-delivery-header">
-            <h1>
-                Mark Order as Delivered
-            </h1>
-          <p>Enter the Order ID to mark it as delivered</p>
+        <div className="page-heading order-delivery-header">
+          <h1 className="page-heading-title">Mark Order as Delivered</h1>
+          <p className="page-heading-desc">Enter the Order ID to mark it as delivered</p>
         </div>
 
         <form onSubmit={handleSubmit} className="order-delivery-form">
@@ -174,13 +181,13 @@ const OrderDelivery: React.FC = () => {
                 value={orderId}
                 onChange={handleInputChange}
                 placeholder="Enter Order ID (e.g., FL-1)"
-                className={`form-input ${isValidFormat === false ? 'invalid' : isValidFormat === true ? 'valid' : ''}`}
+                className={`form-input ${!isCheckingOrder && orderId.trim() && !orderPreview ? 'invalid' : orderPreview ? 'valid' : ''}`}
                 disabled={isLoading}
                 required
                 aria-describedby="orderId-help"
                 style={{ textTransform: 'uppercase' }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !isLoading && isValidFormat) {
+                  if (e.key === 'Enter' && !isLoading && orderPreview) {
                     e.preventDefault()
                     const form = e.currentTarget.form
                     if (form) {
@@ -190,22 +197,39 @@ const OrderDelivery: React.FC = () => {
                   }
                 }}
               />
-              {isValidFormat === true && (
+              {isCheckingOrder && orderId.trim() && (
+                <span className="validation-icon checking" aria-hidden>⟳</span>
+              )}
+              {!isCheckingOrder && orderPreview && (
                 <span className="validation-icon valid">✓</span>
               )}
-              {isValidFormat === false && (
+              {!isCheckingOrder && orderId.trim() && !orderPreview && (
                 <span className="validation-icon invalid">✗</span>
               )}
             </div>
             <div id="orderId-help" className="help-text">
-              Format: XX-00 (e.g., FL-1, AB-123)
+              Enter Order ID (e.g., FL-1, ABC-123).
             </div>
+            {orderPreview && (
+              <div className="order-preview-card">
+                <div className="detail-row">
+                  <span className="detail-label">Project:</span>
+                  <span className="detail-value">{orderPreview.Project}</span>
+                </div>
+                {orderPreview.ProjectAddress && (
+                  <div className="detail-row">
+                    <span className="detail-label">Address:</span>
+                    <span className="detail-value">{orderPreview.ProjectAddress}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <button
             type="submit"
             className={`submit-button ${isLoading ? 'loading' : ''}`}
-            disabled={isLoading || isValidFormat === false}
+            disabled={isLoading || isCheckingOrder || !orderPreview}
             aria-label="Mark order as delivered"
           >
             {isLoading ? (
@@ -294,7 +318,7 @@ const OrderDelivery: React.FC = () => {
                 <h4 className="info-section-title">How to use</h4>
                 <ul className="info-list">
                   <li>Enter the Order ID in the field above</li>
-                  <li>Format must be XX-00 (e.g., FL-1, AB-123)</li>
+                  <li>We check if the order exists (e.g., FL-1, ABC-123)</li>
                   <li>Click "Mark as Delivered" to confirm</li>
                 </ul>
               </div>

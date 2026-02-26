@@ -62,11 +62,12 @@
   width: auto;
 }
 
+/* Mismo estilo que Work Order Planner header (wop-header h1) */
 .creator-header h1 {
   margin: 0;
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 600;
-  color: var(--mode-gray-900);
+  color: #111827;
   letter-spacing: -0.02em;
 }
 

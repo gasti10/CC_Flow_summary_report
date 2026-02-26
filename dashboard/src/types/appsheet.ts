@@ -6,6 +6,7 @@ export interface Project {
   Number?: string
   Status?: string
   'Project ID'?: string
+  Address?: string
   'Start Date'?: string
   'Expected Completion Date'?: string
   'Finalization Date'?: string
@@ -103,6 +104,20 @@ export interface SheetInventory {
   material_incoming_detail: string
 }
 
+/** Tabla Supplier en AppSheet: columnas Supplier ID, Name, etc. */
+export interface Supplier {
+  _RowNumber?: string
+  'Supplier ID': string
+  Category?: string
+  Name: string
+  Address?: string
+  Email?: string
+  'Extra Email'?: string
+  Mobile?: string
+  Phone?: string
+  BestCtt?: string
+}
+
 export interface PeopleAllowance {
   _RowNumber: string
   allowance_id: string
@@ -157,6 +172,39 @@ export interface VerticalAccess {
   'Access Notes': string
   Status: string
   'Created Date': string
+}
+
+/** Tabla Orders cut en AppSheet */
+export interface OrderCut {
+  'Order ID': string
+  Project: string
+  Status: string
+  Sheets?: string
+  Responsable: string
+  'Expected to'?: string
+  'Creation Date': string
+  Colour: string
+  Comment?: string
+  Notification?: boolean
+  'End Date'?: string
+  Priority?: string
+  'Delivered Date'?: string
+  Specification?: string  // specification_id (UUID)
+}
+
+/** Tabla Specifications en AppSheet */
+export interface SpecificationAppSheet {
+  specification_id: string  // UUID
+  Panel: string
+  'Z-Tags': string  // LongText
+  CNC: string  // LongText
+  Rivet: string  // LongText
+  Fold: string  // LongText
+  Stiffener: string  // LongText
+  Material: string  // LongText
+  Delivery: string  // LongText
+  Image: string
+  project: string
 }
 
 // Interfaces para las respuestas de la API

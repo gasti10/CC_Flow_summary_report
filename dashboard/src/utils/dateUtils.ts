@@ -119,6 +119,62 @@ export const getTodayLocalDate = (): string => {
 };
 
 /**
+ * Fecha y hora de hoy en YYYY-MM-DDTHH:mm según la zona horaria LOCAL.
+ * Para inputs type="datetime-local".
+ */
+export const getTodayLocalDateTime = (): string => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${y}-${m}-${day}T${h}:${min}`;
+};
+
+/**
+ * Convierte un valor de fecha/hora al formato YYYY-MM-DDTHH:mm para input datetime-local.
+ * Compatible con: YYYY-MM-DD, YYYY-MM-DD 00:00:00, YYYY-MM-DD HH:mm:ss, YYYY-MM-DDTHH:mm.
+ * Los datos antiguos suelen venir como YYYY-MM-DD 00:00:00.
+ */
+export const toDateTimeLocalValue = (dateString: string | undefined): string => {
+  if (!dateString || !dateString.trim()) return '';
+  try {
+    const d = new Date(dateString);
+    if (isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${y}-${m}-${day}T${h}:${min}`;
+  } catch {
+    return '';
+  }
+};
+
+/**
+ * Convierte un valor de datetime-local (YYYY-MM-DDTHH:mm) al formato de almacenamiento.
+ * Formato: YYYY-MM-DD HH:mm:ss (compatible con datos existentes y Creation Date).
+ */
+export const fromDateTimeLocalToStorage = (value: string): string => {
+  if (!value || !value.trim()) return '';
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    const s = String(d.getSeconds()).padStart(2, '0');
+    return `${y}-${m}-${day} ${h}:${min}:${s}`;
+  } catch {
+    return '';
+  }
+};
+
+/**
  * Obtiene el primer día del mes actual
  * @returns Fecha en formato YYYY-MM-DD
  */

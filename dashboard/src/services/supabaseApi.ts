@@ -8,6 +8,7 @@ import type {
   ProjectFilters
 } from '../types/supabase'
 import type { Project } from '../types/appsheet'
+import type { Specification } from '../types/supabase'
 import { supabaseClient } from './supabaseClient'
 
 interface SupabaseConfig {
@@ -271,6 +272,7 @@ class SupabaseAPI {
         Number: row.Number?.toString() || '',
         Status: row.Status || '',
         'Project ID': row['Project ID'] || '',
+        Address: row.Address || '',
         'Start Date': row['Start Date'] || '',
         'Expected Completion Date': row['Expected Completion Date'] || '',
         'Finalization Date': row['Finalization Date'] || '',
@@ -367,6 +369,273 @@ class SupabaseAPI {
     }
   }
 
+  /** Órdenes con status Draft (para Work Order Planner), enriquecidas con Project Manager desde Projects */
+  async getDraftOrders(): Promise<Array<{
+    'Order ID': string
+    Project: string
+    Status: string
+    Priority?: string
+    'Creation Date'?: string
+    Responsable?: string
+    Colour?: string
+    Comment?: string
+    specification_id?: string | null
+    /** Project Manager (desde Projects.PM) */
+    ProjectManager?: string
+  }>> {
+    const cacheKey = 'orders-cut-draft'
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cached = this.getCachedData<any[]>(cacheKey)
+    if (cached) return cached
+
+    try {
+      const [ordersRes, projects] = await Promise.all([
+        supabaseClient
+          .from('Orders cut')
+          .select('"Order ID", Project, Status, Priority, "Creation Date", Responsable, Colour, Comment, specification_id')
+          .eq('Status', 'Draft')
+          .order('"Creation Date"', { ascending: false }),
+        this.getAllProjects()
+      ])
+
+      if (ordersRes.error) throw ordersRes.error
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows = (ordersRes.data || []) as any[]
+      const projectByName = new Map(projects.map(p => [p.Name, p]))
+      const list = rows.map(row => ({
+        ...row,
+        ProjectManager: projectByName.get(row.Project)?.PM ?? undefined
+      }))
+      this.setCachedData(cacheKey, list)
+      return list
+    } catch (error) {
+      console.error('Error fetching draft orders:', error)
+      return []
+    }
+  }
+
+  /** Obtener una orden por ID, con Project Manager y Project Address desde Projects */
+  async getOrderById(orderId: string): Promise<{
+    'Order ID': string
+    Project: string
+    Status: string
+    Priority?: string
+    'Creation Date'?: string
+    Responsable?: string
+    Colour?: string
+    Comment?: string
+    specification_id?: string | null
+    /** Expected delivery (Orders cut) */
+    'Expected to'?: string
+    /** Project Manager (desde Projects.PM) */
+    ProjectManager?: string
+    /** Project Address (desde Projects.Address) */
+    ProjectAddress?: string
+    /** Dimensiones de sheets (desde Orders cut.Sheets) */
+    Sheets?: string
+  } | null> {
+    const cacheKey = `order-${orderId}`
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cached = this.getCachedData<any>(cacheKey)
+    if (cached) return cached
+
+    try {
+      const { data, error } = await supabaseClient
+        .from('Orders cut')
+        .select('*')
+        .eq('Order ID', orderId)
+        .maybeSingle()
+
+      if (error) throw error
+      if (!data) return null
+
+      const projects = await this.getAllProjects()
+      const project = projects.find(p => p.Name === (data as { Project?: string }).Project)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const order = { ...(data as any), ProjectManager: project?.PM, ProjectAddress: project?.Address }
+      this.setCachedData(cacheKey, order)
+      return order
+    } catch (error) {
+      console.error(`Error fetching order ${orderId}:`, error)
+      return null
+    }
+  }
+
+  /** Actualizar Expected to (delivery date) de una orden */
+  async updateOrderExpectedDate(orderId: string, date: string): Promise<void> {
+    const { error } = await supabaseClient
+      .from('Orders cut')
+      .update({ 'Expected to': date })
+      .eq('Order ID', orderId)
+
+    if (error) throw new Error(`Supabase error updating expected date: ${error.message}`)
+    this.cache.delete(`order-${orderId}`)
+    this.cache.delete('orders-cut-draft')
+  }
+
+  /** Actualizar specification_id de una orden (Work Order Planner) */
+  async updateOrderSpecification(orderId: string, specificationId: string | null): Promise<void> {
+    const { error } = await supabaseClient
+      .from('Orders cut')
+      .update({ specification_id: specificationId })
+      .eq('Order ID', orderId)
+
+    if (error) throw new Error(`Supabase error updating order spec: ${error.message}`)
+    this.cache.delete('orders-cut-draft')
+  }
+
+  /** Actualizar Status de una orden (Work Order Planner: Draft -> CNC Machine | Press Fold | etc.) */
+  async updateOrderStatus(orderId: string, status: string): Promise<void> {
+    const { error } = await supabaseClient
+      .from('Orders cut')
+      .update({ Status: status })
+      .eq('Order ID', orderId)
+
+    if (error) throw new Error(`Supabase error updating order status: ${error.message}`)
+    this.cache.delete('orders-cut-draft')
+    this.cache.delete(`order-${orderId}`)
+  }
+
+  /**
+   * Actualiza múltiples campos de una orden de una sola vez (Status, specification_id, Expected to, etc.).
+   * Se usa en el Release para hacer un solo UPDATE en vez de varios.
+   */
+  async updateOrder(orderId: string, fields: Record<string, unknown>): Promise<void> {
+    const { error } = await supabaseClient
+      .from('Orders cut')
+      .update(fields)
+      .eq('Order ID', orderId)
+
+    if (error) throw new Error(`Supabase error updating order: ${error.message}`)
+    this.cache.delete('orders-cut-draft')
+    this.cache.delete(`order-${orderId}`)
+  }
+
+  /** Crear stages en Supabase (Work Order Planner: Release). stage_id = AppSheet Stage ID para que coincidan. */
+  async createStagesOrder(stages: Array<{
+    stage_id: string
+    'Order': string
+    'Action': string
+    'Name'?: string
+    'Estimated time'?: string
+    'Number stage'?: number
+    'Quality Control'?: boolean
+    'Comment'?: string
+    'External'?: boolean
+  }>): Promise<void> {
+    if (stages.length === 0) return
+    const rows = stages.map(s => ({
+      stage_id: s.stage_id,
+      'Order': s['Order'],
+      'Action': s['Action'],
+      'Name': s['Name'] ?? '',
+      'Estimated time': s['Estimated time'] ?? '',
+      'Number stage': s['Number stage'] ?? 0,
+      'Quality Control': s['Quality Control'] ?? false,
+      'Comment': s['Comment'] ?? '',
+      'External': s['External'] ?? false
+    }))
+    const { error } = await supabaseClient
+      .from('Stages Order')
+      .insert(rows)
+
+    if (error) throw new Error(`Supabase error creating stages: ${error.message}`)
+  }
+
+  /** Stages de una orden (Stages Order), ordenados por Number stage. Usado en Work Order Detail cuando la orden ya no es Draft. */
+  async getStagesByOrderId(orderId: string): Promise<Array<{
+    stage_id: string
+    'Order': string
+    'Action': string
+    'Name': string
+    'Estimated time': string
+    'Number stage': number
+    'Quality Control': boolean
+    'Comment': string
+    'External': boolean
+  }>> {
+    const { data, error } = await supabaseClient
+      .from('Stages Order')
+      .select('stage_id, "Order", "Action", "Name", "Estimated time", "Number stage", "Quality Control", "Comment", "External"')
+      .eq('Order', orderId)
+      .order('"Number stage"', { ascending: true })
+
+    if (error) throw new Error(`Supabase error fetching stages: ${error.message}`)
+    return (data ?? []) as unknown as Array<{
+      stage_id: string
+      'Order': string
+      'Action': string
+      'Name': string
+      'Estimated time': string
+      'Number stage': number
+      'Quality Control': boolean
+      'Comment': string
+      'External': boolean
+    }>
+  }
+
+  /** Specifications por proyecto */
+  async getSpecificationsByProject(projectName: string): Promise<Specification[]> {
+    const cacheKey = this.getCacheKey('specifications', { projectName })
+    const cached = this.getCachedData<Specification[]>(cacheKey)
+    if (cached) return cached
+
+    try {
+      const { data, error } = await supabaseClient
+        .from('Specifications')
+        .select('*')
+        .eq('Project', projectName)
+
+      if (error) {
+        console.warn(`Specifications query failed: ${error.message}`)
+        return []
+      }
+      const list = (data || []) as Specification[]
+      if (list.length > 0) this.setCachedData(cacheKey, list)
+      return list
+    } catch {
+      return []
+    }
+  }
+
+  async getSpecificationById(specificationId: string): Promise<Specification | null> {
+    const { data, error } = await supabaseClient
+      .from('Specifications')
+      .select('*')
+      .eq('specification_id', specificationId)
+      .maybeSingle()
+
+    if (error) throw new Error(`Supabase error: ${error.message}`)
+    return data as Specification | null
+  }
+
+  async createSpecification(spec: Omit<Specification, 'specification_id' | 'created_at' | 'updated_at'>): Promise<Specification> {
+    const { data, error } = await supabaseClient
+      .from('Specifications')
+      .insert([spec])
+      .select()
+      .single()
+
+    if (error) throw new Error(`Supabase error creating specification: ${error.message}`)
+    this.cache.delete(this.getCacheKey('specifications', { projectName: spec['Project'] }))
+    return data as Specification
+  }
+
+  async updateSpecification(specificationId: string, spec: Partial<Omit<Specification, 'specification_id'>>): Promise<Specification> {
+    const { data, error } = await supabaseClient
+      .from('Specifications')
+      .update(spec)
+      .eq('specification_id', specificationId)
+      .select()
+      .single()
+
+    if (error) throw new Error(`Supabase error updating specification: ${error.message}`)
+    if (data && (data as Specification)['Project']) {
+      this.cache.delete(this.getCacheKey('specifications', { projectName: (data as Specification)['Project'] }))
+    }
+    return data as Specification
+  }
+
   // Verificar si un Order ID ya existe en la tabla 'Orders cut'
   async checkOrderIdExists(orderId: string): Promise<boolean> {
     if (!orderId || !orderId.trim()) return false
@@ -388,6 +657,22 @@ class SupabaseAPI {
       console.error(`Error checking Order ID existence: ${orderId}`, error)
       // En caso de error, asumimos que no existe para no bloquear al usuario
       return false
+    }
+  }
+
+  /** Cantidad de paneles de una orden */
+  async getPanelCountByOrderId(orderId: string): Promise<number> {
+    if (!orderId?.trim()) return 0
+    try {
+      const { data, error } = await supabaseClient
+        .from('Panels')
+        .select('Name')
+        .eq('Order', orderId)
+
+      if (error) return 0
+      return (data || []).length
+    } catch {
+      return 0
     }
   }
 

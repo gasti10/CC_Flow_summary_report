@@ -61,6 +61,44 @@ export interface PackagingProcess {
   Side?: string
 }
 
+/**
+ * Specifications (Supabase): Work Order técnico; Manager en Work Order Planner.
+ * Los campos material, rivet, cnc, fold, tag, stiffener, delivery guardan JSON
+ * con la forma definida en workOrderForm.ts (WorkOrderForm y secciones).
+ */
+export interface Specification {
+  specification_id: string
+  'Project': string
+  'Panel'?: string
+  header_details?: Record<string, unknown>
+  material?: Record<string, unknown>
+  rivet?: Record<string, unknown>
+  cnc?: Record<string, unknown>
+  fold?: Record<string, unknown>
+  tag?: Record<string, unknown>
+  stiffener?: Record<string, unknown>
+  delivery?: Record<string, unknown>
+  image?: string
+  created_at?: string
+  updated_at?: string
+}
+
+/** Reexportar tipos del Work Order Form (página 1) para formulario y PDF */
+export type {
+  MaterialSpec,
+  RivetSpec,
+  CncSpec,
+  FoldSpec,
+  TagSpec,
+  StiffenerSpec,
+  DeliverySpec,
+  ManufactureProcessSpec,
+  WorkOrderForm,
+  MaterialTypeSpec,
+  MaterialThicknessKey,
+  YesNoNa
+} from './workOrderForm'
+
 // Tipos para las métricas calculadas
 export interface FactoryMetrics {
   totalCutArea: number

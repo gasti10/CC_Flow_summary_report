@@ -15,6 +15,8 @@ import { AuthProvider } from './context/AuthContext'
 import Login from './components/Auth/Login'
 import ProtectedRoute from './components/Auth/ProtectedRoute'
 import CreatorOfOrders from './components/CreatorOfOrders/CreatorOfOrders'
+import WorkOrderPlanner from './components/WorkOrderPlanner/WorkOrderPlanner'
+import WorkOrderDetail from './components/WorkOrderPlanner/WorkOrderDetail'
 
 // Configurar QueryClient con optimizaciones
 const queryClient = new QueryClient({
@@ -81,6 +83,12 @@ function AppContent() {
       label: 'CC Analytics',
       path: '/analytics',
       icon: '📈'
+    },
+    {
+      id: 'work-order-planner',
+      label: 'Work Order Planner',
+      path: '/work-order-planner',
+      icon: '📋'
     }
   ];
 
@@ -151,25 +159,27 @@ function AppContent() {
           <>
             <ProgressiveLoader>
               <Routes>
-                {/* Rutas públicas */}
+                {/* Ruta principal protegida (ProjectSummary) */}
                 <Route path="/" element={
-                  <>
-                    {currentRouteConfig.showHeader && (
-                      <header className="main-header">
-                        <div className="header-left">
-                          <LogoMenu logoPath={logoPath} menuItems={menuItems} />
-                        </div>
-                        <nav className="header-nav">
-                          {sections.map((section) => (
-                            <button key={section.id} className="nav-link" onClick={() => scrollToSection(section.id)}>
-                              {section.label}
-                            </button>
-                          ))}
-                        </nav>
-                      </header>
-                    )}
-                    <ProjectSummary />
-                  </>
+                  <ProtectedRoute>
+                    <>
+                      {currentRouteConfig.showHeader && (
+                        <header className="main-header">
+                          <div className="header-left">
+                            <LogoMenu logoPath={logoPath} menuItems={menuItems} />
+                          </div>
+                          <nav className="header-nav">
+                            {sections.map((section) => (
+                              <button key={section.id} className="nav-link" onClick={() => scrollToSection(section.id)}>
+                                {section.label}
+                              </button>
+                            ))}
+                          </nav>
+                        </header>
+                      )}
+                      <ProjectSummary />
+                    </>
+                  </ProtectedRoute>
                 } />
                 <Route path="/order-delivery" element={<OrderDelivery />} />
                 <Route path="/analytics" element={<Analytics />} />
@@ -183,6 +193,22 @@ function AppContent() {
                   element={
                     <ProtectedRoute>
                       <CreatorOfOrders />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/work-order-planner" 
+                  element={
+                    <ProtectedRoute>
+                      <WorkOrderPlanner />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/work-order-planner/:orderId" 
+                  element={
+                    <ProtectedRoute>
+                      <WorkOrderDetail />
                     </ProtectedRoute>
                   } 
                 />

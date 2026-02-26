@@ -1,7 +1,7 @@
 // Componente de Login con OTP (One-Time Password)
 import { useState, useEffect } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import './Login.css'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
@@ -14,6 +14,14 @@ const Login = () => {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const { sendOtp, verifyOtp, user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+
+  // Ruta de retorno: state.from (ProtectedRoute) > query ?from= > default
+  const getRedirectFrom = () => {
+    const fromState = (location.state as { from?: string } | null)?.from
+    const fromQuery = new URLSearchParams(window.location.search).get('from')
+    return fromState ?? fromQuery ?? '/creator-of-orders'
+  }
 
   // Obtener rutas de imágenes según el entorno
   const getLogoPath = () => {
@@ -33,13 +41,15 @@ const Login = () => {
   // Set dynamic document title
   useDocumentTitle('CC Login');
 
-  // Si el usuario ya está autenticado, redirigir
+  // Si el usuario ya está autenticado, redirigir a la ruta de origen
   useEffect(() => {
     if (user) {
-      const from = new URLSearchParams(window.location.search).get('from') || '/creator-of-orders'
+      const from = (location.state as { from?: string } | null)?.from
+        ?? new URLSearchParams(window.location.search).get('from')
+        ?? '/creator-of-orders'
       navigate(from, { replace: true })
     }
-  }, [user, navigate])
+  }, [user, navigate, location.state])
 
   const handleEmailSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -92,9 +102,7 @@ const Login = () => {
         setMessage({ type: 'error', text: error.message || 'Invalid code. Please try again.' })
         setCode('')
       } else {
-        // El usuario será redirigido automáticamente por el useEffect
-        const from = new URLSearchParams(window.location.search).get('from') || '/creator-of-orders'
-        navigate(from, { replace: true })
+        navigate(getRedirectFrom(), { replace: true })
       }
     } catch {
       setMessage({
@@ -130,12 +138,13 @@ const Login = () => {
             <img src={getLogoPath()} alt="CC Logo" />
           </div>
           
-          <div className="login-header">
-            <h1>Welcome</h1>
-            <p>
-              {step === 'email' 
-                ? 'Enter your email to receive a login code. Can use your Cladding Creations email address.'
-                : 'Enter the 6-digit code sent to your email'
+          <div className="page-heading login-header">
+            <h1 className="page-heading-title">Welcome</h1>
+            <p className="page-heading-desc">
+              {step === 'email'
+                ? <><p>Enter your email to receive a login code</p>
+                  <p>Can use your Cladding Creations email address</p></> 
+                : <p>Enter the 6-digit code sent to your email</p>
               }
             </p>
           </div>

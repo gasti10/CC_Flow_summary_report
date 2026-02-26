@@ -7,15 +7,15 @@ import type {
 } from './types/wizard.types'
 import { WizardContext } from './wizardContextTypes'
 import type { WizardContextType, CreationResult } from './wizardContextTypes'
-import { getTodayLocalDate } from '../../utils/dateUtils'
+import { getTodayLocalDateTime } from '../../utils/dateUtils'
 
 // Estado inicial del formulario
 const initialFormData: OrderFormData = {
   project: '',
   orderId: '',
-  status: 'Ready to cut',
+  status: 'Draft',
   responsable: '',
-  expectedTo: getTodayLocalDate(),
+  expectedTo: getTodayLocalDateTime(),
   priority: 'Normal',
   selectedSheets: [],
   sheets: '',

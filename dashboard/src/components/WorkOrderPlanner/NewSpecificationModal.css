@@ -1,0 +1,371 @@
+/* New Specification Modal - layout tipo Work Order Form (página 1) */
+
+.wos-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.wos-modal-dialog {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  max-width: min(1120px, 96vw);
+  width: 100%;
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.wos-modal-header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.wos-modal-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+  text-align: center;
+  grid-column: 2;
+}
+
+.wos-modal-close {
+  justify-self: end;
+  grid-column: 3;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 1.75rem;
+  line-height: 1;
+  color: #6b7280;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.wos-modal-close:hover:not(:disabled) {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.wos-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.wos-form-body {
+  padding: 1.25rem 1.75rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.wos-section {
+  margin-bottom: 1rem;
+}
+
+.wos-section-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #374151;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.wos-section-label,
+.wos-field-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  margin-bottom: 0.35rem;
+}
+
+.wos-two-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+/* Bloque centrado: label + contenido (ej. ROTATE PANEL YES/NO/N/A) */
+.wos-center-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.wos-center-block .wos-field-label {
+  margin-bottom: 0.5rem;
+}
+
+.wos-field label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.03em;
+}
+
+.wos-input {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  color: #111827;
+  background: #fff;
+}
+
+.wos-input:focus {
+  outline: none;
+  border-color: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.15);
+}
+
+.wos-checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  justify-content: center;
+}
+
+/* Una sola fila cuando hay espacio (ej. RIVET): gap más pequeño, en pantallas estrechas permite wrap */
+.wos-checkbox-row--single {
+  flex-wrap: nowrap;
+  gap: 0.6rem 0.9rem;
+  justify-content: center;
+}
+
+.wos-checkbox-row--single .wos-checkbox-label {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 1000px) {
+  .wos-checkbox-row--single {
+    flex-wrap: wrap;
+  }
+}
+
+.wos-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #374151;
+  cursor: pointer;
+}
+
+.wos-checkbox-label input[type="checkbox"],
+.wos-checkbox-label input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #22c55e;
+}
+
+/* Campo que solo contiene una fila de checkboxes (ej. PARTIAL TRANSFER): alinear al centro de la celda */
+.wos-field-checkbox-row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.wos-field-checkbox-row .wos-checkbox-row {
+  justify-content: flex-start;
+}
+
+@media (min-width: 640px) {
+  .wos-two-cols .wos-field-checkbox-row .wos-checkbox-row {
+    justify-content: center;
+  }
+}
+
+.wos-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.25rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.wos-radio-group .wos-checkbox-label input[type="radio"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #22c55e;
+}
+
+.wos-label-inline {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin-right: 0.5rem;
+  align-self: center;
+}
+
+.wos-input-sm {
+  max-width: 6rem;
+}
+
+.wos-inline-field {
+  display: inline-flex;
+  align-items: center;
+}
+
+.wos-checkbox-field label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.wos-manufacture-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.wos-manufacture-num {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wos-manufacture-input {
+  width: 100%;
+  max-width: 320px;
+  text-align: center;
+}
+
+.wos-error {
+  margin: 0 1.5rem 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+}
+
+/* TAG TYPE / STIFFENER TYPE: opciones con imagen */
+.wos-image-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.wos-image-options--single {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.wos-image-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  min-width: 100px;
+  max-width: 140px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.wos-image-option:hover {
+  border-color: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+}
+
+.wos-image-option--selected {
+  border-color: #22c55e;
+  background: #f0fdf4;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+}
+
+.wos-image-option-img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  display: block;
+}
+
+.wos-image-option-placeholder {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: #9ca3af;
+  background: #f3f4f6;
+  border-radius: 6px;
+  text-align: center;
+  padding: 0.25rem;
+}
+
+.wos-image-option-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #374151;
+  text-align: center;
+}
+
+.wos-image-option--checkbox {
+  position: relative;
+}
+
+.wos-image-option-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.wos-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.25rem 1.75rem;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+  flex-shrink: 0;
+}

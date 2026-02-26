@@ -6,6 +6,7 @@ import type {
   ItemRequest,
   Sheet,
   SheetInventory,
+  Supplier,
   PeopleAllowance,
   DeliveryDocket,
   Document,
@@ -619,6 +620,139 @@ class AppSheetAPI {
     }
   }
 
+  /** Suppliers más usados: resolución en memoria para evitar request a AppSheet cuando aplica */
+  private static readonly SUPPLIER_ID_TO_NAME: Record<string, string> = {
+    'AjOrTnwr': 'Aodeli Australia',
+    'sDQFsksr': 'Fairview Architectural',
+    'nIeCTiVx': 'HVG'
+  }
+
+  /**
+   * Resuelve Supplier IDs a nombres. Primero compara con los 3 IDs más usados (en memoria);
+   * solo consulta AppSheet para el resto.
+   */
+  async getSuppliersByIds(supplierIds: string[]): Promise<Array<{ 'Supplier ID': string; Name: string }>> {
+    const uniqueIds = [...new Set(supplierIds.map(id => id.trim()).filter(Boolean))]
+    if (uniqueIds.length === 0) return []
+
+    const cacheKey = `suppliers-${uniqueIds.sort().join(',')}`
+    const cached = this.getCachedData<Array<{ 'Supplier ID': string; Name: string }>>(cacheKey)
+    if (cached) return cached
+
+    const fromMemory: Array<{ 'Supplier ID': string; Name: string }> = []
+    const idsToFetch: string[] = []
+    for (const id of uniqueIds) {
+      const name = AppSheetAPI.SUPPLIER_ID_TO_NAME[id]
+      if (name !== undefined) {
+        fromMemory.push({ 'Supplier ID': id, Name: name })
+      } else {
+        idsToFetch.push(id)
+      }
+    }
+
+    if (idsToFetch.length === 0) {
+      this.setCachedData(cacheKey, fromMemory)
+      return fromMemory
+    }
+
+    try {
+      const filterConditions = idsToFetch.map(id => `([Supplier ID]=${JSON.stringify(id)})`).join(', ')
+      const filter = `Filter(Supplier, OR(${filterConditions}))`
+      const response = await this.makeRequest<Supplier>('Supplier', 'Find', [], { Selector: filter })
+      const fromAppSheet = response.map(r => ({ 'Supplier ID': r['Supplier ID'] || '', Name: r.Name || '' }))
+      const list = [...fromMemory, ...fromAppSheet]
+      this.setCachedData(cacheKey, list)
+      return list
+    } catch (error) {
+      console.error('Error fetching suppliers by IDs:', error)
+      return fromMemory.length > 0 ? fromMemory : []
+    }
+  }
+
+  /**
+   * Sheets del proyecto filtradas por Colour (para Work Order Planner: datos de material).
+   * Unifica Type (uppercase), Thickness, y resuelve Supplier IDs a Names con un request a Supplier.
+   */
+  /**
+   * Obtiene sheets de AppSheet filtradas por Project + Colour.
+   * @param dimensions — Opcional. String con una o varias dimensiones separadas por coma
+   *                      (ej. "2500x1500" o "2500x1500, 3000x1500").
+   *                      Si se provee, el summary (types, thicknesses, suppliers) se construye
+   *                      solo a partir de las sheets cuya Dimension coincida con alguna de ellas.
+   *                      Las sheets completas siguen retornándose sin filtrar.
+   */
+  async getSheetsByProjectAndColour(projectName: string, colour: string, dimensions?: string): Promise<{
+    sheets: Array<{ Type: string; Thickness: string; Supplier: string; Dimension: string; Colour: string }>
+    summary: { types: string[]; thicknesses: string[]; suppliers: string[]; dimensions: string[] }
+  }> {
+    const cacheKey = `sheets-${projectName}-${colour}-${dimensions ?? ''}`
+    const cached = this.getCachedData<{ sheets: Array<{ Type: string; Thickness: string; Supplier: string; Dimension: string; Colour: string }>; summary: { types: string[]; thicknesses: string[]; suppliers: string[]; dimensions: string[] } }>(cacheKey)
+    if (cached) return cached
+
+    try {
+      const sheetsFilter = `Filter(Sheets, AND([Project]=${JSON.stringify(projectName)}, [Colour]=${JSON.stringify(colour)}))`
+      const sheetsResponse = await this.makeRequest<Sheet>('Sheets', 'Find', [], {
+        Selector: sheetsFilter
+      })
+
+      const sheets = sheetsResponse.map(s => ({
+        Type: (s.Type || '').trim(),
+        Thickness: (s.Thickness || '').trim(),
+        Supplier: (s.Supplier || '').trim(),
+        Dimension: (s.Dimension || '').trim(),
+        Colour: (s.Colour || '').trim()
+      }))
+
+      // Normalizar dimensiones de la orden para matching (quitar espacios: "2500 x 1500" → "2500x1500")
+      const normalize = (d: string) => d.replace(/\s+/g, '').toLowerCase()
+
+      const dimSet = new Set<string>()
+      if (dimensions) {
+        dimensions.split(/[,;]/).forEach(part => {
+          const n = normalize(part.trim())
+          if (n) dimSet.add(n)
+        })
+      }
+
+      // Si hay dimensiones de la orden, filtrar sheets para el summary; sino usar todas
+      const sheetsForSummary = dimSet.size > 0
+        ? sheets.filter(s => dimSet.has(normalize(s.Dimension)))
+        : sheets
+
+      // Types: unificar en uppercase (Sap, SAP -> SAP)
+      const types = [...new Set(sheetsForSummary.map(s => s.Type.toUpperCase()).filter(Boolean))].sort()
+
+      // Thicknesses: valores únicos tal cual
+      const thicknesses = [...new Set(sheetsForSummary.map(s => s.Thickness).filter(Boolean))].sort()
+
+      // Dimensiones únicas (de las sheets que pasaron el filtro)
+      const uniqueDimensions = [...new Set(sheetsForSummary.map(s => s.Dimension).filter(Boolean))].sort()
+
+      // Supplier IDs (pueden venir varios separados por coma en una celda)
+      const supplierIdSet = new Set<string>()
+      sheetsForSummary.forEach(s => {
+        s.Supplier.split(/[,;]/).forEach(part => {
+          const id = part.trim()
+          if (id) supplierIdSet.add(id)
+        })
+      })
+      const supplierIds = Array.from(supplierIdSet)
+
+      // Un request a AppSheet para resolver IDs -> Name
+      const supplierRows = await this.getSuppliersByIds(supplierIds)
+      const idToName = new Map(supplierRows.map(r => [r['Supplier ID'], r.Name || r['Supplier ID']]))
+      const suppliers = supplierIds.map(id => idToName.get(id) ?? id).filter(Boolean)
+      const supplierNames = [...new Set(suppliers)].sort()
+
+      const result = { sheets, summary: { types, thicknesses, suppliers: supplierNames, dimensions: uniqueDimensions } }
+      this.setCachedData(cacheKey, result)
+      return result
+    } catch (error) {
+      console.error(`Error fetching sheets for project ${projectName} colour ${colour}:`, error)
+      return { sheets: [], summary: { types: [], thicknesses: [], suppliers: [], dimensions: [] } }
+    }
+  }
+
   // Obtener sheets simples pensado para Creator of Orders
   async getSheetsByProject(projectName: string): Promise<Array<{
     'Sheet ID': string
@@ -899,28 +1033,45 @@ class AppSheetAPI {
     }
   }
 
-  // Crear stages en AppSheet (batch)
+  // Crear stages en AppSheet (batch). Estimated time se envía en formato Duration (HHH:MM:SS).
+  // Devuelve las filas creadas (con Stage ID u otra clave) para usar el mismo ID en Supabase.
   async createStages(stages: Array<{
     Order: string
     Action: string
-    'Quality Control': boolean
-  }>): Promise<unknown[]> {
+    Name?: string
+    'Estimated time'?: string
+    'Number stage'?: number
+    'Quality Control'?: boolean
+    Comment?: string
+    External?: boolean
+  }>): Promise<Array<Record<string, unknown>>> {
     if (stages.length === 0) {
       console.warn('⚠️ No stages to create')
       return []
     }
 
+    const { toAppSheetDuration } = await import('../utils/durationToAppSheet')
+
     try {
       console.log(`🔄 Creating ${stages.length} stages in AppSheet...`)
-      const response = await this.makeRequest<unknown>('Stages Order', 'Add', stages)
+      const payload = stages.map(s => ({
+        Order: s.Order,
+        Action: s.Action,
+        Name: s.Name ?? '',
+        'Estimated time': toAppSheetDuration(s['Estimated time']),
+        'Number stage': s['Number stage'] ?? 0,
+        'Quality Control': s['Quality Control'] ?? false,
+        Comment: s.Comment ?? '',
+        External: s.External ?? false
+      }))
+      const response = await this.makeRequest<Record<string, unknown>>('Stages Order', 'Add', payload)
 
       if (response && response.length > 0) {
         console.log(`✅ ${response.length} stages created successfully in AppSheet`)
         return response
-      } else {
-        console.error(`❌ Failed to create stages - empty response`)
-        return []
       }
+      console.error(`❌ Failed to create stages - empty response`)
+      return []
     } catch (error) {
       console.error('Error creating stages in AppSheet:', error)
       throw error
@@ -973,6 +1124,8 @@ class AppSheetAPI {
     Colour: string
     Notification: boolean
     'Creation Date': string
+    /** Dimensiones de sheets normalizadas, ej: "2500x1500, 3200x1500" */
+    Sheets?: string
   }): Promise<unknown[]> {
     try {
       console.log(`🔄 Creating order cut in AppSheet: ${order['Order ID']}`)
@@ -986,6 +1139,66 @@ class AppSheetAPI {
       return response
     } catch (error) {
       console.error('Error creating order cut in AppSheet:', error)
+      throw error
+    }
+  }
+
+  /** Actualizar Status de una orden en AppSheet (Orders cut). Edit requiere la clave + campos a actualizar. */
+  async updateOrderCutStatus(orderId: string, status: string): Promise<unknown[]> {
+    try {
+      const payload = { 'Order ID': orderId, Status: status }
+      const response = await this.makeRequest<unknown>('Orders cut', 'Edit', [payload])
+      if (response && response.length > 0) {
+        console.log(`✅ Order ${orderId} status updated to "${status}" in AppSheet`)
+        return response
+      }
+      return []
+    } catch (error) {
+      console.error('Error updating order status in AppSheet:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Actualiza múltiples campos de una orden en AppSheet (Orders cut).
+   * Se usa en el Release para setear Status, specification_id y Expected to de una sola vez.
+   */
+  async updateOrderCut(orderId: string, fields: Record<string, unknown>): Promise<unknown[]> {
+    try {
+      const payload = { 'Order ID': orderId, ...fields }
+      const response = await this.makeRequest<unknown>('Orders cut', 'Edit', [payload])
+      console.log(`✅ Order ${orderId} updated in AppSheet:`, Object.keys(fields).join(', '))
+      return response ?? []
+    } catch (error) {
+      console.error('Error updating order in AppSheet:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Sincroniza una Specification en AppSheet (tabla Specifications).
+   * Si ya existe (mismo specification_id) → Edit; si no existe → Add.
+   * Los campos son texto plano (LongText), no JSON.
+   * El payload viene de specToAppSheetPayload().
+   */
+  async upsertSpecificationInAppSheet(payload: Record<string, string>): Promise<Record<string, unknown>> {
+    const specId = payload.specification_id
+    try {
+      const existing = await this.makeRequest<Record<string, unknown>>('Specifications', 'Find', [], {
+        Selector: `Filter(Specifications, [specification_id]="${specId}")`
+      })
+
+      if (existing && existing.length > 0) {
+        const response = await this.makeRequest<Record<string, unknown>>('Specifications', 'Edit', [payload])
+        console.log(`✅ Specification updated in AppSheet: ${specId}`)
+        return response?.[0] ?? {}
+      } else {
+        const response = await this.makeRequest<Record<string, unknown>>('Specifications', 'Add', [payload])
+        console.log(`✅ Specification created in AppSheet: ${specId}`)
+        return response?.[0] ?? {}
+      }
+    } catch (error) {
+      console.error('Error upserting specification in AppSheet:', error)
       throw error
     }
   }
@@ -1042,7 +1255,10 @@ class AppSheetAPI {
     stages: Array<{
       Order: string
       Action: string
-      'Quality Control': boolean
+      Name: string
+      'Estimated time': string
+      'Number stage': number
+      'Quality Control'?: boolean
     }>,
     panels: Array<{
       Name: string

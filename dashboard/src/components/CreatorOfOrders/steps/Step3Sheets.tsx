@@ -44,7 +44,7 @@ export function Step3Sheets() {
     [formData.ignoredSheetDimensions]
   )
 
-  const { data: sheets, isLoading: sheetsLoading } = useQuery({
+  const { data: sheets, isLoading: sheetsLoading, refetch, isFetching } = useQuery({
     queryKey: ['sheets-by-project', formData.project],
     queryFn: () => appSheetApi.getSheetsByProject(formData.project || ''),
     enabled: !!formData.project,
@@ -498,10 +498,12 @@ export function Step3Sheets() {
 
   return (
     <div className="step-container step3-sheets">
-      <h2 className="step-title">Sheet Selection</h2>
-      <p className="step-description">
-        We detected the sheets from the nesting CSV. Please select the colour for each sheet size.
-      </p>
+      <div className="page-heading">
+        <h2 className="page-heading-title">Sheet Selection</h2>
+        <p className="page-heading-desc">
+          We detected the sheets from the nesting CSV. Please select the colour for each sheet size.
+        </p>
+      </div>
 
       {pendingDetectedChips.length > 0 && (
         <div className="detected-sheets-banner">
@@ -602,6 +604,23 @@ export function Step3Sheets() {
               <option key={colour} value={colour}>{colour}</option>
             ))}
           </select>
+        </div>
+
+        <div className="filter-group step3-refresh-group">
+          <span className="filter-label" aria-hidden="true">&nbsp;</span>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="step3-refresh-btn"
+            title="Refresh sheet stock"
+          >
+            {isFetching ? (
+              <span className="step3-refresh-spinner" aria-hidden="true" />
+            ) : (
+              '↻ Refresh stock'
+            )}
+          </button>
         </div>
       </div>
 

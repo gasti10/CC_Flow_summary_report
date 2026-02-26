@@ -164,6 +164,27 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
+/* Colores por sección: borde izquierdo + fondo suave (Opción 1 + 2) */
+.review-section-order {
+  border-left: 4px solid #3b82f6;
+  background: #f8fafc;
+}
+
+.review-section-sheets {
+  border-left: 4px solid #10b981;
+  background: #f0fdf4;
+}
+
+.review-section-panels {
+  border-left: 4px solid #f59e0b;
+  background: #fffbeb;
+}
+
+.review-section-documents {
+  border-left: 4px solid #8b5cf6;
+  background: #faf5ff;
+}
+
 .section-title {
   margin: 0 0 1.5rem 0;
   color: var(--mode-gray-900, #111827);
@@ -371,6 +392,24 @@
   font-weight: 600;
 }
 
+.review-comment-textarea {
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9375rem;
+  color: #111827;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  resize: vertical;
+  min-height: 4rem;
+}
+
+.review-comment-textarea:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.2);
+}
+
 .review-table-container {
   margin: 1rem 0;
   border: 1px solid #e2e8f0;
@@ -537,6 +576,19 @@
   transform: translateY(-2px);
 }
 
+.review-control-item-inline.review-control-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.review-control-item-inline.review-control-disabled:hover {
+  border-color: #e5e7eb;
+  background: white;
+  box-shadow: none;
+  transform: none;
+}
+
 /* Animaciones para los controles */
 .review-control-animated {
   opacity: 0;
@@ -588,6 +640,42 @@
     transform: translateY(0);
     border-color: #e5e7eb;
     background: white;
+  }
+}
+
+/* Bloque Comment animado (Opción A: misma familia que controles, teal/cyan) */
+.review-comment-block {
+  grid-column: 1 / -1;
+  margin-top: 0;
+  padding: 1rem 1.25rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f9fafb;
+}
+
+.review-comment-animated {
+  opacity: 0;
+  animation: slideInFadeComment 1.5s ease-out forwards;
+}
+
+@keyframes slideInFadeComment {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+    border-color: #e5e7eb;
+    background: #f9fafb;
+  }
+  50% {
+    border-color: #0d9488;
+    background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+    box-shadow: 0 0 15px rgba(13, 148, 136, 0.25);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    border-color: #e5e7eb;
+    background: #f9fafb;
+    box-shadow: none;
   }
 }
 
@@ -1071,6 +1159,21 @@
 .step-error-message ul {
   margin: 0.5rem 0 0 0;
   padding-left: 1.5rem;
+}
+
+.step-error-message .step-error-friendly {
+  margin: 0.5rem 0 1rem 0;
+  color: #c53030;
+}
+
+.step-error-message .step-error-goto-step1 {
+  margin-top: 0.5rem;
+  background: #4299e1;
+  color: white;
+}
+
+.step-error-message .step-error-goto-step1:hover {
+  background: #3182ce;
 }
 
 /* Documents Section Styles */

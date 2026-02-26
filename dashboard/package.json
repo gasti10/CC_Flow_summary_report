@@ -13,10 +13,11 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
-    "canvas-confetti": "^1.9.3",
     "@fontsource/roboto": "^5.2.6",
+    "@react-pdf/renderer": "^4.3.2",
     "@tanstack/react-query": "^5.81.5",
     "@tanstack/react-query-devtools": "^5.81.5",
+    "canvas-confetti": "^1.9.3",
     "chart.js": "^4.5.0",
     "chartjs-adapter-date-fns": "^3.0.0",
     "chartjs-plugin-datalabels": "^2.2.0",

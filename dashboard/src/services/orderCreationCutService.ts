@@ -4,10 +4,20 @@
 import { supabaseApi } from './supabaseApi'
 import { supabaseClient } from './supabaseClient'
 import AppSheetAPI from './appsheetApi'
-import { getBrisbaneDateTime } from '../utils/dateUtils'
+import { getBrisbaneDateTime, fromDateTimeLocalToStorage } from '../utils/dateUtils'
 import type { OrderFormData } from '../components/CreatorOfOrders/types/wizard.types'
 
 const appSheetApi = new AppSheetAPI()
+
+/** Dimensiones normalizadas de las sheets usadas en la orden, separadas por ", " (ej: 2500x1500, 3200x1500). */
+function getSheetsDimensionsString(selectedSheets: { dimension: string }[]): string {
+  if (!selectedSheets?.length) return ''
+  const normalized = selectedSheets
+    .map((s) => (s.dimension || '').trim().replace(/\s+/g, '').toLowerCase())
+    .filter(Boolean)
+  const unique = [...new Set(normalized)].sort()
+  return unique.join(', ')
+}
 
 export interface CreateOrderProgress {
   step: number
@@ -62,6 +72,7 @@ export async function createOrder(
       status: 'in-progress'
     })
 
+    const sheetsDimensions = getSheetsDimensionsString(formData.selectedSheets)
     const order = {
       'Order ID': formData.orderId,
       Project: formData.project,
@@ -69,15 +80,19 @@ export async function createOrder(
       Status: formData.status,
       Colour: formData.colour,
       Notification: notification,
-      'Creation Date': creationDate
+      'Creation Date': creationDate,
+      Comment: formData.orderComment ?? '',
+      ...(formData.expectedTo ? { 'Expected to': fromDateTimeLocalToStorage(formData.expectedTo) } : {}),
+      ...(sheetsDimensions ? { Sheets: sheetsDimensions } : {})
     }
 
-    // Preparar stages (solo para AppSheet)
+    // Preparar stages (solo para AppSheet; no se crean si la orden es Draft)
     const stages = [
       { Order: formData.orderId, Action: 'Cut', 'Quality Control': qualityControl },
       { Order: formData.orderId, Action: 'Manufacturing', 'Quality Control': qualityControl },
-      { Order: formData.orderId, Action: 'Packaging', 'Quality Control': qualityControl }
+      { Order: formData.orderId, Action: 'Packing', 'Quality Control': qualityControl }
     ]
+    const isDraftOrder = formData.status === 'Draft' || formData.status === 'Pending Revision'
 
     // Preparar paneles
     const panels = formData.panels.map(panel => ({
@@ -116,6 +131,11 @@ export async function createOrder(
         .insert([order])
 
       if (orderError) {
+        if (orderError.code === '23505') {
+          throw new Error(
+            'ORDER_ID_DUPLICATE: This Order ID is already in use. Go to Order Information (Step 1) to choose a different Order ID or generate a new one.'
+          )
+        }
         throw new Error(`Supabase error creating order: ${orderError.message}`)
       }
 
@@ -202,32 +222,40 @@ export async function createOrder(
       // Continuar aunque falle AppSheet (ya está en Supabase)
     }
 
-    // Paso 5: Crear stages en AppSheet
-    onProgress?.({
-      step: 5,
-      totalSteps,
-      message: 'Creating stages in CC Flow 2026 (3 stages)...',
-      status: 'in-progress'
-    })
-
-    try {
-      await appSheetApi.createStages(stages)
+    // Paso 5: Crear stages en AppSheet (solo si la orden NO es Draft)
+    if (!isDraftOrder) {
       onProgress?.({
         step: 5,
         totalSteps,
-        message: 'Stages created in CC Flow 2026 (3 stages)',
+        message: 'Creating stages in CC Flow 2026 (3 stages)...',
+        status: 'in-progress'
+      })
+
+      try {
+        await appSheetApi.createStages(stages)
+        onProgress?.({
+          step: 5,
+          totalSteps,
+          message: 'Stages created in CC Flow 2026 (3 stages)',
+          status: 'completed'
+        })
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        warnings.push(`Failed to create stages in AppSheet: ${errorMessage}`)
+        onProgress?.({
+          step: 5,
+          totalSteps,
+          message: `Warning: ${errorMessage}`,
+          status: 'error'
+        })
+      }
+    } else {
+      onProgress?.({
+        step: 5,
+        totalSteps,
+        message: 'Skipping stages (Draft order – Manager will set workflow on release)',
         status: 'completed'
       })
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      warnings.push(`Failed to create stages in AppSheet: ${errorMessage}`)
-      onProgress?.({
-        step: 5,
-        totalSteps,
-        message: `Warning: ${errorMessage}`,
-        status: 'error'
-      })
-      // Continuar aunque falle stages
     }
 
     // Paso 6: Crear panels en AppSheet

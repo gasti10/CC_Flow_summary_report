@@ -8,7 +8,7 @@ import { useLastOrder } from '../../../hooks/useLastOrder'
 import { useOrderIdValidation } from '../../../hooks/useOrderIdValidation'
 import AppSheetAPI from '../../../services/appsheetApi'
 import { supabaseApi } from '../../../services/supabaseApi'
-import { getTodayLocalDate } from '../../../utils/dateUtils'
+import { getTodayLocalDate, getTodayLocalDateTime, toDateTimeLocalValue } from '../../../utils/dateUtils'
 import LoadingSpinner from '../../Common/LoadingSpinner'
 import './Step1Order.css'
 
@@ -23,13 +23,10 @@ interface OrderCut {
   Colour?: string
 }
 
-// Opciones para Status
+// Opciones para Status (Draft = pendiente de Manager; Ready to cut = flujo legacy directo a producción)
 const statusOptions = [
-  { value: 'Ready to cut', label: 'Ready to cut', icon: '✂️' },
-  { value: 'cutting', label: 'Cutting', icon: '⚙️' },
-  { value: 'manufacturing', label: 'Manufacturing', icon: '🏭' },
-  { value: 'delivering', label: 'Delivering', icon: '🚚' },
-  { value: 'delivered', label: 'Delivered', icon: '✅' }
+  { value: 'Draft', label: 'Draft', icon: '📋' },
+  { value: 'Ready to cut', label: 'Ready to cut', icon: '✂️' }
 ]
 
 // Opciones para Priority con colores
@@ -243,10 +240,12 @@ export function Step1Order() {
 
   return (
     <div className="step-container step1-order">
-      <h2 className="step-title">Order Information</h2>
-      <p className="step-description">
-        Complete the basic information for the cutting order
-      </p>
+      <div className="page-heading">
+        <h2 className="page-heading-title">Order Information</h2>
+        <p className="page-heading-desc">
+          Complete the basic information for the cutting order
+        </p>
+      </div>
 
       <div className="step1-layout">
         {/* Left Column - Form Fields */}
@@ -429,11 +428,11 @@ export function Step1Order() {
             </label>
             <input
               id="expectedTo"
-              type="date"
-              value={formData.expectedTo}
+              type="datetime-local"
+              value={toDateTimeLocalValue(formData.expectedTo) || getTodayLocalDateTime()}
               onChange={(e) => handleChange('expectedTo', e.target.value)}
               className={`form-input input-centered ${stepValidation.errors.includes('The expected date is required') ? 'error' : ''}`}
-              min={getTodayLocalDate()}
+              min={`${getTodayLocalDate()}T00:00`}
             />
             {stepValidation.errors.includes('The expected date is required') && (
               <span className="form-error">The expected date is required</span>
