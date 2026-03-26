@@ -22,7 +22,7 @@ export const TAG_THICKNESS_OPTIONS: Array<'0mm' | '1.6mm' | '3mm'> = ['0mm', '1.
 
 /** Tipos de STIFFENER (selección múltiple). Imágenes en public/work-order-form/ */
 export const STIFFENER_TYPE_OPTIONS: FormOptionWithImage[] = [
-  { id: 'stiffener_1', label: 'Type 1', imageSrc: '/work-order-form/stiffener-type-1.png' },
-  { id: 'stiffener_2', label: 'Type 2', imageSrc: '/work-order-form/stiffener-type-2.png' },
-  { id: 'stiffener_3', label: 'Type 3', imageSrc: '/work-order-form/stiffener-type-3.png' }
+  { id: 'stiffener_1', label: 'ST', imageSrc: '/work-order-form/stiffener-type-1.png' },
+  { id: 'stiffener_2', label: 'STB', imageSrc: '/work-order-form/stiffener-type-2.png' },
+  { id: 'stiffener_3', label: 'ANGLE', imageSrc: '/work-order-form/stiffener-type-3.png' }
 ]

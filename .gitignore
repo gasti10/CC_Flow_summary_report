@@ -39,3 +39,9 @@ Apps_Script_Upload_Files/
 # data
 *.csv
 *.sql
+
+# Templates
+templates/
+
+# Scripts auxiliares
+scripts/

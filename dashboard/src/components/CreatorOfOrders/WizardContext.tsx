@@ -90,6 +90,9 @@ export function WizardProvider({ children }: WizardProviderProps) {
         if (dataToValidate.selectedSheets.length === 0) {
           errors.push('Must select at least one sheet')
         } else {
+          const normalizeDimension = (s: string): string =>
+            (s || '').trim().replace(/\s+/g, '').toLowerCase()
+
           // Validar que todas las sheets seleccionadas tengan QTY > 0
           const invalidSheets = dataToValidate.selectedSheets.filter(s => s.qty <= 0)
           if (invalidSheets.length > 0) {
@@ -99,14 +102,30 @@ export function WizardProvider({ children }: WizardProviderProps) {
           if (sheetsWithoutColour.length > 0) {
             errors.push('All sheets must have a colour')
           }
-          const ignored = new Set(dataToValidate.ignoredSheetDimensions || [])
-          const detectedDimensions = new Set(
+
+          const ignoredNormalized = new Set(
+            (dataToValidate.ignoredSheetDimensions || []).map((d) => normalizeDimension(d))
+          )
+
+          const detectedDimensionsNormalized = new Set(
             dataToValidate.panels
               .map(panel => panel.sheetName?.trim())
               .filter(Boolean)
-              .filter((dimension) => !ignored.has(dimension))
+              .map((d) => normalizeDimension(d as string))
+              .filter((dimension) => !ignoredNormalized.has(dimension))
           )
-          if (dataToValidate.selectedSheets.length < detectedDimensions.size) {
+
+          const selectedDimensionsNormalized = new Set(
+            dataToValidate.selectedSheets
+              .map((s) => normalizeDimension(s.dimension))
+              .filter(Boolean)
+          )
+
+          const missingDetectedDimensions = Array.from(detectedDimensionsNormalized).filter(
+            (dimension) => !selectedDimensionsNormalized.has(dimension)
+          )
+
+          if (missingDetectedDimensions.length > 0) {
             errors.push('Please select a colour for every detected sheet size')
           }
         }

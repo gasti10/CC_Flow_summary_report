@@ -49,6 +49,7 @@ export interface RivetSpec {
   diameter32?: boolean
   diameter4?: boolean
   diameter48?: boolean
+  diameter5?: boolean
 }
 
 export type ManufactureProcessSpec = [string, string, string, string, string, string, string, string, string, string]
@@ -64,7 +65,7 @@ export interface CncSpec {
   rotatePanel?: YesNoNa
   bridges?: boolean
   bridgesNo?: boolean
-  trimSticker?: 'YES' | 'HEIGHT' | 'N/A'
+  trimSticker?: 'YES' | 'N/A'
   trimStickerHeight?: string
   secureSmallParts?: boolean
   secureSmallPartsNo?: boolean

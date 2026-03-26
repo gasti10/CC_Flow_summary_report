@@ -62,7 +62,7 @@ function cncToText(cnc: Record<string, unknown>): string {
   else if (cnc.bridgesNo) lines.push('Bridges: NO')
   if (cnc.trimSticker) {
     let ts = `Trim Sticker: ${String(cnc.trimSticker)}`
-    if (cnc.trimSticker === 'HEIGHT' && cnc.trimStickerHeight) ts += ` (${String(cnc.trimStickerHeight)})`
+    if ((cnc.trimSticker === 'YES' || cnc.trimSticker === 'HEIGHT') && cnc.trimStickerHeight) ts += ` (${String(cnc.trimStickerHeight)})`
     lines.push(ts)
   }
   if (cnc.secureSmallParts) lines.push('Secure Small Parts: YES')

@@ -446,6 +446,7 @@ export default function WorkOrderPdfDocument({
           <CheckboxCell label="ø3.2mm" checked={!!rivet.diameter32} />
           <CheckboxCell label="ø4mm" checked={!!rivet.diameter4} />
           <CheckboxCell label="ø4.8mm" checked={!!rivet.diameter48} />
+          <CheckboxCell label="ø5mm" checked={!!rivet.diameter5} />
         </View>
 
         {/* MANUFACTURE PROCESS: solo los stages activos */}
@@ -501,10 +502,9 @@ export default function WorkOrderPdfDocument({
           <View style={styles.detailRow2Col}>
             <View style={styles.detailCell}>
               <Text style={styles.detailLabel}>TRIM STICKER</Text>
-              <CheckboxCell label="YES" checked={cnc.trimSticker === 'YES'} />
-              <CheckboxCell label="HEIGHT" checked={cnc.trimSticker === 'HEIGHT'} />
+              <CheckboxCell label="YES" checked={cnc.trimSticker === 'YES' || cnc.trimSticker === 'HEIGHT'} />
               <CheckboxCell label="N/A" checked={cnc.trimSticker === 'N/A'} />
-              {cnc.trimSticker === 'HEIGHT' && cnc.trimStickerHeight ? (
+              {(cnc.trimSticker === 'YES' || cnc.trimSticker === 'HEIGHT') && cnc.trimStickerHeight ? (
                 <Text style={{ marginLeft: 3, fontSize: 8 }}>{String(cnc.trimStickerHeight)}</Text>
               ) : null}
             </View>

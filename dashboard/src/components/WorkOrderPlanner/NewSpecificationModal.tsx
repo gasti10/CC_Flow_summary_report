@@ -156,7 +156,11 @@ function mergeFormFromSpec(
     },
     material: (spec.material ?? base.material) as WorkOrderForm['material'],
     rivet: (spec.rivet ?? base.rivet) as WorkOrderForm['rivet'],
-    cnc: (spec.cnc ?? base.cnc) as WorkOrderForm['cnc'],
+    cnc: (() => {
+      const c = (spec.cnc ?? base.cnc) as Record<string, unknown>
+      if (c?.trimSticker === 'HEIGHT') return { ...c, trimSticker: 'YES' } as WorkOrderForm['cnc']
+      return (spec.cnc ?? base.cnc) as WorkOrderForm['cnc']
+    })(),
     fold: (spec.fold ?? base.fold) as WorkOrderForm['fold'],
     tag: (spec.tag ?? base.tag) as WorkOrderForm['tag'],
     stiffener: (spec.stiffener ?? base.stiffener) as WorkOrderForm['stiffener'],
@@ -279,8 +283,15 @@ export default function NewSpecificationModal({
     }
   })
 
+  const [trimStickerError, setTrimStickerError] = useState<string | null>(null)
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    setTrimStickerError(null)
+    if (form.cnc?.trimSticker === 'YES' && !(form.cnc?.trimStickerHeight ?? '').trim()) {
+      setTrimStickerError('Height is required when TRIM STICKER is YES.')
+      return
+    }
     if (isEditMode) updateMutation.mutate()
     else createMutation.mutate()
   }
@@ -449,7 +460,7 @@ export default function NewSpecificationModal({
 
             <div className="wos-section wos-section-title">RIVET SPECIFICATIONS</div>
             <div className="wos-section wos-checkbox-row wos-checkbox-row--single">
-              {['aluminium', 'stainless', 'steel', 'domeHead', 'cSunk', 'flange', 'diameter32', 'diameter4', 'diameter48'].map(key => (
+              {['aluminium', 'stainless', 'steel', 'domeHead', 'cSunk', 'flange', 'diameter32', 'diameter4', 'diameter48', 'diameter5'].map(key => (
                 <label key={key} className="wos-checkbox-label">
                   <input
                     type="checkbox"
@@ -458,7 +469,7 @@ export default function NewSpecificationModal({
                       setForm(prev => ({ ...prev, rivet: { ...prev.rivet, [key]: e.target.checked } as WorkOrderForm['rivet'] }))
                     }}
                   />
-                  {key === 'domeHead' ? 'DOME HEAD' : key === 'cSunk' ? 'C/SUNK' : key === 'diameter32' ? 'ø3.2mm' : key === 'diameter4' ? 'ø4mm' : key === 'diameter48' ? 'ø4.8mm' : key.toUpperCase()}
+                  {key === 'domeHead' ? 'DOME HEAD' : key === 'cSunk' ? 'C/SUNK' : key === 'diameter32' ? 'ø3.2mm' : key === 'diameter4' ? 'ø4mm' : key === 'diameter48' ? 'ø4.8mm' : key === 'diameter5' ? 'ø5mm' : key.toUpperCase()}
                 </label>
               ))}
             </div>
@@ -502,14 +513,33 @@ export default function NewSpecificationModal({
               </div>
               <div className="wos-checkbox-row" style={{ marginBottom: '0.75rem' }}>
                 <span className="wos-label-inline">TRIM STICKER</span>
-                {(['YES', 'HEIGHT', 'N/A'] as const).map(v => (
+                {(['YES', 'N/A'] as const).map(v => (
                   <label key={v} className="wos-checkbox-label">
-                    <input type="radio" name="trimSticker" checked={form.cnc?.trimSticker === v} onChange={() => updateCnc('trimSticker', v)} />
+                    <input
+                      type="radio"
+                      name="trimSticker"
+                      checked={form.cnc?.trimSticker === v}
+                      onChange={() => {
+                        updateCnc('trimSticker', v)
+                        if (v !== 'YES') updateCnc('trimStickerHeight', '')
+                        setTrimStickerError(null)
+                      }}
+                    />
                     {v}
                   </label>
                 ))}
-                {form.cnc?.trimSticker === 'HEIGHT' && (
-                  <input type="text" className="wos-input wos-input-sm" placeholder="Height" value={form.cnc?.trimStickerHeight ?? ''} onChange={e => updateCnc('trimStickerHeight', e.target.value)} style={{ maxWidth: '80px' }} />
+                {form.cnc?.trimSticker === 'YES' && (
+                  <>
+                    <input
+                      type="text"
+                      className="wos-input wos-input-sm"
+                      style={{ maxWidth: '80px', ...(trimStickerError ? { borderColor: 'var(--color-error, #c00)' } : {}) }}
+                      placeholder="Height (required)"
+                      value={form.cnc?.trimStickerHeight ?? ''}
+                      onChange={e => { updateCnc('trimStickerHeight', e.target.value); setTrimStickerError(null) }}
+                    />
+                    {trimStickerError && <span className="wos-error" style={{ marginLeft: 6, display: 'inline' }}>{trimStickerError}</span>}
+                  </>
                 )}
               </div>
               <div className="wos-checkbox-row" style={{ marginBottom: '0.75rem' }}>

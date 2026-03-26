@@ -130,48 +130,50 @@ export function Step3Sheets() {
       return
     }
 
-    const nextSelected: SelectedSheet[] = []
     const deducedDimensionsNormalized = new Set(
       visibleDeducedSheets.map((sheet) => normalizeDimension(sheet.dimension))
     )
 
-    const suggestedByDimension = new Map(
-      suggestedSelections.map((selection) => [selection.dimension, selection])
+    // Permitir selección múltiple: si el usuario ya seleccionó varias sheets con la misma dimensión,
+    // no debemos "unificarlas" ni eliminar las demás.
+    const preservedOutsideDetected = formData.selectedSheets.filter(
+      (sheet) => !deducedDimensionsNormalized.has(normalizeDimension(sheet.dimension))
+    )
+    const preservedInsideDetected = formData.selectedSheets.filter(
+      (sheet) => deducedDimensionsNormalized.has(normalizeDimension(sheet.dimension))
+    )
+
+    const nextSelected: SelectedSheet[] = [
+      ...preservedOutsideDetected,
+      ...preservedInsideDetected
+    ]
+
+    // Mapa por dimensión normalizada para evitar problemas de formato (espacios/mayúsculas)
+    const suggestedByDimensionNorm = new Map(
+      suggestedSelections.map((selection) => [normalizeDimension(selection.dimension), selection])
     )
 
     visibleDeducedSheets.forEach((deduced) => {
       const deducedNorm = normalizeDimension(deduced.dimension)
-      const existing = formData.selectedSheets.find(
+
+      // Si ya existe al menos una selección para esta dimensión, mantenemos TODAS (multi-select).
+      const alreadySelectedForDim = nextSelected.some(
         (sheet) => normalizeDimension(sheet.dimension) === deducedNorm
       )
+      if (alreadySelectedForDim) return
 
-      if (existing) {
-        nextSelected.push({
-          ...existing,
-          qty: existing.qty > 0 ? existing.qty : deduced.qty
-        })
-        return
-      }
+      const suggested = suggestedByDimensionNorm.get(deducedNorm)
+      if (!suggested) return
 
-      const suggested = suggestedByDimension.get(deduced.dimension)
-      if (suggested) {
-        const sheet = suggested.sheet
-        nextSelected.push({
-          sheetId: sheet['Sheet ID'],
-          dimension: sheet.Dimension || deduced.dimension,
-          colour: sheet.Colour || '',
-          qty: suggested.qty,
-          sheetData: sheet
-        })
-      }
+      const sheet = suggested.sheet
+      nextSelected.push({
+        sheetId: sheet['Sheet ID'],
+        dimension: sheet.Dimension || deduced.dimension,
+        colour: sheet.Colour || '',
+        qty: suggested.qty,
+        sheetData: sheet
+      })
     })
-
-    // Preservar selecciones manuales que NO corresponden a dimensiones detectadas
-    const preservedSelections = formData.selectedSheets.filter(
-      (sheet) => !deducedDimensionsNormalized.has(normalizeDimension(sheet.dimension))
-    )
-
-    nextSelected.push(...preservedSelections)
 
     const normalizedCurrent = formData.selectedSheets.map((sheet) => ({
       sheetId: sheet.sheetId,
@@ -362,40 +364,53 @@ export function Step3Sheets() {
   }
 
   const handleSheetToggle = (sheet: SimpleSheet) => {
-    const existingIndex = formData.selectedSheets.findIndex(
-      (s) => s.sheetId === sheet['Sheet ID']
-    )
+    const sheetId = sheet['Sheet ID']
+    const existingIndex = formData.selectedSheets.findIndex((s) => s.sheetId === sheetId)
 
-    let newSelectedSheets: SelectedSheet[]
+    const dimension = sheet.Dimension?.trim() || ''
+    const dimensionNorm = normalizeDimension(dimension)
 
     if (existingIndex >= 0) {
-      const dimension = sheet.Dimension?.trim() || ''
-      if (dimension && matchedDimensionsNormalized.has(normalizeDimension(dimension))) {
-        // Si la dimensión viene detectada por el CSV, al borrar también se ignora
+      // Deseleccionar una sheet concreta: NO eliminar otras sheets con la misma dimensión.
+      const nextSelectedSheets = formData.selectedSheets.filter((s) => s.sheetId !== sheetId)
+
+      // Solo si la dimensión era "detectada" y ya no quedan selecciones para esa dimensión,
+      // entonces marcamos la dimensión como ignorada.
+      if (dimension && matchedDimensionsNormalized.has(dimensionNorm)) {
         const deducedDim = visibleDeducedSheets.find(
-          (d) => normalizeDimension(d.dimension) === normalizeDimension(dimension)
+          (d) => normalizeDimension(d.dimension) === dimensionNorm
         )
-        ignoreDetectedDimension(deducedDim?.dimension ?? dimension)
-        return
+
+        const stillHasSelectionForDim = nextSelectedSheets.some(
+          (s) => normalizeDimension(s.dimension) === dimensionNorm
+        )
+
+        if (!stillHasSelectionForDim) {
+          ignoreDetectedDimension(deducedDim?.dimension ?? dimension)
+          return
+        }
       }
 
-      newSelectedSheets = formData.selectedSheets.filter((s) => s.sheetId !== sheet['Sheet ID'])
-    } else {
-      const sheetNorm = normalizeDimension(sheet.Dimension || '')
-      const deduced = deducedSheets.find((d) => normalizeDimension(d.dimension) === sheetNorm)
-      newSelectedSheets = formData.selectedSheets.filter(
-        (s) => normalizeDimension(s.dimension) !== sheetNorm
-      )
-      newSelectedSheets.push({
-        sheetId: sheet['Sheet ID'],
-        dimension: sheet.Dimension || '',
-        colour: sheet.Colour || '',
-        qty: deduced?.qty || 1,
-        sheetData: sheet
-      })
+      updateFormData({ selectedSheets: nextSelectedSheets })
+      return
     }
 
-    updateFormData({ selectedSheets: newSelectedSheets })
+    // Seleccionar una sheet concreta (multi-select por sheetId)
+    const sheetNorm = normalizeDimension(sheet.Dimension || '')
+    const deduced = deducedSheets.find((d) => normalizeDimension(d.dimension) === sheetNorm)
+
+    updateFormData({
+      selectedSheets: [
+        ...formData.selectedSheets,
+        {
+          sheetId,
+          dimension: sheet.Dimension || '',
+          colour: sheet.Colour || '',
+          qty: deduced?.qty || 1,
+          sheetData: sheet
+        }
+      ]
+    })
   }
 
   const handleQtyChange = (sheetId: string, qty: number) => {
@@ -788,13 +803,21 @@ export function Step3Sheets() {
                           const deducedDim = visibleDeducedSheets.find(
                             (d) => normalizeDimension(d.dimension) === normalizeDimension(sheet.dimension)
                           )
+
+                          const nextSelectedSheets = formData.selectedSheets.filter((s) => s.sheetId !== sheet.sheetId)
                           if (deducedDim) {
-                            ignoreDetectedDimension(deducedDim.dimension)
-                          } else {
-                            updateFormData({
-                              selectedSheets: formData.selectedSheets.filter((s) => s.sheetId !== sheet.sheetId)
-                            })
+                            const dimNorm = normalizeDimension(deducedDim.dimension)
+                            const stillHasSelectionForDim = nextSelectedSheets.some(
+                              (s) => normalizeDimension(s.dimension) === dimNorm
+                            )
+
+                            if (!stillHasSelectionForDim) {
+                              ignoreDetectedDimension(deducedDim.dimension)
+                              return
+                            }
                           }
+
+                          updateFormData({ selectedSheets: nextSelectedSheets })
                         }}
                         className="summary-remove-btn"
                         title="Remove"
