@@ -207,10 +207,16 @@ export default function WorkOrderPlanner() {
                 Manage and review pending work orders before releasing them to production. Ensure all required information is provided before submitting.
               </p>
             </div>
-            <Link to="/creator-of-orders" className="wop-btn-new-order">
-              <span className="material-icons wop-btn-new-order-icon" aria-hidden>add</span>
-              New Order
-            </Link>
+            <div className="wop-intro-actions">
+              <Link to="/site-orders-planner" className="wop-btn-new-order wop-btn-site-orders">
+                <span className="material-icons wop-btn-new-order-icon" aria-hidden>playlist_add_check</span>
+                Site Orders Planner
+              </Link>
+              <Link to="/creator-of-orders" className="wop-btn-new-order">
+                <span className="material-icons wop-btn-new-order-icon" aria-hidden>add</span>
+                New Order
+              </Link>
+            </div>
           </div>
         </section>
 

@@ -262,3 +262,58 @@ export interface CSVExportData {
     end: string;
   };
 }
+
+/** Delivery checkboxes for Material Order PDF (aligned with Work Order PDF delivery block). */
+export interface MaterialPdfDeliveryMeta {
+  bigTruck?: boolean
+  smallTruck?: boolean
+  ute?: boolean
+  pallet?: boolean
+  aFrame?: boolean
+  other?: boolean
+  additionalInfo?: string
+}
+
+/** Persisted form fields for WorkMaterialOrder PDF (no sketch images). */
+export interface MaterialPdfMeta {
+  area?: string
+  partial_transfer?: boolean
+  /** PDF delivery date, `YYYY-MM-DD` (input type="date"). */
+  delivery_date?: string
+  delivery?: MaterialPdfDeliveryMeta
+}
+
+export interface SiteOrderPlan {
+  plan_id: string
+  /** AppSheet Site/Material order id; null = plan not tied to a pending order */
+  order_id: string | null
+  project: string
+  created_by?: string | null
+  created_at?: string
+  updated_at?: string
+  document_id?: string | null
+  notes?: string | null
+  /** PDF options: area, partial transfer, delivery flags */
+  material_pdf_meta?: MaterialPdfMeta | null
+}
+
+export interface SiteOrderCuttingLine {
+  line_id: string
+  plan_id: string
+  item_id?: string | null
+  item_request_id?: string | null
+  description: string
+  thickness?: string | null
+  size_length: string
+  uom: string
+  qty: number
+  unit: string
+}
+
+export interface SiteOrderManufactureStep {
+  step_id: string
+  plan_id: string
+  step_no: number
+  stage_key: string
+  comment: string
+}

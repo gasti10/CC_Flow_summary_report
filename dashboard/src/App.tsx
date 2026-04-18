@@ -17,6 +17,8 @@ import ProtectedRoute from './components/Auth/ProtectedRoute'
 import CreatorOfOrders from './components/CreatorOfOrders/CreatorOfOrders'
 import WorkOrderPlanner from './components/WorkOrderPlanner/WorkOrderPlanner'
 import WorkOrderDetail from './components/WorkOrderPlanner/WorkOrderDetail'
+import SiteOrdersPlannerHub from './components/SiteOrdersPlanner/SiteOrdersPlannerHub'
+import SiteOrderPlanDetail from './components/SiteOrdersPlanner/SiteOrderPlanDetail'
 
 // Configurar QueryClient con optimizaciones
 const queryClient = new QueryClient({
@@ -211,6 +213,22 @@ function AppContent() {
                       <WorkOrderDetail />
                     </ProtectedRoute>
                   } 
+                />
+                <Route
+                  path="/site-orders-planner"
+                  element={
+                    <ProtectedRoute>
+                      <SiteOrdersPlannerHub />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/site-orders-planner/:planId"
+                  element={
+                    <ProtectedRoute>
+                      <SiteOrderPlanDetail />
+                    </ProtectedRoute>
+                  }
                 />
               </Routes>
             </ProgressiveLoader>

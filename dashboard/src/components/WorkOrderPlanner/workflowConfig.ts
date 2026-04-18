@@ -26,6 +26,38 @@ export interface WorkflowStageItem {
   outsourced?: boolean
 }
 
+/** Opciones estándar por stage para el editor de workflow. */
+export const WORKFLOW_STAGE_INSTRUCTION_OPTIONS: Record<string, string[]> = {
+  cnc: [
+    'USE FULL SHEET ONLY',
+    'USE OFFCUT ONLY',
+    'USE FULL SHEET & OFFCUT'
+  ],
+  folds: [
+    'RETURN ONLY',
+    'RETURN & PANEL',
+    'RETURN ONLY & SOME PANELS'
+  ],
+  tags: [
+    'STANDARD H&L',
+    'CRR H&L HEAVY DUTY',
+    'GCLR M & F'
+  ],
+  stiffeners: [
+    'STANDARD (STB)',
+    'HEAVY DUTY (ST)'
+  ],
+  glue: [
+    'YES',
+    'SOME PARTS'
+  ],
+  pack: [
+    'STANDARD',
+    'USE CC PROTECTIVE WRAP',
+    'USE BLANKETS'
+  ]
+}
+
 /** Icono Material Icons por stage (un solo color en la UI) */
 export const STAGE_ICONS: Record<string, string> = {
   cnc: 'content_cut',

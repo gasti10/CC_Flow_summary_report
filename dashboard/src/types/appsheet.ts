@@ -67,6 +67,16 @@ export interface ItemRequest {
   Name?: string
 }
 
+export interface ItemCatalog {
+  _RowNumber?: string | number
+  'Item ID': string
+  Name: string
+  Category?: string
+  'Sub Category'?: string
+  'Detailed Specification'?: string
+  Tool?: string
+}
+
 export interface Sheet {
   _RowNumber: string
   'Sheet ID': string

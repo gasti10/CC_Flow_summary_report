@@ -13,6 +13,7 @@ import type {
   AppSheetResponse,
   MaterialsData,
   EnrichedItemRequest,
+  ItemCatalog,
 } from '../types/appsheet'
 import { supabaseApi } from './supabaseApi'
 
@@ -29,15 +30,23 @@ interface CacheEntry<T> {
 
 // Interfaz para items en cache
 interface CachedItem {
-  '_RowNumber': number
+  '_RowNumber'?: number | string
   'Item ID': string
   'Name': string
+  'Category'?: string
+  'Sub Category'?: string
+  'Detailed Specification'?: string
+  'Tool'?: string
 }
 
 interface Item {
-  '_RowNumber': number
+  '_RowNumber'?: number | string
   'Item ID': string
   'Name': string
+  'Category'?: string
+  'Sub Category'?: string
+  'Detailed Specification'?: string
+  'Tool'?: string
 }
 
 class AppSheetAPI {
@@ -389,6 +398,82 @@ class AppSheetAPI {
     } catch (error) {
       console.error('Error fetching orders:', error)
       return []
+    }
+  }
+
+  // Obtener órdenes Pending de Site por Project Name (tabla Orders)
+  async getPendingOrdersByProject(projectName: string): Promise<Order[]> {
+    const cacheKey = `orders-pending-${projectName}`
+    const cached = this.getCachedData<Order[]>(cacheKey)
+    if (cached) return cached
+
+    try {
+      const orders = await this.getOrdersByProject(projectName)
+      const pending = orders.filter(order => String(order.Status || '').trim().toLowerCase() === 'pending')
+      this.setCachedData(cacheKey, pending)
+      return pending
+    } catch (error) {
+      console.error('Error fetching pending orders:', error)
+      return []
+    }
+  }
+
+  // Obtener Items Request por Order ID (tabla Items Request)
+  async getItemsRequestsByOrderId(orderId: string): Promise<ItemRequest[]> {
+    const cleanOrderId = orderId?.trim()
+    if (!cleanOrderId) return []
+
+    const cacheKey = `items-requests-order-${cleanOrderId}`
+    const cached = this.getCachedData<ItemRequest[]>(cacheKey)
+    if (cached) return cached
+
+    try {
+      const selector = `Filter(Items Request, [Order ID]=${JSON.stringify(cleanOrderId)})`
+      const response = await this.makeRequest<ItemRequest>('Items Request', 'Find', [], {
+        Selector: selector
+      })
+      this.setCachedData(cacheKey, response)
+      return response
+    } catch (error) {
+      console.error(`Error fetching items requests for order ${cleanOrderId}:`, error)
+      return []
+    }
+  }
+
+  // Obtener catálogo de Items por IDs (tabla Items)
+  async getItemsByIds(itemIds: string[]): Promise<ItemCatalog[]> {
+    const normalized = [...new Set(itemIds.map(id => id.trim()).filter(Boolean))]
+    if (normalized.length === 0) return []
+
+    const cacheKey = `items-by-ids-${normalized.slice().sort().join(',')}`
+    const cached = this.getCachedData<ItemCatalog[]>(cacheKey)
+    if (cached) return cached
+
+    try {
+      const conditions = normalized.map(id => `[Item ID]=${JSON.stringify(id)}`).join(', ')
+      const selector = `Filter(Items, OR(${conditions}))`
+      const response = await this.makeRequest<ItemCatalog>('Items', 'Find', [], {
+        Selector: selector
+      })
+      this.setCachedData(cacheKey, response)
+      return response
+    } catch (error) {
+      // Fallback a cache global si falla la consulta directa a Items
+      console.warn('Items by IDs query failed, falling back to cached all-items:', error)
+      const all = await this.getAllItems()
+      const filtered = all
+        .filter(item => normalized.includes(item['Item ID']))
+        .map(item => ({
+          _RowNumber: item._RowNumber,
+          'Item ID': item['Item ID'],
+          Name: item.Name,
+          Category: item.Category,
+          'Sub Category': item['Sub Category'],
+          'Detailed Specification': item['Detailed Specification'],
+          Tool: item.Tool
+        }))
+      this.setCachedData(cacheKey, filtered)
+      return filtered
     }
   }
 

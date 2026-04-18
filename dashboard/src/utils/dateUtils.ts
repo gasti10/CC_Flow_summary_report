@@ -32,6 +32,17 @@ export const formatDate = (dateString: string | undefined): string => {
 };
 
 /**
+ * Formatea `YYYY-MM-DD` a DD/MM/YYYY sin depender del huso horario de `Date`.
+ */
+export const formatYmdToDisplay = (ymd: string | undefined | null): string => {
+  if (!ymd?.trim()) return 'N/A'
+  const m = ymd.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return formatDate(ymd)
+  const [, y, mo, d] = m
+  return `${d}/${mo}/${y}`
+}
+
+/**
  * Formatea una fecha con hora (DD/MM/YYYY HH:MM)
  * @param dateString - La fecha como string
  * @returns La fecha y hora formateada

@@ -54,7 +54,7 @@ const CreatorOfOrdersContent = () => {
           <h1>Panel Order Creator</h1>
         </div>
         <div className="user-info">
-          <span>Welcome, {user?.email}</span>
+          <span>{user?.email}</span>
           <button onClick={() => signOut()} className="logout-button">
             Logout
           </button>

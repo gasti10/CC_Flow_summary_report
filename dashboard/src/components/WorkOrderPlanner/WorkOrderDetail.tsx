@@ -15,6 +15,7 @@ import { useAuth } from '../../hooks/useAuth'
 import LoadingSpinner from '../Common/LoadingSpinner'
 import {
   WORKFLOW_STAGE_CATALOG,
+  WORKFLOW_STAGE_INSTRUCTION_OPTIONS,
   WORKFLOW_TEMPLATES,
   getStagesForTemplate,
   getStageById,
@@ -374,7 +375,7 @@ export default function WorkOrderDetail() {
           <WorkOrderPdfDocument
             order={orderForPdf}
             spec={selectedSpec}
-            workflowStages={workflowStages}
+            workflowStages={workflowStagesForOutput}
             panelCount={panelCount ?? undefined}
             logoUrl={logoUrl}
           />
@@ -409,7 +410,7 @@ export default function WorkOrderDetail() {
       // Pasos 1-5 con progreso
       const result = await releaseOrderToProduction({
         orderId,
-        workflowStages,
+        workflowStages: workflowStagesForOutput,
         spec: selectedSpec,
         expectedDate: expectedDate ? fromDateTimeLocalToStorage(expectedDate) : (order?.['Expected to'] ?? undefined),
         onProgress: handleProgress
@@ -521,6 +522,8 @@ export default function WorkOrderDetail() {
   const orderSheets = typeof (order.Sheets ?? (order as Record<string, unknown>).sheets) === 'string'
     ? (order.Sheets ?? (order as Record<string, unknown>).sheets)
     : ''
+
+  const workflowStagesForOutput = workflowStages
 
   const canRelease = !!selectedSpecId && workflowStages.length > 0 && !releaseMutation.isPending
 
@@ -700,11 +703,19 @@ export default function WorkOrderDetail() {
                             <input
                               type="text"
                               className="wod-stage-comment-input"
+                              list={(WORKFLOW_STAGE_INSTRUCTION_OPTIONS[stage.id] ?? []).length ? `wod-stage-comment-suggestions-${stage.id}` : undefined}
                               value={stage.comment ?? ''}
                               onChange={(e) => setStageComment(index, e.target.value)}
-                              placeholder="Comment"
+                              placeholder="Comment (includes quick suggestions)"
                               aria-label="Comment"
                             />
+                            {(WORKFLOW_STAGE_INSTRUCTION_OPTIONS[stage.id] ?? []).length ? (
+                              <datalist id={`wod-stage-comment-suggestions-${stage.id}`}>
+                                {(WORKFLOW_STAGE_INSTRUCTION_OPTIONS[stage.id] ?? []).map(option => (
+                                  <option key={option} value={option} />
+                                ))}
+                              </datalist>
+                            ) : null}
                             <div className="wod-stage-actions">
                               <button type="button" className="wod-stage-btn" onClick={() => moveStage(index, 'up')} disabled={index === 0} title="Move up" aria-label="Move up">
                                 <span className="material-icons" aria-hidden>arrow_upward</span>
@@ -906,7 +917,7 @@ export default function WorkOrderDetail() {
                         <WorkOrderPdfDocument
                           order={orderForPdf}
                           spec={selectedSpec}
-                          workflowStages={workflowStages}
+                          workflowStages={workflowStagesForOutput}
                           panelCount={panelCount ?? undefined}
                           logoUrl={logoUrl}
                         />

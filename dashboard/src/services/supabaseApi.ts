@@ -5,7 +5,11 @@ import type {
   MainMetrics,
   ProjectSummary,
   OrderSummary,
-  ProjectFilters
+  ProjectFilters,
+  SiteOrderPlan,
+  SiteOrderCuttingLine,
+  SiteOrderManufactureStep,
+  MaterialPdfMeta
 } from '../types/supabase'
 import type { Project } from '../types/appsheet'
 import type { Specification } from '../types/supabase'
@@ -14,6 +18,40 @@ import { supabaseClient } from './supabaseClient'
 interface SupabaseConfig {
   url: string
   anonKey: string
+}
+
+export interface SiteOrderCuttingLineInput {
+  item_id?: string | null
+  item_request_id?: string | null
+  description: string
+  thickness?: string | null
+  size_length: string
+  uom: string
+  qty: number
+  unit: string
+}
+
+export interface SiteOrderManufactureStepInput {
+  step_no: number
+  stage_key: string
+  comment: string
+}
+
+export interface SiteOrderPlanPayload {
+  order_id?: string | null
+  project: string
+  created_by?: string | null
+  document_id?: string | null
+  notes?: string | null
+  material_pdf_meta?: MaterialPdfMeta | null
+  cutting_lines: SiteOrderCuttingLineInput[]
+  manufacture_steps: SiteOrderManufactureStepInput[]
+}
+
+export interface SiteOrderPlanDetails {
+  plan: SiteOrderPlan
+  cutting_lines: SiteOrderCuttingLine[]
+  manufacture_steps: SiteOrderManufactureStep[]
 }
 
 class SupabaseAPI {
@@ -802,6 +840,256 @@ class SupabaseAPI {
   // Limpiar cache
   clearCache(): void {
     this.cache.clear()
+  }
+
+  private async fetchSiteOrderPlanDetailsByPlanId(planId: string): Promise<SiteOrderPlanDetails | null> {
+    const cleanId = planId.trim()
+    if (!cleanId) return null
+
+    const { data: planRow, error: planError } = await supabaseClient
+      .from('site_order_plans')
+      .select('*')
+      .eq('plan_id', cleanId)
+      .maybeSingle()
+
+    if (planError) throw new Error(`Supabase error fetching site order plan: ${planError.message}`)
+    if (!planRow) return null
+
+    const plan = planRow as SiteOrderPlan
+    const [cuttingRes, stepsRes] = await Promise.all([
+      supabaseClient
+        .from('site_order_cutting_lines')
+        .select('*')
+        .eq('plan_id', plan.plan_id),
+      supabaseClient
+        .from('site_order_manufacture_steps')
+        .select('*')
+        .eq('plan_id', plan.plan_id)
+        .order('step_no', { ascending: true })
+    ])
+
+    if (cuttingRes.error) throw new Error(`Supabase error fetching cutting lines: ${cuttingRes.error.message}`)
+    if (stepsRes.error) throw new Error(`Supabase error fetching manufacture steps: ${stepsRes.error.message}`)
+
+    return {
+      plan,
+      cutting_lines: (cuttingRes.data ?? []) as SiteOrderCuttingLine[],
+      manufacture_steps: (stepsRes.data ?? []) as SiteOrderManufactureStep[]
+    }
+  }
+
+  /** Single plan by primary key (detail screen). */
+  async getSiteOrderPlanByPlanId(planId: string): Promise<SiteOrderPlanDetails | null> {
+    return this.fetchSiteOrderPlanDetailsByPlanId(planId)
+  }
+
+  /** All saved plans for a project (hub: combined queue). */
+  async listSiteOrderPlansByProject(project: string): Promise<SiteOrderPlan[]> {
+    const p = project.trim()
+    if (!p) return []
+
+    const { data, error } = await supabaseClient
+      .from('site_order_plans')
+      .select('*')
+      .eq('project', p)
+      .order('updated_at', { ascending: false })
+
+    if (error) throw new Error(`Supabase error listing site order plans: ${error.message}`)
+    return (data ?? []) as SiteOrderPlan[]
+  }
+
+  /** All plans linked to an AppSheet order id. */
+  async listSiteOrderPlansByOrderId(orderId: string): Promise<SiteOrderPlan[]> {
+    const clean = orderId.trim()
+    if (!clean) return []
+
+    const { data, error } = await supabaseClient
+      .from('site_order_plans')
+      .select('*')
+      .eq('order_id', clean)
+      .order('updated_at', { ascending: false })
+
+    if (error) throw new Error(`Supabase error listing site order plans by order: ${error.message}`)
+    return (data ?? []) as SiteOrderPlan[]
+  }
+
+  /**
+   * D7-A: empty plan row so the client can navigate to /site-orders-planner/:planId immediately.
+   */
+  async insertSiteOrderPlanDraft(payload: {
+    project: string
+    order_id?: string | null
+    created_by?: string | null
+  }): Promise<SiteOrderPlanDetails> {
+    const project = payload.project.trim()
+    if (!project) throw new Error('Project is required')
+
+    const { data: planData, error: planError } = await supabaseClient
+      .from('site_order_plans')
+      .insert([{
+        project,
+        order_id: payload.order_id?.trim() || null,
+        created_by: payload.created_by ?? null,
+        document_id: null,
+        notes: null,
+        material_pdf_meta: {}
+      }])
+      .select('*')
+      .single()
+
+    if (planError) throw new Error(`Supabase error creating site order plan draft: ${planError.message}`)
+    const plan = planData as SiteOrderPlan
+
+    const details = await this.fetchSiteOrderPlanDetailsByPlanId(plan.plan_id)
+    if (!details) throw new Error('Site order plan draft created but could not be reloaded')
+    return details
+  }
+
+  async createSiteOrderPlan(payload: SiteOrderPlanPayload): Promise<SiteOrderPlanDetails> {
+    const {
+      order_id: rawOrderId,
+      project,
+      created_by = null,
+      document_id = null,
+      notes = null,
+      cutting_lines,
+      manufacture_steps
+    } = payload
+
+    const order_id = rawOrderId?.trim() || null
+
+    const { data: planData, error: planError } = await supabaseClient
+      .from('site_order_plans')
+      .insert([{
+        order_id,
+        project,
+        created_by,
+        document_id,
+        notes,
+        material_pdf_meta: payload.material_pdf_meta ?? {}
+      }])
+      .select('*')
+      .single()
+
+    if (planError) throw new Error(`Supabase error creating site order plan: ${planError.message}`)
+    const plan = planData as SiteOrderPlan
+
+    if (cutting_lines.length > 0) {
+      const linesPayload = cutting_lines.map(line => ({
+        plan_id: plan.plan_id,
+        item_id: line.item_id ?? null,
+        item_request_id: line.item_request_id ?? null,
+        description: line.description,
+        thickness: line.thickness ?? null,
+        size_length: line.size_length,
+        uom: line.uom,
+        qty: line.qty,
+        unit: line.unit
+      }))
+      const { error: linesError } = await supabaseClient
+        .from('site_order_cutting_lines')
+        .insert(linesPayload)
+      if (linesError) throw new Error(`Supabase error creating cutting lines: ${linesError.message}`)
+    }
+
+    if (manufacture_steps.length > 0) {
+      const stepsPayload = manufacture_steps.map(step => ({
+        plan_id: plan.plan_id,
+        step_no: step.step_no,
+        stage_key: step.stage_key,
+        comment: step.comment
+      }))
+      const { error: stepsError } = await supabaseClient
+        .from('site_order_manufacture_steps')
+        .insert(stepsPayload)
+      if (stepsError) throw new Error(`Supabase error creating manufacture steps: ${stepsError.message}`)
+    }
+
+    const details = await this.fetchSiteOrderPlanDetailsByPlanId(plan.plan_id)
+    if (!details) throw new Error('Site order plan created but could not be reloaded')
+    return details
+  }
+
+  /** Full replace of lines/steps; header fields include optional order_id (user may attach/detach order). */
+  async updateSiteOrderPlanByPlanId(
+    planId: string,
+    payload: Omit<SiteOrderPlanPayload, 'order_id'> & { order_id?: string | null }
+  ): Promise<SiteOrderPlanDetails> {
+    const cleanPlanId = planId.trim()
+    if (!cleanPlanId) throw new Error('Plan ID is required')
+
+    const existing = await this.fetchSiteOrderPlanDetailsByPlanId(cleanPlanId)
+    if (!existing) {
+      throw new Error('Site order plan not found')
+    }
+
+    const order_id = payload.order_id !== undefined
+      ? (payload.order_id?.trim() || null)
+      : existing.plan.order_id
+
+    const { error: updateError } = await supabaseClient
+      .from('site_order_plans')
+      .update({
+        project: payload.project,
+        order_id,
+        created_by: payload.created_by ?? existing.plan.created_by ?? null,
+        document_id: payload.document_id ?? existing.plan.document_id ?? null,
+        notes: payload.notes ?? null,
+        material_pdf_meta: payload.material_pdf_meta !== undefined
+          ? (payload.material_pdf_meta ?? {})
+          : (existing.plan.material_pdf_meta ?? {}),
+        updated_at: new Date().toISOString()
+      })
+      .eq('plan_id', existing.plan.plan_id)
+    if (updateError) throw new Error(`Supabase error updating site order plan: ${updateError.message}`)
+
+    const [deleteLinesRes, deleteStepsRes] = await Promise.all([
+      supabaseClient
+        .from('site_order_cutting_lines')
+        .delete()
+        .eq('plan_id', existing.plan.plan_id),
+      supabaseClient
+        .from('site_order_manufacture_steps')
+        .delete()
+        .eq('plan_id', existing.plan.plan_id)
+    ])
+    if (deleteLinesRes.error) throw new Error(`Supabase error replacing cutting lines: ${deleteLinesRes.error.message}`)
+    if (deleteStepsRes.error) throw new Error(`Supabase error replacing manufacture steps: ${deleteStepsRes.error.message}`)
+
+    if (payload.cutting_lines.length > 0) {
+      const linesPayload = payload.cutting_lines.map(line => ({
+        plan_id: existing.plan.plan_id,
+        item_id: line.item_id ?? null,
+        item_request_id: line.item_request_id ?? null,
+        description: line.description,
+        thickness: line.thickness ?? null,
+        size_length: line.size_length,
+        uom: line.uom,
+        qty: line.qty,
+        unit: line.unit
+      }))
+      const { error: linesError } = await supabaseClient
+        .from('site_order_cutting_lines')
+        .insert(linesPayload)
+      if (linesError) throw new Error(`Supabase error updating cutting lines: ${linesError.message}`)
+    }
+
+    if (payload.manufacture_steps.length > 0) {
+      const stepsPayload = payload.manufacture_steps.map(step => ({
+        plan_id: existing.plan.plan_id,
+        step_no: step.step_no,
+        stage_key: step.stage_key,
+        comment: step.comment
+      }))
+      const { error: stepsError } = await supabaseClient
+        .from('site_order_manufacture_steps')
+        .insert(stepsPayload)
+      if (stepsError) throw new Error(`Supabase error updating manufacture steps: ${stepsError.message}`)
+    }
+
+    const details = await this.fetchSiteOrderPlanDetailsByPlanId(cleanPlanId)
+    if (!details) throw new Error('Site order plan updated but could not be reloaded')
+    return details
   }
 }
 

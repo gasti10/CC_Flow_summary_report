@@ -56,10 +56,28 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     showDataPreloader: false,
     loadingText: 'Loading CC Work Order Detail...',
     showHeader: false
+  },
+  '/site-orders-planner': {
+    name: 'site-orders-planner',
+    animationDuration: 1200,
+    showDataPreloader: false,
+    loadingText: 'Loading Site Orders Planner...',
+    showHeader: false
+  },
+  '/site-orders-planner/:planId': {
+    name: 'site-orders-planner-detail',
+    animationDuration: 0,
+    showDataPreloader: false,
+    loadingText: 'Loading Site Order Plan...',
+    showHeader: false
   }
 } as const;
 
 // Helper function to get route configuration
 export const getRouteConfig = (pathname: string): RouteConfig => {
-  return ROUTE_CONFIG[pathname] || ROUTE_CONFIG['/'];
-}; 
+  if (/^\/site-orders-planner\/.+/.test(pathname)) {
+    return ROUTE_CONFIG['/site-orders-planner/:planId'];
+  }
+  const map = ROUTE_CONFIG as Record<string, RouteConfig>
+  return map[pathname] ?? ROUTE_CONFIG['/']
+} 
