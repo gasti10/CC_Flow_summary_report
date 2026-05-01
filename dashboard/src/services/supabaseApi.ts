@@ -328,10 +328,14 @@ class SupabaseAPI {
         'Allowed SQM to buy': row['Allowed SQM to buy'] 
           ? Number(row['Allowed SQM to buy']) 
           : undefined,
-        // Campos calculados de AppSheet (requieren datos de AppSheet)
-        // Estos se actualizarán en background cuando AppSheet responda
-        'Real Cut Square Meters': undefined,
-        'Real Cut Linear Meters': undefined,
+        // Campos calculados (si existen en Supabase se usan, si no quedan undefined)
+        // y se completan con AppSheet cuando corresponda.
+        'Real Cut Square Meters': row['Real Cut Square Meters'] !== null && row['Real Cut Square Meters'] !== undefined
+          ? Number(row['Real Cut Square Meters'])
+          : undefined,
+        'Real Cut Linear Meters': row['Real Cut Linear Meters'] !== null && row['Real Cut Linear Meters'] !== undefined
+          ? Number(row['Real Cut Linear Meters'])
+          : undefined,
         'Total Orders': undefined,
         'Total Materials': undefined,
         'Total Sheets': undefined,

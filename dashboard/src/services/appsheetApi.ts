@@ -324,7 +324,21 @@ class AppSheetAPI {
       const allProjects = await this.getAllProjects()
       
       // Buscar el proyecto específico por nombre
-      const project = allProjects.find(p => p.Name === projectName)
+      let project = allProjects.find(p => p.Name === projectName)
+      
+      // Si el proyecto existe pero no tiene métricas de corte, forzar AppSheet
+      // para evitar mostrar datos incompletos provenientes de Supabase.
+      const hasMissingCuttingMetrics = project
+        ? project['Real Cut Square Meters'] === undefined || project['Real Cut Linear Meters'] === undefined
+        : false
+
+      if (hasMissingCuttingMetrics) {
+        const completeProjects = await this.getAllProjects({ forceAppSheet: true })
+        const completeProject = completeProjects.find(p => p.Name === projectName)
+        if (completeProject) {
+          project = completeProject
+        }
+      }
       
       if (project) {
         console.log(`✅ Project data found in cache for: ${projectName}`)

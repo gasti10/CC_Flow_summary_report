@@ -224,10 +224,10 @@ const ProjectSummary: React.FC = () => {
                   <span className="cutting-label">Expected Square Meters:</span>
                   <span className="cutting-value">{projectData['Expected Square Meters'] || '0'}</span>
                 </div>
-                <div className={`cutting-item ${getCuttingItemAlertClass(String(projectData['Real Cut Square Meters'] || ''), String(projectData['Expected Square Meters'] || ''))}`}>
+                <div className={`cutting-item ${getCuttingItemAlertClass(String(projectData['Real Cut Square Meters'] ?? ''), String(projectData['Expected Square Meters'] ?? ''))}`}>
                   <span className="cutting-icon">✂️</span>
                   <span className="cutting-label">Real Cut Square Meters:</span>
-                  <span className="cutting-value">{projectData['Real Cut Square Meters'] || '0.00'}</span>
+                  <span className="cutting-value">{projectData['Real Cut Square Meters'] ?? '0.00'}</span>
                 </div>
                 {projectData['Allowed SQM to buy'] && (
                   <div className="cutting-item">
@@ -245,11 +245,11 @@ const ProjectSummary: React.FC = () => {
                 <div 
                   className="progress-bar" 
                   style={{
-                    '--progress-width': `${projectData['Real Cut Square Meters'] && projectData['Expected Square Meters'] ? ((Number(projectData['Real Cut Square Meters']) / Number(projectData['Expected Square Meters'])) * 100) : 0}%`,
-                    backgroundColor: getProgressBarColor(projectData['Real Cut Square Meters'] && projectData['Expected Square Meters'] ? ((Number(projectData['Real Cut Square Meters']) / Number(projectData['Expected Square Meters'])) * 100) : 0)
+                    '--progress-width': `${projectData['Real Cut Square Meters'] != null && projectData['Expected Square Meters'] != null ? ((Number(projectData['Real Cut Square Meters']) / Number(projectData['Expected Square Meters'])) * 100) : 0}%`,
+                    backgroundColor: getProgressBarColor(projectData['Real Cut Square Meters'] != null && projectData['Expected Square Meters'] != null ? ((Number(projectData['Real Cut Square Meters']) / Number(projectData['Expected Square Meters'])) * 100) : 0)
                   } as React.CSSProperties}
                 >
-                  {projectData['Real Cut Square Meters'] && projectData['Expected Square Meters'] ? `${((Number(projectData['Real Cut Square Meters']) / Number(projectData['Expected Square Meters'])) * 100).toFixed(2)}%` : '0%'}
+                  {projectData['Real Cut Square Meters'] != null && projectData['Expected Square Meters'] != null ? `${((Number(projectData['Real Cut Square Meters']) / Number(projectData['Expected Square Meters'])) * 100).toFixed(2)}%` : '0%'}
                 </div>
               </div>
             </>
