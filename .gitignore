@@ -45,3 +45,6 @@ templates/
 
 # Scripts auxiliares
 scripts/
+
+# supabase
+supabase/.temp/

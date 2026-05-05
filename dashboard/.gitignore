@@ -94,6 +94,7 @@ dist
 # Temporary folders
 tmp/
 temp/
+supabase/.temp/
 
 # Data
 data/
