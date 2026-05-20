@@ -29,9 +29,10 @@ Thumbs.db
 # Data
 data/
 
-# Apps Script files
+# Apps Script files (local backups; production code lives in Google Apps Script)
 Apps_Script_Creator_of_Orders/
 Apps_Script_Upload_Files/
+Apps_Script_Legacy/
 
 # Cursor
 .cursor/
