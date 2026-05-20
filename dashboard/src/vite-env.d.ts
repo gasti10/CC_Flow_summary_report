@@ -12,6 +12,7 @@ interface ImportMeta {
 declare module 'canvas-confetti' {
   interface Options {
     particleCount?: number
+    angle?: number
     spread?: number
     origin?: { x?: number; y?: number }
     startVelocity?: number
@@ -20,6 +21,8 @@ declare module 'canvas-confetti' {
     gravity?: number
     scalar?: number
     drift?: number
+    shapes?: Array<'square' | 'circle'>
+    zIndex?: number
   }
   function confetti(options?: Options): Promise<null>
   export default confetti

@@ -19,6 +19,15 @@ import WorkOrderPlanner from './components/WorkOrderPlanner/WorkOrderPlanner'
 import WorkOrderDetail from './components/WorkOrderPlanner/WorkOrderDetail'
 import SiteOrdersPlannerHub from './components/SiteOrdersPlanner/SiteOrdersPlannerHub'
 import SiteOrderPlanDetail from './components/SiteOrdersPlanner/SiteOrderPlanDetail'
+import SafetyHomePage from './components/Safety/SafetyHomePage'
+import DocumentsListPage from './components/Safety/Documents/DocumentsListPage'
+import DocumentDetailPage from './components/Safety/Documents/DocumentDetailPage'
+import ProjectsSchedulesPage from './components/Safety/Projects/ProjectsSchedulesPage'
+import ProjectMembersPage from './components/Safety/Projects/ProjectMembersPage'
+import ScheduleCreatePage from './components/Safety/Schedules/ScheduleCreatePage'
+import ScheduleDetailPage from './components/Safety/Schedules/ScheduleDetailPage'
+import WorkerHomePage from './components/Safety/Worker/WorkerHomePage'
+import WorkerAssignmentPage from './components/Safety/Worker/WorkerAssignmentPage'
 
 // Configurar QueryClient con optimizaciones
 const queryClient = new QueryClient({
@@ -91,6 +100,12 @@ function AppContent() {
       label: 'Work Order Planner',
       path: '/work-order-planner',
       icon: '📋'
+    },
+    {
+      id: 'safety-swms',
+      label: 'Safety/SWMS',
+      path: '/safety',
+      icon: '🦺'
     }
   ];
 
@@ -227,6 +242,86 @@ function AppContent() {
                   element={
                     <ProtectedRoute>
                       <SiteOrderPlanDetail />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety"
+                  element={
+                    <ProtectedRoute>
+                      <SafetyHomePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/documents"
+                  element={
+                    <ProtectedRoute>
+                      <DocumentsListPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/documents/:documentId"
+                  element={
+                    <ProtectedRoute>
+                      <DocumentDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/projects"
+                  element={
+                    <ProtectedRoute>
+                      <ProjectsSchedulesPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/projects/:projectName/members"
+                  element={
+                    <ProtectedRoute>
+                      <ProjectMembersPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/projects/:projectName/schedules/new"
+                  element={
+                    <ProtectedRoute>
+                      <ScheduleCreatePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/schedules/new"
+                  element={
+                    <ProtectedRoute>
+                      <ScheduleCreatePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/schedules/:scheduleId"
+                  element={
+                    <ProtectedRoute>
+                      <ScheduleDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/my-assignments"
+                  element={
+                    <ProtectedRoute>
+                      <WorkerHomePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/my-assignments/:scheduleWorkerId"
+                  element={
+                    <ProtectedRoute>
+                      <WorkerAssignmentPage />
                     </ProtectedRoute>
                   }
                 />

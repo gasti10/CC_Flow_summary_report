@@ -48,3 +48,4 @@ scripts/
 
 # supabase
 supabase/.temp/
+supabase/*.md
