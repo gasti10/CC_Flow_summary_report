@@ -2443,48 +2443,102 @@
   border-radius: 10px;
   overflow-x: hidden;
   overflow-y: auto;
-  height: min(85vh, 960px);
-  background: #f8fafc;
+  height: clamp(420px, calc(100dvh - 16rem), 920px);
+  background: #eef2f7;
   -webkit-overflow-scrolling: touch;
 }
 
-.safety-worker-viewer-status {
-  padding: 1rem 1.1rem;
+.safety-worker-viewer-help {
+  margin-bottom: 10px;
 }
 
-.safety-worker-pdf-pages {
+.safety-worker-viewer-wrap--loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.safety-pdf-viewer-status {
+  margin: 12px;
+}
+
+.safety-pdf-pages {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 12px 0;
 }
 
-.safety-worker-pdf-page-wrap {
+.safety-pdf-page {
+  width: 100%;
+  max-width: 920px;
   display: flex;
   justify-content: center;
   background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
 }
 
-.safety-worker-pdf-page {
+.safety-pdf-page-canvas {
   display: block;
   width: 100%;
   height: auto;
 }
 
-.safety-worker-viewer-end {
+.safety-pdf-page-count {
+  margin: 0;
+  padding: 4px 12px 0;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.safety-worker-assignment-layout {
   display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.safety-worker-alert-card {
+  order: 0;
+}
+
+.safety-worker-meta-card {
+  order: 1;
+}
+
+.safety-worker-viewer-card {
+  order: 2;
+  padding-bottom: 14px;
+}
+
+.safety-worker-sign-card {
+  order: 3;
+}
+
+@media (min-width: 720px) {
+  .safety-worker-viewer-wrap {
+    height: clamp(480px, calc(100dvh - 20rem), 940px);
+  }
+}
+
+.safety-worker-meta-card .safety-detail-header--centered {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.safety-worker-viewer-end {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 0.35rem;
+  width: 100%;
+  justify-content: center;
+  box-sizing: border-box;
   padding: 0.85rem 0.8rem 1rem;
   color: #4b5563;
   font-size: 0.84rem;
-  border-top: 1px dashed #d1d5db;
-  background: #fff;
+  background: linear-gradient(180deg, rgba(238, 242, 247, 0), #eef2f7 35%);
 }
 
 .safety-worker-reading-gate {
@@ -3022,5 +3076,78 @@
     height: 1.85rem;
     top: 0;
     right: 0;
+  }
+
+  .safety-worker-assignment-layout {
+    gap: 10px;
+  }
+
+  .safety-worker-viewer-card {
+    order: 1;
+  }
+
+  .safety-worker-meta-card {
+    order: 2;
+    padding: 12px 14px;
+  }
+
+  .safety-worker-sign-card {
+    order: 3;
+  }
+
+  .safety-worker-viewer-wrap {
+    height: clamp(340px, calc(100dvh - 10.5rem), 82dvh);
+    border-radius: 8px;
+  }
+
+  .safety-worker-viewer-card .safety-section-heading {
+    margin-bottom: 6px;
+    font-size: 0.95rem;
+  }
+
+  .safety-worker-viewer-help {
+    margin-bottom: 8px;
+    font-size: 0.82rem;
+  }
+
+  .safety-worker-meta-header {
+    gap: 8px;
+  }
+
+  .safety-worker-meta-card .safety-detail-doc-title {
+    gap: 6px;
+  }
+
+  .safety-worker-meta-card .safety-detail-doc-name {
+    font-size: 1.02rem;
+  }
+
+  .safety-worker-meta-grid {
+    max-width: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .safety-worker-meta-card .safety-detail-meta-item {
+    min-height: auto;
+    padding: 6px 8px;
+  }
+
+  .safety-worker-meta-card .safety-detail-meta-label {
+    font-size: 0.66rem;
+  }
+
+  .safety-worker-meta-card .safety-detail-meta-value {
+    font-size: 0.8rem;
+  }
+
+  .safety-worker-reading-gate {
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+
+  .safety-worker-consent {
+    padding: 12px 14px;
+    font-size: 0.92rem;
   }
 }

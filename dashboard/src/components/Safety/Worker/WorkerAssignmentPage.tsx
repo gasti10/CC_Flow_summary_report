@@ -1,16 +1,17 @@
-import { useMemo, useRef, useState, type UIEvent } from 'react'
+import { lazy, Suspense, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import SafetyLayout from '../SafetyLayout'
 import { safetyApi } from '../../../services/safetyApi'
 import WorkerSignatureStep from './WorkerSignatureStep'
-import WorkerSwmsViewer from './WorkerSwmsViewer'
 import SignatureSuccessModal from './SignatureSuccessModal'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import type {
   SafetyWorkerAssignmentDetail,
   SafetyWorkerAssignmentListItem
 } from '../../../types/safety'
+
+const SafetyPdfViewer = lazy(() => import('./SafetyPdfViewer'))
 
 function formatDueAt(value: string | null): string {
   if (!value) return 'No due date'
@@ -143,13 +144,6 @@ export default function WorkerAssignmentPage() {
     [readerReachedEnd, readConfirmation]
   )
 
-  const handleViewerScroll = (event: UIEvent<HTMLDivElement>) => {
-    if (readerReachedEnd || isReadOnly) return
-    const target = event.currentTarget
-    const reachedBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 16
-    if (reachedBottom) setReaderReachedEnd(true)
-  }
-
   return (
     <SafetyLayout
       title="Assignment detail"
@@ -172,67 +166,42 @@ export default function WorkerAssignmentPage() {
           </div>
         </section>
       ) : detail ? (
-        <>
+        <div className="safety-worker-assignment-layout">
           {isSigned ? (
-            <section className="safety-card">
+            <section className="safety-card safety-worker-alert-card">
               <div className="safety-alert safety-alert--success">
                 <p>{getReadOnlyMessage(detail)}</p>
               </div>
             </section>
           ) : isReadOnly ? (
-            <section className="safety-card">
+            <section className="safety-card safety-worker-alert-card">
               <p className="safety-muted">{getReadOnlyMessage(detail)}</p>
             </section>
           ) : null}
 
-          <section className="safety-card">
-            <div className="safety-detail-header safety-detail-header--centered">
-              <div className="safety-detail-meta">
-                <h3 className="safety-detail-doc-title">
-                  <span className="safety-detail-doc-name">{detail.document_title}</span>
-                  <span className="safety-detail-doc-version">v{detail.version_number}</span>
-                </h3>
-                <div className="safety-detail-meta-grid">
-                  <div className="safety-detail-meta-item">
-                    <span className="safety-detail-meta-label">Project</span>
-                    <strong className="safety-detail-meta-value">{detail.project_name}</strong>
-                  </div>
-                  <div className="safety-detail-meta-item">
-                    <span className="safety-detail-meta-label">Due at</span>
-                    <strong className="safety-detail-meta-value">{formatDueAt(detail.due_at)}</strong>
-                  </div>
-                  <div className="safety-detail-meta-item">
-                    <span className="safety-detail-meta-label">Late sign</span>
-                    <strong className="safety-detail-meta-value">{detail.allow_late_sign ? 'Allowed' : 'Not allowed'}</strong>
-                  </div>
-                  {isSigned && detail.signed_at ? (
-                    <div className="safety-detail-meta-item">
-                      <span className="safety-detail-meta-label">Signed at</span>
-                      <strong className="safety-detail-meta-value">{formatSignedAt(detail.signed_at)}</strong>
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-              <span className={`safety-status-pill safety-status-pill--${detail.worker_status}`}>
-                {detail.worker_status}
-              </span>
-            </div>
-
-          </section>
-
-          <section className="safety-card">
+          <section className="safety-card safety-worker-viewer-card">
             <h3 className="safety-section-heading">SWMS viewer</h3>
-            <p className="safety-muted">
+            <p className="safety-muted safety-worker-viewer-help">
               {isReadOnly
                 ? 'Review the SWMS document below.'
-                : 'Scroll to the end to unlock the signature step.'}
+                : 'Scroll through the full document to unlock the signature step.'}
             </p>
 
-            <WorkerSwmsViewer
-              pdfUrl={detail.pdf_signed_url}
-              showEndMarker={!isReadOnly}
-              onScroll={handleViewerScroll}
-            />
+            <Suspense
+              fallback={(
+                <div className="safety-worker-viewer-wrap safety-worker-viewer-wrap--loading" aria-busy="true">
+                  <p className="safety-muted safety-pdf-viewer-status">Loading viewer…</p>
+                </div>
+              )}
+            >
+              <SafetyPdfViewer
+                url={detail.pdf_signed_url}
+                title={`SWMS · ${detail.document_title}`}
+                showReadingEndMarker={!isReadOnly}
+                reachedEnd={readerReachedEnd}
+                onReachedEnd={() => setReaderReachedEnd(true)}
+              />
+            </Suspense>
 
             {!isReadOnly ? (
               <div className="safety-worker-reading-gate">
@@ -262,21 +231,57 @@ export default function WorkerAssignmentPage() {
             ) : null}
           </section>
 
+          <section className="safety-card safety-worker-meta-card">
+            <div className="safety-detail-header safety-detail-header--centered safety-worker-meta-header">
+              <div className="safety-detail-meta">
+                <h3 className="safety-detail-doc-title">
+                  <span className="safety-detail-doc-name">{detail.document_title}</span>
+                  <span className="safety-detail-doc-version">v{detail.version_number}</span>
+                </h3>
+                <div className="safety-detail-meta-grid safety-worker-meta-grid">
+                  <div className="safety-detail-meta-item">
+                    <span className="safety-detail-meta-label">Project</span>
+                    <strong className="safety-detail-meta-value">{detail.project_name}</strong>
+                  </div>
+                  <div className="safety-detail-meta-item">
+                    <span className="safety-detail-meta-label">Due at</span>
+                    <strong className="safety-detail-meta-value">{formatDueAt(detail.due_at)}</strong>
+                  </div>
+                  <div className="safety-detail-meta-item">
+                    <span className="safety-detail-meta-label">Late sign</span>
+                    <strong className="safety-detail-meta-value">{detail.allow_late_sign ? 'Allowed' : 'Not allowed'}</strong>
+                  </div>
+                  {isSigned && detail.signed_at ? (
+                    <div className="safety-detail-meta-item">
+                      <span className="safety-detail-meta-label">Signed at</span>
+                      <strong className="safety-detail-meta-value">{formatSignedAt(detail.signed_at)}</strong>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              <span className={`safety-status-pill safety-status-pill--${detail.worker_status}`}>
+                {detail.worker_status}
+              </span>
+            </div>
+          </section>
+
           {canSign ? (
-            <WorkerSignatureStep
-              disabled={!readingGateReady}
-              lockReason="Signature is locked until reading is completed and confirmed."
-              isSubmitting={signMutation.isPending}
-              initialSignedName={profileDefaultsQuery.data?.full_name ?? ''}
-              onSignedNameCommit={async (value) => {
-                await updateNameMutation.mutateAsync(value)
-              }}
-              onSubmit={async (payload) => {
-                await signMutation.mutateAsync(payload)
-              }}
-            />
+            <section className="safety-card safety-worker-sign-card">
+              <WorkerSignatureStep
+                disabled={!readingGateReady}
+                lockReason="Signature is locked until reading is completed and confirmed."
+                isSubmitting={signMutation.isPending}
+                initialSignedName={profileDefaultsQuery.data?.full_name ?? ''}
+                onSignedNameCommit={async (value) => {
+                  await updateNameMutation.mutateAsync(value)
+                }}
+                onSubmit={async (payload) => {
+                  await signMutation.mutateAsync(payload)
+                }}
+              />
+            </section>
           ) : null}
-        </>
+        </div>
       ) : (
         <section className="safety-card">
           <p className="safety-muted">Assignment not found.</p>
