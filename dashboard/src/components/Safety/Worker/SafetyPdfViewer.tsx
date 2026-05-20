@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { getDocument, type PDFDocumentProxy } from 'pdfjs-dist'
-import { configureSafetyPdfJs } from '../utils/configureSafetyPdfJs'
+import { useCallback, useEffect, useRef, useState, type UIEvent } from 'react'
+import { configureSafetyPdfJs, getDocument, type PDFDocumentProxy } from '../utils/configureSafetyPdfJs'
 
 configureSafetyPdfJs()
 
@@ -11,6 +10,8 @@ interface SafetyPdfViewerProps {
   reachedEnd?: boolean
   onReachedEnd?: () => void
 }
+
+type ViewerMode = 'pdfjs' | 'iframe-fallback'
 
 export default function SafetyPdfViewer({
   url,
@@ -23,12 +24,17 @@ export default function SafetyPdfViewer({
   const pagesRef = useRef<HTMLDivElement>(null)
   const endMarkerRef = useRef<HTMLDivElement>(null)
   const renderGenerationRef = useRef(0)
+  const reachedEndNotifiedRef = useRef(false)
+  const checkScrollEndRef = useRef<() => void>(() => {})
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [pageCount, setPageCount] = useState(0)
+  const [viewerMode, setViewerMode] = useState<ViewerMode>('pdfjs')
+  const [iframeReachedEnd, setIframeReachedEnd] = useState(false)
 
   const notifyReachedEnd = useCallback(() => {
-    if (reachedEnd || !onReachedEnd) return
+    if (reachedEndNotifiedRef.current || reachedEnd || !onReachedEnd) return
+    reachedEndNotifiedRef.current = true
     onReachedEnd()
   }, [onReachedEnd, reachedEnd])
 
@@ -39,8 +45,24 @@ export default function SafetyPdfViewer({
     if (atBottom) notifyReachedEnd()
   }, [notifyReachedEnd])
 
+  checkScrollEndRef.current = checkScrollEnd
+
   useEffect(() => {
-    if (reachedEnd || !onReachedEnd || !showReadingEndMarker || status !== 'ready') return
+    if (reachedEnd) reachedEndNotifiedRef.current = true
+  }, [reachedEnd])
+
+  const handleIframeScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (iframeReachedEnd || reachedEnd) return
+    const target = event.currentTarget
+    const atBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 24
+    if (atBottom) {
+      setIframeReachedEnd(true)
+      notifyReachedEnd()
+    }
+  }
+
+  useEffect(() => {
+    if (reachedEnd || !onReachedEnd || !showReadingEndMarker || status !== 'ready' || viewerMode !== 'pdfjs') return
     const marker = endMarkerRef.current
     const root = scrollRef.current
     if (!marker || !root) return
@@ -53,7 +75,7 @@ export default function SafetyPdfViewer({
     )
     observer.observe(marker)
     return () => observer.disconnect()
-  }, [notifyReachedEnd, onReachedEnd, reachedEnd, showReadingEndMarker, status])
+  }, [notifyReachedEnd, onReachedEnd, reachedEnd, showReadingEndMarker, status, viewerMode])
 
   useEffect(() => {
     let cancelled = false
@@ -63,6 +85,9 @@ export default function SafetyPdfViewer({
       setStatus('loading')
       setErrorMessage(null)
       setPageCount(0)
+      setViewerMode('pdfjs')
+      setIframeReachedEnd(false)
+      reachedEndNotifiedRef.current = false
       if (pagesRef.current) pagesRef.current.replaceChildren()
 
       try {
@@ -77,7 +102,7 @@ export default function SafetyPdfViewer({
         const scrollContainer = scrollRef.current
         if (!container || !scrollContainer) return
 
-        const pixelRatio = window.devicePixelRatio || 1
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2)
         const contentWidth = Math.max(scrollContainer.clientWidth - 24, 280)
 
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
@@ -107,12 +132,17 @@ export default function SafetyPdfViewer({
 
         if (!cancelled) {
           setStatus('ready')
-          window.requestAnimationFrame(checkScrollEnd)
+          window.requestAnimationFrame(() => checkScrollEndRef.current())
         }
       } catch (error) {
         if (!cancelled) {
-          setStatus('error')
-          setErrorMessage(error instanceof Error ? error.message : 'Could not load PDF.')
+          setViewerMode('iframe-fallback')
+          setStatus('ready')
+          setErrorMessage(
+            error instanceof Error
+              ? `${error.message} Showing browser PDF viewer instead.`
+              : 'Could not render with the built-in viewer. Showing browser PDF viewer instead.'
+          )
         }
       }
     }
@@ -121,7 +151,32 @@ export default function SafetyPdfViewer({
     return () => {
       cancelled = true
     }
-  }, [checkScrollEnd, url])
+  }, [url])
+
+  if (viewerMode === 'iframe-fallback') {
+    return (
+      <div className="safety-worker-viewer-stack">
+        {errorMessage ? (
+          <div className="safety-alert safety-alert--error safety-pdf-viewer-status">
+            <p>{errorMessage}</p>
+          </div>
+        ) : null}
+        <div className="safety-worker-viewer-wrap" onScroll={handleIframeScroll}>
+          <iframe
+            src={url}
+            className="safety-worker-viewer-frame-fallback"
+            title={title}
+          />
+          {showReadingEndMarker ? (
+            <div className="safety-worker-viewer-end">
+              <span className="material-icons" aria-hidden>flag</span>
+              You reached the end of the reading panel.
+            </div>
+          ) : null}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

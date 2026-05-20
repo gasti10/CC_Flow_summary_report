@@ -2438,6 +2438,19 @@
   }
 }
 
+.safety-worker-viewer-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.safety-worker-viewer-frame-fallback {
+  display: block;
+  width: 100%;
+  min-height: clamp(520px, calc(100dvh - 12rem), 900px);
+  border: 0;
+  background: #fff;
+}
+
 .safety-worker-viewer-wrap {
   border: 1px solid #d1d5db;
   border-radius: 10px;

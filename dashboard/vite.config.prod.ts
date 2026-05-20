@@ -18,22 +18,11 @@ export default defineConfig({
     sourcemap: false,
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules/pdfjs-dist')) {
-            return 'pdfjs'
-          }
-          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
-            return 'vendor'
-          }
-          if (id.includes('node_modules/chart.js') || id.includes('node_modules/react-chartjs-2')) {
-            return 'charts'
-          }
-          if (id.includes('node_modules/@tanstack/react-query')) {
-            return 'query'
-          }
-          if (id.includes('node_modules/react-router-dom') || id.includes('node_modules/react-router/')) {
-            return 'router'
-          }
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          charts: ['chart.js', 'react-chartjs-2'],
+          query: ['@tanstack/react-query'],
+          router: ['react-router-dom']
         }
       }
     }
@@ -44,5 +33,10 @@ export default defineConfig({
   // Configuraciones específicas para producción
   define: {
     'process.env.NODE_ENV': '"production"'
+  },
+  preview: {
+    host: true,
+    port: 4173,
+    strictPort: true
   }
 }) 
