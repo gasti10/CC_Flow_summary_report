@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { getLogoPath } from '../../utils/assetUtils'
@@ -13,9 +14,17 @@ interface SafetyLayoutProps {
   subnavEnd?: ReactNode
 }
 
+function getEmailInitial(email: string | undefined): string {
+  if (!email) return '?'
+  const localPart = email.trim().split('@')[0] ?? email
+  const letter = localPart.replace(/[^a-zA-Z0-9]/g, '').charAt(0) || email.trim().charAt(0)
+  return letter.toUpperCase()
+}
+
 export default function SafetyLayout({ title, subtitle, children, actions, subnavEnd }: SafetyLayoutProps) {
   const { user, signOut } = useAuth()
   const location = useLocation()
+  const subnavLinksRef = useRef<HTMLDivElement>(null)
   const isSafetyHub = title.trim().toLowerCase() === 'safety hub'
   const documentsNavActive =
     location.pathname === '/safety/documents' || /^\/safety\/documents\/.+/.test(location.pathname)
@@ -23,6 +32,31 @@ export default function SafetyLayout({ title, subtitle, children, actions, subna
     location.pathname.startsWith('/safety/projects') || location.pathname.startsWith('/safety/schedules/')
   const myAssignmentsNavActive =
     location.pathname === '/safety/my-assignments' || location.pathname.startsWith('/safety/my-assignments/')
+
+  useEffect(() => {
+    const container = subnavLinksRef.current
+    if (!container) return
+
+    const scrollActiveIntoCenter = () => {
+      const activeItem = container.querySelector<HTMLElement>('.safety-subnav-item.is-active')
+      if (!activeItem) return
+
+      const maxScroll = container.scrollWidth - container.clientWidth
+      const targetScrollLeft =
+        activeItem.offsetLeft - (container.clientWidth - activeItem.offsetWidth) / 2
+
+      container.scrollTo({
+        left: Math.min(maxScroll, Math.max(0, targetScrollLeft)),
+        behavior: 'smooth'
+      })
+    }
+
+    const frame = requestAnimationFrame(scrollActiveIntoCenter)
+    return () => cancelAnimationFrame(frame)
+  }, [location.pathname])
+
+  const userEmail = user?.email
+  const emailInitial = getEmailInitial(userEmail)
 
   return (
     <div className="safety-shell">
@@ -32,9 +66,30 @@ export default function SafetyLayout({ title, subtitle, children, actions, subna
           <h1 className="safety-header-title">Safety</h1>
         </div>
         <div className="safety-header-right">
-          <span className="safety-user-email">{user?.email}</span>
-          <button type="button" className="safety-logout" onClick={() => signOut()}>
-            Logout
+          {userEmail ? (
+            <>
+              <span
+                className="safety-user-avatar"
+                title={userEmail}
+                aria-label={`Signed in as ${userEmail}`}
+              >
+                {emailInitial}
+              </span>
+              <span className="safety-user-email" title={userEmail}>
+                {userEmail}
+              </span>
+            </>
+          ) : null}
+          <button
+            type="button"
+            className="safety-logout"
+            onClick={() => signOut()}
+            aria-label="Logout"
+          >
+            <span className="material-icons safety-logout-icon" aria-hidden>
+              logout
+            </span>
+            <span className="safety-logout-label">Logout</span>
           </button>
         </div>
       </header>
@@ -61,7 +116,7 @@ export default function SafetyLayout({ title, subtitle, children, actions, subna
             {actions ? <div className="safety-page-actions">{actions}</div> : null}
           </div>
           <nav className="safety-subnav" aria-label="Safety navigation">
-            <div className="safety-subnav-links">
+            <div className="safety-subnav-links" ref={subnavLinksRef}>
               <Link to="/safety" className={`safety-subnav-item${isSafetyHub ? ' is-active' : ''}`}>Overview</Link>
               <Link to="/safety/documents" className={`safety-subnav-item${documentsNavActive ? ' is-active' : ''}`}>Documents</Link>
               <Link to="/safety/projects" className={`safety-subnav-item${projectsNavActive ? ' is-active' : ''}`}>Projects/Jobs/Sites</Link>
