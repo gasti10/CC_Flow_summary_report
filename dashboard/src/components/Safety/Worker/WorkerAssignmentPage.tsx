@@ -71,9 +71,11 @@ export default function WorkerAssignmentPage() {
   const [readingModeOpen, setReadingModeOpen] = useState(false)
   const [readingModeMounted, setReadingModeMounted] = useState(false)
   const [highlightConsent, setHighlightConsent] = useState(false)
+  const [highlightViewer, setHighlightViewer] = useState(false)
   const [modalFeedback, setModalFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const signatureSuccessShownRef = useRef(false)
   const readingGateRef = useRef<HTMLDivElement>(null)
+  const viewerAreaRef = useRef<HTMLDivElement>(null)
   const consentCheckboxRef = useRef<HTMLInputElement>(null)
   const isMobile = useMaxWidth(MOBILE_MAX_WIDTH_PX)
 
@@ -179,8 +181,24 @@ export default function WorkerAssignmentPage() {
     setReadingModeOpen(false)
   }
 
-  const handleContinueToSign = () => {
-    setReadingModeOpen(false)
+  const focusDocumentForReading = () => {
+    if (isMobile) {
+      openReadingMode()
+      return
+    }
+
+    setHighlightViewer(true)
+    window.requestAnimationFrame(() => {
+      viewerAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
+
+  const focusReadingGateForSign = () => {
+    if (!readerReachedEnd) {
+      focusDocumentForReading()
+      return
+    }
+
     setHighlightConsent(true)
     window.requestAnimationFrame(() => {
       readingGateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -190,11 +208,31 @@ export default function WorkerAssignmentPage() {
     })
   }
 
+  const handleConsentLabelClick = () => {
+    if (readerReachedEnd) return
+    focusDocumentForReading()
+  }
+
+  const handleContinueToSign = () => {
+    setReadingModeOpen(false)
+    focusReadingGateForSign()
+  }
+
   useEffect(() => {
     if (!highlightConsent) return
     const timeoutId = window.setTimeout(() => setHighlightConsent(false), 8000)
     return () => window.clearTimeout(timeoutId)
   }, [highlightConsent])
+
+  useEffect(() => {
+    if (!highlightViewer) return
+    const timeoutId = window.setTimeout(() => setHighlightViewer(false), 8000)
+    return () => window.clearTimeout(timeoutId)
+  }, [highlightViewer])
+
+  useEffect(() => {
+    if (readerReachedEnd) setHighlightViewer(false)
+  }, [readerReachedEnd])
 
   const viewerHelpText = useMemo(() => {
     if (isReadOnly) {
@@ -308,25 +346,36 @@ export default function WorkerAssignmentPage() {
                 </button>
               )}
             </div>
-            <p className="safety-muted safety-worker-viewer-help">{viewerHelpText}</p>
+            <div
+              ref={viewerAreaRef}
+              className={`safety-worker-viewer-target${highlightViewer ? ' safety-worker-viewer-target--attention' : ''}`}
+            >
+              {highlightViewer && !readerReachedEnd && !isMobile ? (
+                <p className="safety-worker-reading-cue" role="status" aria-live="polite">
+                  <span className="material-icons" aria-hidden>menu_book</span>
+                  Scroll to the bottom of the document to unlock confirmation.
+                </p>
+              ) : null}
+              <p className="safety-muted safety-worker-viewer-help">{viewerHelpText}</p>
 
-            {!isMobile ? (
-              <Suspense
-                fallback={(
-                  <div className="safety-worker-viewer-wrap safety-worker-viewer-wrap--loading" aria-busy="true">
-                    <p className="safety-muted safety-pdf-viewer-status">Loading viewer…</p>
-                  </div>
-                )}
-              >
-                <SafetyPdfViewer
-                  url={detail.pdf_signed_url}
-                  title={`SWMS · ${detail.document_title}`}
-                  showReadingEndMarker={!isReadOnly}
-                  reachedEnd={readerReachedEnd}
-                  onReachedEnd={() => setReaderReachedEnd(true)}
-                />
-              </Suspense>
-            ) : null}
+              {!isMobile ? (
+                <Suspense
+                  fallback={(
+                    <div className="safety-worker-viewer-wrap safety-worker-viewer-wrap--loading" aria-busy="true">
+                      <p className="safety-muted safety-pdf-viewer-status">Loading viewer…</p>
+                    </div>
+                  )}
+                >
+                  <SafetyPdfViewer
+                    url={detail.pdf_signed_url}
+                    title={`SWMS · ${detail.document_title}`}
+                    showReadingEndMarker={!isReadOnly}
+                    reachedEnd={readerReachedEnd}
+                    onReachedEnd={() => setReaderReachedEnd(true)}
+                  />
+                </Suspense>
+              ) : null}
+            </div>
 
             {!isReadOnly ? (
               <div
@@ -340,7 +389,12 @@ export default function WorkerAssignmentPage() {
                   </p>
                 ) : null}
                 <label
-                  className={`safety-worker-consent${highlightConsent ? ' safety-worker-consent--attention' : ''}`}
+                  className={`safety-worker-consent${highlightConsent && readerReachedEnd ? ' safety-worker-consent--attention' : ''}${!readerReachedEnd ? ' safety-worker-consent--pending-reading' : ''}`}
+                  onClick={(event) => {
+                    if (readerReachedEnd) return
+                    event.preventDefault()
+                    handleConsentLabelClick()
+                  }}
                 >
                   <input
                     ref={consentCheckboxRef}
@@ -352,7 +406,9 @@ export default function WorkerAssignmentPage() {
                     }}
                     disabled={!readerReachedEnd}
                   />
-                  <span>I confirm I have read and understood this SWMS before signing.</span>
+                  <span>
+                    I confirm I have read and understood this SWMS before signing.
+                  </span>
                 </label>
                 <div className="safety-worker-gate-status">
                   <span className={`safety-status-pill safety-status-pill--${readerReachedEnd ? 'signed' : 'pending'}`}>
@@ -376,6 +432,7 @@ export default function WorkerAssignmentPage() {
               <WorkerSignatureStep
                 disabled={!readingGateReady}
                 lockReason="Signature is locked until reading is completed and confirmed."
+                onLockedClick={focusReadingGateForSign}
                 isSubmitting={signMutation.isPending}
                 initialSignedName={profileDefaultsQuery.data?.full_name ?? ''}
                 onSignedNameCommit={async (value) => {

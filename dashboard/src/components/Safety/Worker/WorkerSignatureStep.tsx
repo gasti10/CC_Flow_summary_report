@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 
 interface SignaturePoint {
   x: number
@@ -15,6 +15,7 @@ interface WorkerSignatureStepProps {
   isSubmitting: boolean
   initialSignedName?: string
   lockReason?: string
+  onLockedClick?: () => void
   onSignedNameCommit?: (fullName: string) => Promise<void>
   onSubmit: (payload: {
     signed_name: string
@@ -30,6 +31,7 @@ export default function WorkerSignatureStep({
   isSubmitting,
   initialSignedName,
   lockReason,
+  onLockedClick,
   onSignedNameCommit,
   onSubmit
 }: WorkerSignatureStepProps) {
@@ -175,14 +177,43 @@ export default function WorkerSignatureStep({
     }
   }
 
+  const handleLockedClick = () => {
+    if (!disabled) return
+    onLockedClick?.()
+  }
+
+  const handleLockedKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (!disabled) return
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      onLockedClick?.()
+    }
+  }
+
   return (
-    <section className="safety-card safety-worker-signature-card">
+    <section
+      className={`safety-card safety-worker-signature-card${disabled ? ' is-locked' : ''}`}
+      onClick={disabled ? handleLockedClick : undefined}
+      onKeyDown={disabled ? handleLockedKeyDown : undefined}
+      role={disabled ? 'button' : undefined}
+      tabIndex={disabled ? 0 : undefined}
+      aria-label={
+        disabled
+          ? 'Signature locked. Go to reading confirmation to unlock.'
+          : undefined
+      }
+    >
       <h3 className="safety-section-heading">Signature step</h3>
       <p className="safety-muted">Sign with finger/stylus and submit evidence.</p>
 
       {disabled ? (
-        <div className="safety-alert safety-alert--error">
-          <p>{lockReason || 'Complete reading first to unlock full name and signature.'}</p>
+        <div className="safety-signature-lock-banner" role="status" aria-live="polite">
+          <span className="material-icons safety-signature-lock-banner-icon" aria-hidden>
+            lock
+          </span>
+          <p>
+            {lockReason || 'Complete reading first to unlock full name and signature.'}
+          </p>
         </div>
       ) : null}
 
@@ -202,16 +233,26 @@ export default function WorkerSignatureStep({
       {savingName ? <p className="safety-muted">Saving name...</p> : null}
 
       <label className="safety-label">Signature</label>
-      <canvas
-        ref={canvasRef}
-        className={`safety-worker-signature-canvas${disabled ? ' is-disabled' : ''}`}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={() => setIsDrawing(false)}
-        aria-label="Signature canvas"
-        aria-disabled={disabled}
-      />
+      <div className="safety-worker-signature-canvas-wrap">
+        <canvas
+          ref={canvasRef}
+          className={`safety-worker-signature-canvas${disabled ? ' is-disabled' : ''}`}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={() => setIsDrawing(false)}
+          aria-label="Signature canvas"
+          aria-disabled={disabled}
+        />
+        {disabled ? (
+          <div className="safety-worker-signature-lock-overlay" aria-hidden>
+            <div className="safety-signature-lock-badge">
+              <span className="material-icons safety-signature-lock-overlay-icon">lock</span>
+            </div>
+            <span className="safety-signature-lock-label">Locked</span>
+          </div>
+        ) : null}
+      </div>
 
       <div className="safety-modal-footer">
         <button type="button" className="safety-btn-secondary" onClick={clearSignature} disabled={isSubmitting || disabled}>
@@ -228,13 +269,23 @@ export default function WorkerSignatureStep({
       <div className="safety-modal-footer safety-modal-footer--center">
         <button
           type="button"
-          className={`safety-btn-primary safety-btn-sign${isSubmitting ? ' is-signing' : ''}`}
-          onClick={submit}
+          className={`safety-btn-primary safety-btn-sign${isSubmitting ? ' is-signing' : ''}${disabled ? ' is-locked' : ''}`}
+          onClick={(event) => {
+            if (disabled) {
+              event.stopPropagation()
+              handleLockedClick()
+              return
+            }
+            void submit()
+          }}
           disabled={isSubmitting}
+          aria-disabled={disabled || isSubmitting}
         >
           <span className="safety-btn-sign-icon-wrap" aria-hidden>
-            <span className="material-icons">{isSubmitting ? 'hourglass_top' : 'draw'}</span>
-            {!isSubmitting ? (
+            <span className="material-icons">
+              {isSubmitting ? 'hourglass_top' : disabled ? 'lock' : 'draw'}
+            </span>
+            {!isSubmitting && !disabled ? (
               <>
                 <span className="safety-btn-sign-scribble" />
                 <span className="safety-btn-sign-spark" />
@@ -242,7 +293,7 @@ export default function WorkerSignatureStep({
             ) : null}
           </span>
           <span className="safety-btn-sign-label">
-            {isSubmitting ? 'Signing...' : 'Sign assignment'}
+            {isSubmitting ? 'Signing...' : disabled ? 'Signature locked' : 'Sign assignment'}
           </span>
         </button>
       </div>
