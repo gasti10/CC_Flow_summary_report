@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build --config vite.config.prod.ts",
     "lint": "eslint .",
     "preview": "vite preview --config vite.config.prod.ts --host",
+    "build:safety-email-assets": "node scripts/build-safety-email-assets.mjs",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },
@@ -40,6 +41,7 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "gh-pages": "^6.1.1",
     "globals": "^16.2.0",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4.1.13",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.34.1",

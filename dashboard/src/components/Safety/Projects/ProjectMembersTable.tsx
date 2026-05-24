@@ -61,7 +61,8 @@ export default function ProjectMembersTable({
                 <td className="sop-mfg-td sop-mfg-td--instr">
                   <div className="safety-docs-cell-primary">{member.job_title ?? '—'}</div>
                 </td>
-                <td className="sop-mfg-td sop-mfg-td--instr">
+                <td className="sop-mfg-td sop-mfg-td--instr safety-members-td-role">
+                  <div className="safety-members-role-cell">
                   <select
                     className="safety-input safety-members-role-select"
                     value={member.role}
@@ -74,6 +75,7 @@ export default function ProjectMembersTable({
                     <option value="manager">Manager</option>
                     <option value="worker">Worker</option>
                   </select>
+                  </div>
                 </td>
                 <td className="sop-mfg-td sop-mfg-td--instr">
                   <div className="safety-docs-cell-primary">{formatSafetyEnumLabel(member.source_role)}</div>

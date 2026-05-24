@@ -48,5 +48,9 @@ templates/
 scripts/
 
 # supabase
+supabase/
 supabase/.temp/
 supabase/*.md
+
+# docs
+docs/

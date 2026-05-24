@@ -7,6 +7,7 @@ interface ScheduleSuccessModalProps {
   documentLabel?: string
   recipientCount: number
   dueAtLabel?: string
+  notificationSummary?: string
   onClose: () => void
   onContinue: () => void
   continueLabel?: string
@@ -18,6 +19,7 @@ export default function ScheduleSuccessModal({
   documentLabel,
   recipientCount,
   dueAtLabel,
+  notificationSummary,
   onClose,
   onContinue,
   continueLabel = 'View schedule'
@@ -106,6 +108,12 @@ export default function ScheduleSuccessModal({
               <p className="safety-schedule-success-meta-row">
                 <span className="safety-schedule-success-meta-label">Due</span>
                 <strong>{dueAtLabel}</strong>
+              </p>
+            ) : null}
+            {notificationSummary ? (
+              <p className="safety-schedule-success-meta-row">
+                <span className="safety-schedule-success-meta-label">Email</span>
+                <strong>{notificationSummary}</strong>
               </p>
             ) : null}
           </div>

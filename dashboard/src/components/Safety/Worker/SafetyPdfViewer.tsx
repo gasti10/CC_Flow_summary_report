@@ -6,6 +6,7 @@ configureSafetyPdfJs()
 interface SafetyPdfViewerProps {
   url: string
   title: string
+  layout?: 'inline' | 'reading-mode'
   showReadingEndMarker?: boolean
   reachedEnd?: boolean
   onReachedEnd?: () => void
@@ -16,6 +17,7 @@ type ViewerMode = 'pdfjs' | 'iframe-fallback'
 export default function SafetyPdfViewer({
   url,
   title,
+  layout = 'inline',
   showReadingEndMarker = true,
   reachedEnd = false,
   onReachedEnd
@@ -153,6 +155,10 @@ export default function SafetyPdfViewer({
     }
   }, [url])
 
+  const viewerWrapClassName = layout === 'reading-mode'
+    ? 'safety-worker-viewer-wrap safety-worker-viewer-wrap--reading-mode'
+    : 'safety-worker-viewer-wrap'
+
   if (viewerMode === 'iframe-fallback') {
     return (
       <div className="safety-worker-viewer-stack">
@@ -161,7 +167,7 @@ export default function SafetyPdfViewer({
             <p>{errorMessage}</p>
           </div>
         ) : null}
-        <div className="safety-worker-viewer-wrap" onScroll={handleIframeScroll}>
+        <div className={viewerWrapClassName} onScroll={handleIframeScroll}>
           <iframe
             src={url}
             className="safety-worker-viewer-frame-fallback"
@@ -181,7 +187,7 @@ export default function SafetyPdfViewer({
   return (
     <div
       ref={scrollRef}
-      className="safety-worker-viewer-wrap"
+      className={viewerWrapClassName}
       onScroll={checkScrollEnd}
       aria-busy={status === 'loading'}
     >

@@ -3,6 +3,7 @@ export type SafetyScheduleStatus = 'active' | 'closed'
 export type SafetyWorkerStatus = 'pending' | 'signed' | 'overdue'
 export type SafetyRecipientMembershipState = 'project_member' | 'non_member'
 export type SafetyInvitationStatus = 'requested' | 'invited' | 'joined' | 'signed' | 'failed' | 'cancelled'
+export type SafetyNotificationStatus = 'queued' | 'sent' | 'failed'
 
 export interface SafetyDocumentListItem {
   document_id: string
@@ -129,6 +130,34 @@ export interface SafetyScheduleWorkerRow {
   invited_at: string | null
   joined_at: string | null
   signed_at: string | null
+}
+
+export interface SafetyNotificationLog {
+  notification_id: string
+  schedule_id: string | null
+  schedule_worker_id: string | null
+  worker_user_id: string | null
+  recipient_email: string | null
+  channel: 'email'
+  template_key: string
+  status: SafetyNotificationStatus
+  provider_message_id: string | null
+  error_message: string | null
+  requested_by: string | null
+  idempotency_key: string | null
+  created_at: string
+  sent_at: string | null
+  recipient_full_name?: string | null
+  worker_status?: SafetyWorkerStatus | null
+}
+
+export interface SafetyNotificationDispatchResult {
+  queued_count: number
+  sent_count: number
+  failed_count: number
+  skipped_count: number
+  notification_ids: string[]
+  message?: string
 }
 
 export interface SafetyScheduleDetail {

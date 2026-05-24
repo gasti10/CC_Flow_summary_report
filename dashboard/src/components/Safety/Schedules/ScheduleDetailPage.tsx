@@ -5,14 +5,40 @@ import SafetyLayout from '../SafetyLayout'
 import { safetyApi } from '../../../services/safetyApi'
 import ScheduleWorkersTable from './ScheduleWorkersTable'
 import ExtendDueDateModal from './ExtendDueDateModal'
-import type { SafetyWorkerStatus } from '../../../types/safety'
+import type { SafetyNotificationLog, SafetyScheduleWorkerRow, SafetyWorkerStatus } from '../../../types/safety'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
+import { safetyProjectsPath } from '../utils/safetyProjectsPath'
+import '../../SiteOrdersPlanner/SiteOrdersPlanner.css'
 
 function formatDueAt(value: string | null): string {
   if (!value) return 'No due date'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return 'No due date'
   return date.toLocaleString('en-AU')
+}
+
+function formatLogDate(iso: string | null): string {
+  if (!iso) return '—'
+  try {
+    const d = new Date(iso)
+    const date = d.toLocaleDateString('en-AU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    const time = d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true })
+    const timeNoBreak = time.replace(/\s+(am|pm)$/i, '\u00a0$1')
+    return `${date}\u00a0${timeNoBreak}`
+  } catch {
+    return '—'
+  }
+}
+
+function buildLatestNotificationByWorkerId(logs: SafetyNotificationLog[]): Record<string, SafetyNotificationLog> {
+  const map: Record<string, SafetyNotificationLog> = {}
+  for (const log of logs) {
+    if (!log.schedule_worker_id) continue
+    if (!map[log.schedule_worker_id]) {
+      map[log.schedule_worker_id] = log
+    }
+  }
+  return map
 }
 
 export default function ScheduleDetailPage() {
@@ -27,6 +53,12 @@ export default function ScheduleDetailPage() {
   const detailQuery = useQuery({
     queryKey: ['safety-schedule-detail', scheduleId],
     queryFn: () => safetyApi.getScheduleDetail(scheduleId ?? ''),
+    enabled: !!scheduleId
+  })
+
+  const notificationsQuery = useQuery({
+    queryKey: ['safety-schedule-notifications', scheduleId],
+    queryFn: () => safetyApi.listScheduleNotifications(scheduleId ?? ''),
     enabled: !!scheduleId
   })
 
@@ -50,6 +82,34 @@ export default function ScheduleDetailPage() {
     }
   })
 
+  const sendNotificationsMutation = useMutation({
+    mutationFn: async (payload?: { scheduleWorkerIds?: string[]; forceResend?: boolean }) => {
+      if (!scheduleId) throw new Error('Schedule ID is missing.')
+      return safetyApi.queueAndSendScheduleNotifications({
+        scheduleId,
+        scheduleWorkerIds: payload?.scheduleWorkerIds,
+        forceResend: payload?.forceResend ?? false
+      })
+    },
+    onSuccess: async (result) => {
+      if (result.failed_count > 0) {
+        setFeedback({
+          type: 'error',
+          message: `Email dispatch completed with failures (${result.sent_count} sent / ${result.failed_count} failed).`
+        })
+      } else {
+        setFeedback({
+          type: 'success',
+          message: `Email notifications sent (${result.sent_count}).`
+        })
+      }
+      await queryClient.invalidateQueries({ queryKey: ['safety-schedule-notifications', scheduleId] })
+    },
+    onError: (error: Error) => {
+      setFeedback({ type: 'error', message: error.message })
+    }
+  })
+
   const counters = useMemo(() => {
     const schedule = detailQuery.data?.schedule
     if (!schedule) return null
@@ -60,12 +120,41 @@ export default function ScheduleDetailPage() {
     ]
   }, [detailQuery.data?.schedule])
 
+  const pendingWorkerIds = useMemo(() => {
+    const workers = detailQuery.data?.workers ?? []
+    return workers.filter((row) => row.status !== 'signed').map((row) => row.schedule_worker_id)
+  }, [detailQuery.data?.workers])
+
+  const latestNotificationByWorkerId = useMemo(
+    () => buildLatestNotificationByWorkerId(notificationsQuery.data ?? []),
+    [notificationsQuery.data]
+  )
+
+  const notificationRows = notificationsQuery.data ?? []
+
+  const isNotificationSendPending = sendNotificationsMutation.isPending
+  const sendWorkerIds = sendNotificationsMutation.variables?.scheduleWorkerIds
+  const isSingleWorkerSend = sendWorkerIds?.length === 1
+  const isBulkSending = isNotificationSendPending && !isSingleWorkerSend
+  const currentResendingWorkerId = isNotificationSendPending && isSingleWorkerSend
+    ? sendWorkerIds[0]
+    : null
+
+  const handleResendWorker = (worker: SafetyScheduleWorkerRow) => {
+    sendNotificationsMutation.mutate({
+      scheduleWorkerIds: [worker.schedule_worker_id],
+      forceResend: true
+    })
+  }
+
+  const backProjectsPath = safetyProjectsPath(detailQuery.data?.schedule.project_name)
+
   return (
     <SafetyLayout
       title="Schedule detail"
       subtitle="Track signature completion and adjust due date when site conditions change."
       subnavEnd={(
-        <Link className="safety-btn-secondary safety-btn-back" to="/safety/projects">
+        <Link className="safety-btn-secondary safety-btn-back" to={backProjectsPath}>
           <span className="material-icons safety-btn-back-icon" aria-hidden>arrow_back</span>
           Back
         </Link>
@@ -111,6 +200,30 @@ export default function ScheduleDetailPage() {
                 </span>
                 <button
                   type="button"
+                  className={`safety-btn-secondary safety-btn-notify${isBulkSending ? ' is-sending' : ''}`}
+                  title="Send signature request emails to all workers who have not signed yet"
+                  onClick={() => {
+                    sendNotificationsMutation.mutate({
+                      scheduleWorkerIds: pendingWorkerIds,
+                      forceResend: false
+                    })
+                  }}
+                  disabled={
+                    detailQuery.data.schedule.status !== 'active'
+                    || pendingWorkerIds.length === 0
+                    || isNotificationSendPending
+                  }
+                >
+                  <span className="safety-btn-notify-icon-wrap" aria-hidden>
+                    <span className="material-icons">{isBulkSending ? 'hourglass_top' : 'mail'}</span>
+                    {!isBulkSending ? <span className="safety-btn-notify-spark" /> : null}
+                  </span>
+                  <span className="safety-btn-notify-label">
+                    {isBulkSending ? 'Sending notifications...' : 'Send notifications'}
+                  </span>
+                </button>
+                <button
+                  type="button"
                   className="safety-btn-primary"
                   onClick={() => setShowExtendModal(true)}
                   disabled={detailQuery.data.schedule.status !== 'active'}
@@ -142,7 +255,69 @@ export default function ScheduleDetailPage() {
             rows={detailQuery.data.workers}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
+            latestNotificationByWorkerId={latestNotificationByWorkerId}
+            onResendWorkerNotification={handleResendWorker}
+            isResendingWorkerId={currentResendingWorkerId}
+            isNotificationSendPending={isNotificationSendPending}
           />
+
+          <section className="safety-card">
+            <div className="safety-workers-header">
+              <h3>Email notification history</h3>
+            </div>
+            {notificationsQuery.isLoading ? (
+              <p className="safety-muted">Loading notification logs...</p>
+            ) : notificationsQuery.isError ? (
+              <div className="safety-alert safety-alert--error">
+                <p>{notificationsQuery.error instanceof Error ? notificationsQuery.error.message : 'Could not load notification logs.'}</p>
+              </div>
+            ) : (
+              <div className="sop-mfg-table-wrap safety-schedule-mfg-wrap">
+                <table className="sop-mfg-table safety-schedule-mfg-table" aria-label="Email notification history">
+                  <colgroup>
+                    <col style={{ width: '34%' }} />
+                    <col style={{ width: '18%' }} />
+                    <col style={{ width: '24%' }} />
+                    <col style={{ width: '24%' }} />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th scope="col" className="sop-mfg-th sop-mfg-th--instr">Recipient</th>
+                      <th scope="col" className="sop-mfg-th sop-mfg-th--instr">Status</th>
+                      <th scope="col" className="sop-mfg-th sop-mfg-th--instr">Created at</th>
+                      <th scope="col" className="sop-mfg-th sop-mfg-th--instr">Sent at</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {notificationRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="sop-mfg-td sop-empty-cell">No notification logs yet.</td>
+                      </tr>
+                    ) : notificationRows.map((row) => (
+                      <tr key={row.notification_id}>
+                        <td className="sop-mfg-td sop-mfg-td--instr safety-schedule-td-worker">
+                          <div className="safety-docs-cell-primary">{row.recipient_full_name || 'Recipient'}</div>
+                          <div className="safety-docs-cell-muted">{row.recipient_email || 'No email'}</div>
+                        </td>
+                        <td className="sop-mfg-td sop-mfg-td--instr">
+                          <span className={`safety-status-pill safety-status-pill--${row.status}`}>
+                            {row.status}
+                          </span>
+                          {row.error_message ? <div className="safety-docs-cell-muted">{row.error_message}</div> : null}
+                        </td>
+                        <td className="sop-mfg-td sop-mfg-td--instr">
+                          <time dateTime={row.created_at}>{formatLogDate(row.created_at)}</time>
+                        </td>
+                        <td className="sop-mfg-td sop-mfg-td--instr">
+                          <time dateTime={row.sent_at ?? undefined}>{formatLogDate(row.sent_at)}</time>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         </>
       ) : (
         <section className="safety-card">

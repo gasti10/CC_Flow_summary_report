@@ -226,8 +226,24 @@ export default function WorkerSignatureStep({
       ) : null}
 
       <div className="safety-modal-footer safety-modal-footer--center">
-        <button type="button" className="safety-btn-primary" onClick={submit} disabled={isSubmitting}>
-          {isSubmitting ? 'Signing...' : 'Sign assignment'}
+        <button
+          type="button"
+          className={`safety-btn-primary safety-btn-sign${isSubmitting ? ' is-signing' : ''}`}
+          onClick={submit}
+          disabled={isSubmitting}
+        >
+          <span className="safety-btn-sign-icon-wrap" aria-hidden>
+            <span className="material-icons">{isSubmitting ? 'hourglass_top' : 'draw'}</span>
+            {!isSubmitting ? (
+              <>
+                <span className="safety-btn-sign-scribble" />
+                <span className="safety-btn-sign-spark" />
+              </>
+            ) : null}
+          </span>
+          <span className="safety-btn-sign-label">
+            {isSubmitting ? 'Signing...' : 'Sign assignment'}
+          </span>
         </button>
       </div>
     </section>

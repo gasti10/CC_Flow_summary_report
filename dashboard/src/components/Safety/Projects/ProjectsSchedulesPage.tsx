@@ -1,16 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import SafetyLayout from '../SafetyLayout'
 import { safetyApi } from '../../../services/safetyApi'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
+import {
+  readSafetyProjectFromSearchParams,
+  SAFETY_PROJECTS_SEARCH_PARAM
+} from '../utils/safetyProjectsPath'
 
 export default function ProjectsSchedulesPage() {
   useDocumentTitle('Safety Projects - Cladding Creations')
   const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
   const selectedPanelNewScheduleRef = useRef<HTMLAnchorElement | null>(null)
   const selectedProjectPanelRef = useRef<HTMLDivElement | null>(null)
-  const [projectName, setProjectName] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const projectName = readSafetyProjectFromSearchParams(searchParams)
   const [projectSearch, setProjectSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active'>('all')
   const [showProjectContact, setShowProjectContact] = useState(false)
@@ -66,6 +71,26 @@ export default function ProjectsSchedulesPage() {
       })
       .slice(0, 20)
   }, [projectSearch, projectsQuery.data])
+
+  const pickerProjects = useMemo(() => {
+    if (!projectName || filteredProjects.some(project => project.Name === projectName)) {
+      return filteredProjects
+    }
+    const selected = (projectsQuery.data ?? []).find(project => project.Name === projectName)
+    if (!selected) return filteredProjects
+    return [selected, ...filteredProjects].slice(0, 20)
+  }, [filteredProjects, projectName, projectsQuery.data])
+
+  function selectProject(name: string) {
+    const next = new URLSearchParams(searchParams)
+    const trimmed = name.trim()
+    if (!trimmed) {
+      next.delete(SAFETY_PROJECTS_SEARCH_PARAM)
+    } else {
+      next.set(SAFETY_PROJECTS_SEARCH_PARAM, trimmed)
+    }
+    setSearchParams(next, { replace: true })
+  }
 
   const selectedProjectInfo = useMemo(
     () => (projectsQuery.data ?? []).find(project => project.Name === projectName),
@@ -130,17 +155,17 @@ export default function ProjectsSchedulesPage() {
             <div className="safety-project-picker">
               {projectsQuery.isLoading ? (
                 <p className="safety-muted" style={{ padding: '12px' }}>Loading projects...</p>
-              ) : filteredProjects.length === 0 ? (
+              ) : pickerProjects.length === 0 ? (
                 <p className="safety-muted" style={{ padding: '12px' }}>No projects match your search.</p>
               ) : (
-                filteredProjects.map((project) => {
+                pickerProjects.map((project) => {
                   const isSelected = projectName === project.Name
                   return (
                     <button
                       key={project.Name}
                       type="button"
                       className={`safety-project-option${isSelected ? ' is-selected' : ''}`}
-                      onClick={() => setProjectName(project.Name)}
+                      onClick={() => selectProject(project.Name)}
                     >
                       <div className="safety-project-name">{project.Name}</div>
                       <div className="safety-project-meta">

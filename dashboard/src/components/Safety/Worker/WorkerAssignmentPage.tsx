@@ -1,10 +1,11 @@
-import { lazy, Suspense, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import SafetyLayout from '../SafetyLayout'
 import { safetyApi } from '../../../services/safetyApi'
 import WorkerSignatureStep from './WorkerSignatureStep'
 import SignatureSuccessModal from './SignatureSuccessModal'
+import SafetyReadingMode from './SafetyReadingMode'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import type {
   SafetyWorkerAssignmentDetail,
@@ -12,6 +13,25 @@ import type {
 } from '../../../types/safety'
 
 const SafetyPdfViewer = lazy(() => import('./SafetyPdfViewer'))
+
+const MOBILE_MAX_WIDTH_PX = 719
+
+function useMaxWidth(maxWidth: number): boolean {
+  const query = `(max-width: ${maxWidth}px)`
+  const [matches, setMatches] = useState(() => (
+    typeof window !== 'undefined' ? window.matchMedia(query).matches : false
+  ))
+
+  useEffect(() => {
+    const media = window.matchMedia(query)
+    const update = () => setMatches(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [query])
+
+  return matches
+}
 
 function formatDueAt(value: string | null): string {
   if (!value) return 'No due date'
@@ -48,8 +68,14 @@ export default function WorkerAssignmentPage() {
   const queryClient = useQueryClient()
   const [readerReachedEnd, setReaderReachedEnd] = useState(false)
   const [readConfirmation, setReadConfirmation] = useState(false)
+  const [readingModeOpen, setReadingModeOpen] = useState(false)
+  const [readingModeMounted, setReadingModeMounted] = useState(false)
+  const [highlightConsent, setHighlightConsent] = useState(false)
   const [modalFeedback, setModalFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const signatureSuccessShownRef = useRef(false)
+  const readingGateRef = useRef<HTMLDivElement>(null)
+  const consentCheckboxRef = useRef<HTMLInputElement>(null)
+  const isMobile = useMaxWidth(MOBILE_MAX_WIDTH_PX)
 
   useDocumentTitle('Worker Assignment - Cladding Creations')
 
@@ -144,6 +170,50 @@ export default function WorkerAssignmentPage() {
     [readerReachedEnd, readConfirmation]
   )
 
+  const openReadingMode = () => {
+    setReadingModeMounted(true)
+    setReadingModeOpen(true)
+  }
+
+  const closeReadingMode = () => {
+    setReadingModeOpen(false)
+  }
+
+  const handleContinueToSign = () => {
+    setReadingModeOpen(false)
+    setHighlightConsent(true)
+    window.requestAnimationFrame(() => {
+      readingGateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      window.setTimeout(() => {
+        consentCheckboxRef.current?.focus({ preventScroll: true })
+      }, 450)
+    })
+  }
+
+  useEffect(() => {
+    if (!highlightConsent) return
+    const timeoutId = window.setTimeout(() => setHighlightConsent(false), 8000)
+    return () => window.clearTimeout(timeoutId)
+  }, [highlightConsent])
+
+  const viewerHelpText = useMemo(() => {
+    if (isReadOnly) {
+      return isMobile
+        ? 'Open the document to review the SWMS.'
+        : 'Review the SWMS document below.'
+    }
+    if (readerReachedEnd) {
+      return 'Reading complete. Confirm below, then sign.'
+    }
+    return isMobile
+      ? 'Open the document and scroll to the end to unlock signing.'
+      : 'Scroll through the full document to unlock the signature step.'
+  }, [isMobile, isReadOnly, readerReachedEnd])
+
+  const readingGateHint = isMobile
+    ? 'Use Read document, scroll to the bottom, then return here to confirm.'
+    : 'Scroll to the bottom first to enable this checkbox.'
+
   return (
     <SafetyLayout
       title="Assignment detail"
@@ -179,58 +249,6 @@ export default function WorkerAssignmentPage() {
             </section>
           ) : null}
 
-          <section className="safety-card safety-worker-viewer-card">
-            <h3 className="safety-section-heading">SWMS viewer</h3>
-            <p className="safety-muted safety-worker-viewer-help">
-              {isReadOnly
-                ? 'Review the SWMS document below.'
-                : 'Scroll through the full document to unlock the signature step.'}
-            </p>
-
-            <Suspense
-              fallback={(
-                <div className="safety-worker-viewer-wrap safety-worker-viewer-wrap--loading" aria-busy="true">
-                  <p className="safety-muted safety-pdf-viewer-status">Loading viewer…</p>
-                </div>
-              )}
-            >
-              <SafetyPdfViewer
-                url={detail.pdf_signed_url}
-                title={`SWMS · ${detail.document_title}`}
-                showReadingEndMarker={!isReadOnly}
-                reachedEnd={readerReachedEnd}
-                onReachedEnd={() => setReaderReachedEnd(true)}
-              />
-            </Suspense>
-
-            {!isReadOnly ? (
-              <div className="safety-worker-reading-gate">
-                <label className="safety-worker-consent">
-                  <input
-                    type="checkbox"
-                    checked={readConfirmation}
-                    onChange={(event) => setReadConfirmation(event.target.checked)}
-                    disabled={!readerReachedEnd}
-                  />
-                  <span>I confirm I have read and understood this SWMS before signing.</span>
-                </label>
-                <div className="safety-worker-gate-status">
-                  <span className={`safety-status-pill safety-status-pill--${readerReachedEnd ? 'signed' : 'pending'}`}>
-                    Reading gate: {readerReachedEnd ? 'complete' : 'pending'}
-                  </span>
-                  <span className={`safety-status-pill safety-status-pill--${readConfirmation ? 'signed' : 'pending'}`}>
-                    Confirmation: {readConfirmation ? 'complete' : 'pending'}
-                  </span>
-                </div>
-                {!readerReachedEnd ? <p className="safety-muted">Scroll to the bottom first to enable this checkbox.</p> : null}
-              </div>
-            ) : isSigned ? (
-              <p className="safety-muted safety-worker-reading-gate">
-                Reading and signature were completed for this assignment.
-              </p>
-            ) : null}
-          </section>
-
           <section className="safety-card safety-worker-meta-card">
             <div className="safety-detail-header safety-detail-header--centered safety-worker-meta-header">
               <div className="safety-detail-meta">
@@ -247,10 +265,6 @@ export default function WorkerAssignmentPage() {
                     <span className="safety-detail-meta-label">Due at</span>
                     <strong className="safety-detail-meta-value">{formatDueAt(detail.due_at)}</strong>
                   </div>
-                  <div className="safety-detail-meta-item">
-                    <span className="safety-detail-meta-label">Late sign</span>
-                    <strong className="safety-detail-meta-value">{detail.allow_late_sign ? 'Allowed' : 'Not allowed'}</strong>
-                  </div>
                   {isSigned && detail.signed_at ? (
                     <div className="safety-detail-meta-item">
                       <span className="safety-detail-meta-label">Signed at</span>
@@ -258,11 +272,103 @@ export default function WorkerAssignmentPage() {
                     </div>
                   ) : null}
                 </div>
+                {detail.notes?.trim() ? (
+                  <div className="safety-worker-schedule-notes">
+                    <span className="safety-detail-meta-label">Schedule notes</span>
+                    <p className="safety-worker-schedule-notes-body">{detail.notes.trim()}</p>
+                  </div>
+                ) : null}
               </div>
               <span className={`safety-status-pill safety-status-pill--${detail.worker_status}`}>
                 {detail.worker_status}
               </span>
             </div>
+          </section>
+
+          <section className="safety-card safety-worker-viewer-card">
+            <div className="safety-worker-viewer-card-head">
+              <h3 className="safety-section-heading">SWMS viewer</h3>
+              {isMobile ? (
+                <button
+                  type="button"
+                  className="safety-btn-primary safety-reading-mode-open-btn"
+                  onClick={openReadingMode}
+                >
+                  <span className="material-icons" aria-hidden>fullscreen</span>
+                  Read document
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="safety-btn-secondary safety-reading-mode-open-btn safety-reading-mode-open-btn--desktop"
+                  onClick={openReadingMode}
+                >
+                  <span className="material-icons" aria-hidden>fullscreen</span>
+                  Expand viewer
+                </button>
+              )}
+            </div>
+            <p className="safety-muted safety-worker-viewer-help">{viewerHelpText}</p>
+
+            {!isMobile ? (
+              <Suspense
+                fallback={(
+                  <div className="safety-worker-viewer-wrap safety-worker-viewer-wrap--loading" aria-busy="true">
+                    <p className="safety-muted safety-pdf-viewer-status">Loading viewer…</p>
+                  </div>
+                )}
+              >
+                <SafetyPdfViewer
+                  url={detail.pdf_signed_url}
+                  title={`SWMS · ${detail.document_title}`}
+                  showReadingEndMarker={!isReadOnly}
+                  reachedEnd={readerReachedEnd}
+                  onReachedEnd={() => setReaderReachedEnd(true)}
+                />
+              </Suspense>
+            ) : null}
+
+            {!isReadOnly ? (
+              <div
+                ref={readingGateRef}
+                className={`safety-worker-reading-gate${highlightConsent ? ' safety-worker-reading-gate--attention' : ''}`}
+              >
+                {highlightConsent && readerReachedEnd ? (
+                  <p className="safety-worker-consent-cue" role="status" aria-live="polite">
+                    <span className="material-icons" aria-hidden>touch_app</span>
+                    Tap the checkbox below to confirm and continue to sign.
+                  </p>
+                ) : null}
+                <label
+                  className={`safety-worker-consent${highlightConsent ? ' safety-worker-consent--attention' : ''}`}
+                >
+                  <input
+                    ref={consentCheckboxRef}
+                    type="checkbox"
+                    checked={readConfirmation}
+                    onChange={(event) => {
+                      setReadConfirmation(event.target.checked)
+                      if (event.target.checked) setHighlightConsent(false)
+                    }}
+                    disabled={!readerReachedEnd}
+                  />
+                  <span>I confirm I have read and understood this SWMS before signing.</span>
+                </label>
+                <div className="safety-worker-gate-status">
+                  <span className={`safety-status-pill safety-status-pill--${readerReachedEnd ? 'signed' : 'pending'}`}>
+                    Reading gate: {readerReachedEnd ? 'complete' : 'pending'}
+                  </span>
+                  <span className={`safety-status-pill safety-status-pill--${readConfirmation ? 'signed' : 'pending'}`}>
+                    Confirmation: {readConfirmation ? 'complete' : 'pending'}
+                  </span>
+                </div>
+                {!readerReachedEnd ? <p className="safety-muted">{readingGateHint}</p> : null}
+              </div>
+            ) : isSigned ? (
+              <p className="safety-muted safety-worker-reading-gate">
+                Reading and signature were completed for this assignment.
+              </p>
+            ) : null}
           </section>
 
           {canSign ? (
@@ -280,6 +386,20 @@ export default function WorkerAssignmentPage() {
                 }}
               />
             </section>
+          ) : null}
+
+          {readingModeMounted ? (
+            <SafetyReadingMode
+              isOpen={readingModeOpen}
+              pdfUrl={detail.pdf_signed_url}
+              documentTitle={detail.document_title}
+              versionNumber={detail.version_number}
+              reachedEnd={readerReachedEnd}
+              showReadingGate={!isReadOnly}
+              onClose={closeReadingMode}
+              onContinueToSign={handleContinueToSign}
+              onReachedEnd={() => setReaderReachedEnd(true)}
+            />
           ) : null}
         </div>
       ) : (

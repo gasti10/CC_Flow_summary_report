@@ -10,6 +10,7 @@ import { validateScheduleBasics, validateScheduleCreate } from '../utils/schedul
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import type { SafetyActiveProfile, SafetyScheduleRecipientInput } from '../../../types/safety'
 import { formatSafetyEnumLabel, recipientFromActiveProfile } from './scheduleRecipientFromProfile'
+import { safetyProjectsPath } from '../utils/safetyProjectsPath'
 
 /** Valor inicial para `datetime-local`: hoy 07:00 si aún no son las 07:00; si ya pasaron, mañana 07:00 (hora local). */
 function getDefaultDueAtDatetimeLocal(): string {
@@ -40,6 +41,7 @@ interface ScheduleCreateSuccessState {
   documentLabel?: string
   recipientCount: number
   dueAtLabel?: string
+  notificationSummary?: string
 }
 
 function formatDueAtForSuccess(value: string): string | undefined {
@@ -145,7 +147,7 @@ export default function ScheduleCreatePage() {
         recipients: selectedRecipients
       })
     },
-    onSuccess: (scheduleId) => {
+    onSuccess: async (scheduleId) => {
       setErrors([])
       setShowCreateConfirmModal(false)
       const selectedDoc = (documentsQuery.data ?? []).find(
@@ -154,12 +156,30 @@ export default function ScheduleCreatePage() {
       const documentLabel = selectedDoc
         ? `${selectedDoc.title} (v${selectedDoc.latest_version_number ?? 1})`
         : undefined
+      let notificationSummary = 'not sent'
+      try {
+        const sendResult = await safetyApi.queueAndSendScheduleNotifications({ scheduleId })
+        if (sendResult.failed_count > 0) {
+          notificationSummary = `${sendResult.sent_count} sent / ${sendResult.failed_count} failed`
+        } else {
+          notificationSummary = `${sendResult.sent_count} sent`
+        }
+      } catch (error) {
+        notificationSummary = 'failed'
+        setFeedback({
+          type: 'error',
+          message: error instanceof Error
+            ? `Schedule created, but email dispatch failed: ${error.message}`
+            : 'Schedule created, but email dispatch failed.'
+        })
+      }
       setCreateSuccess({
         scheduleId,
         projectName: projectInput,
         documentLabel,
         recipientCount: selectedRecipients.length,
-        dueAtLabel: formatDueAtForSuccess(dueAt)
+        dueAtLabel: formatDueAtForSuccess(dueAt),
+        notificationSummary
       })
     },
     onError: (error: Error) => {
@@ -218,6 +238,8 @@ export default function ScheduleCreatePage() {
       || 'Recipient'
   }
 
+  const backProjectsPath = safetyProjectsPath(projectInput.trim() || initialProject)
+
   return (
     <SafetyLayout
       title="New schedule"
@@ -227,7 +249,7 @@ export default function ScheduleCreatePage() {
           : `Project: ${projectInput || 'Select a project'} · Choose recipients and review selection.`
       }
       subnavEnd={(
-        <Link className="safety-btn-secondary safety-btn-back" to="/safety/projects">
+        <Link className="safety-btn-secondary safety-btn-back" to={backProjectsPath}>
           <span className="material-icons safety-btn-back-icon" aria-hidden>arrow_back</span>
           Back
         </Link>
@@ -337,7 +359,7 @@ export default function ScheduleCreatePage() {
         <div className="safety-modal-footer safety-modal-footer--center">
           {createStep === 1 ? (
             <>
-              <button type="button" className="safety-btn-secondary" onClick={() => navigate('/safety/projects')}>
+              <button type="button" className="safety-btn-secondary" onClick={() => navigate(backProjectsPath)}>
                 Cancel
               </button>
               <button
@@ -438,6 +460,7 @@ export default function ScheduleCreatePage() {
           documentLabel={createSuccess.documentLabel}
           recipientCount={createSuccess.recipientCount}
           dueAtLabel={createSuccess.dueAtLabel}
+          notificationSummary={createSuccess.notificationSummary}
           onClose={goToCreatedSchedule}
           onContinue={goToCreatedSchedule}
         />

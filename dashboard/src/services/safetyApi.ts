@@ -8,6 +8,8 @@ import type {
   SafetyActiveProfile,
   SafetyDocumentDetail,
   SafetyDocumentListItem,
+  SafetyNotificationDispatchResult,
+  SafetyNotificationLog,
   SafetyDocumentVersion,
   SafetyProjectMember,
   SafetyProjectMemberRole,
@@ -101,6 +103,27 @@ class SafetyAPI {
 
   private normalizeIsoOrNull(value: string | null | undefined): string | null {
     return value?.trim() ? value : null
+  }
+
+  private normalizeNotificationLogs(rows: Array<Record<string, unknown>>): SafetyNotificationLog[] {
+    return rows.map((row) => ({
+      notification_id: String(row.notification_id ?? ''),
+      schedule_id: row.schedule_id ? String(row.schedule_id) : null,
+      schedule_worker_id: row.schedule_worker_id ? String(row.schedule_worker_id) : null,
+      worker_user_id: row.worker_user_id ? String(row.worker_user_id) : null,
+      recipient_email: row.recipient_email ? String(row.recipient_email) : null,
+      channel: 'email' as const,
+      template_key: String(row.template_key ?? 'swms_signature_request'),
+      status: (row.status as SafetyNotificationLog['status']) ?? 'queued',
+      provider_message_id: row.provider_message_id ? String(row.provider_message_id) : null,
+      error_message: row.error_message ? String(row.error_message) : null,
+      requested_by: row.requested_by ? String(row.requested_by) : null,
+      idempotency_key: row.idempotency_key ? String(row.idempotency_key) : null,
+      created_at: String(row.created_at ?? ''),
+      sent_at: row.sent_at ? String(row.sent_at) : null,
+      recipient_full_name: row.recipient_full_name ? String(row.recipient_full_name) : null,
+      worker_status: (row.worker_status as SafetyNotificationLog['worker_status'] | null) ?? null
+    })).filter((row) => row.notification_id.length > 0)
   }
 
   private normalizeRecipientInput(recipient: SafetyScheduleRecipientInput): SafetyScheduleRecipientInput | null {
@@ -519,6 +542,19 @@ class SafetyAPI {
       p_role: role
     })
     if (rpcRes.error) throw new Error(`Could not update member role: ${rpcRes.error.message}`)
+  }
+
+  async countUnsignedAssignmentsForMember(memberId: string): Promise<number> {
+    const rpcRes = await supabaseClient.rpc('safety_count_unsigned_assignments_for_member', {
+      p_member_id: memberId
+    })
+    if (rpcRes.error) {
+      throw new Error(`Could not count unsigned assignments: ${rpcRes.error.message}`)
+    }
+    const value = rpcRes.data
+    if (typeof value === 'number') return Math.max(0, value)
+    if (typeof value === 'string') return Math.max(0, Number.parseInt(value, 10) || 0)
+    return 0
   }
 
   async removeProjectMember(memberId: string): Promise<void> {
@@ -1031,6 +1067,115 @@ class SafetyAPI {
       status: ((row.status as SafetyWorkerSignatureResult['status'] | null) ?? 'signed'),
       invitation_status: ((row.invitation_status as SafetyWorkerSignatureResult['invitation_status'] | null) ?? 'signed')
     } satisfies SafetyWorkerSignatureResult
+  }
+
+  async queueScheduleNotifications(params: {
+    scheduleId: string
+    scheduleWorkerIds?: string[]
+    templateKey?: string
+    forceResend?: boolean
+  }): Promise<string[]> {
+    const payloadIds = (params.scheduleWorkerIds ?? []).map((id) => id.trim()).filter(Boolean)
+    const rpcRes = await supabaseClient.rpc('safety_queue_schedule_notifications', {
+      p_schedule_id: params.scheduleId,
+      p_schedule_worker_ids: payloadIds.length > 0 ? payloadIds : null,
+      p_template_key: params.templateKey ?? 'swms_signature_request',
+      p_force_resend: params.forceResend ?? false
+    })
+    if (rpcRes.error) {
+      throw new Error(`Could not queue notifications: ${rpcRes.error.message}`)
+    }
+    if (!Array.isArray(rpcRes.data)) return []
+    return rpcRes.data
+      .map((row: unknown) => {
+        if (typeof row === 'string') return row
+        if (row && typeof row === 'object' && 'notification_id' in row) {
+          return String((row as { notification_id?: string }).notification_id ?? '')
+        }
+        return ''
+      })
+      .filter((value: string) => value.length > 0)
+  }
+
+  async sendQueuedNotifications(notificationIds: string[]): Promise<SafetyNotificationDispatchResult> {
+    const ids = notificationIds.map((id) => id.trim()).filter(Boolean)
+    if (ids.length === 0) {
+      return {
+        queued_count: 0,
+        sent_count: 0,
+        failed_count: 0,
+        skipped_count: 0,
+        notification_ids: []
+      }
+    }
+
+    const invokeRes = await supabaseClient.functions.invoke('safety-send-notification', {
+      body: { notification_ids: ids }
+    })
+    if (invokeRes.error) {
+      throw new Error(`Could not send queued notifications: ${invokeRes.error.message}`)
+    }
+
+    const data = (invokeRes.data ?? {}) as Record<string, unknown>
+    return {
+      queued_count: Number(data.queued_count ?? ids.length),
+      sent_count: Number(data.sent_count ?? 0),
+      failed_count: Number(data.failed_count ?? 0),
+      skipped_count: Number(data.skipped_count ?? 0),
+      notification_ids: Array.isArray(data.notification_ids)
+        ? data.notification_ids.map((id) => String(id))
+        : ids,
+      message: data.message ? String(data.message) : undefined
+    }
+  }
+
+  async queueAndSendScheduleNotifications(params: {
+    scheduleId: string
+    scheduleWorkerIds?: string[]
+    templateKey?: string
+    forceResend?: boolean
+  }): Promise<SafetyNotificationDispatchResult> {
+    const notificationIds = await this.queueScheduleNotifications(params)
+    const sendResult = await this.sendQueuedNotifications(notificationIds)
+    return {
+      ...sendResult,
+      queued_count: notificationIds.length,
+      notification_ids: notificationIds
+    }
+  }
+
+  async listScheduleNotifications(scheduleId: string): Promise<SafetyNotificationLog[]> {
+    const rpcRes = await supabaseClient.rpc('safety_list_schedule_notifications', {
+      p_schedule_id: scheduleId
+    })
+    if (!rpcRes.error && Array.isArray(rpcRes.data)) {
+      return this.normalizeNotificationLogs(rpcRes.data as Array<Record<string, unknown>>)
+    }
+
+    const fallbackRes = await supabaseClient
+      .from('notification_logs')
+      .select(`
+        notification_id, schedule_id, schedule_worker_id, worker_user_id, recipient_email,
+        channel, template_key, status, provider_message_id, error_message, requested_by,
+        idempotency_key, created_at, sent_at,
+        schedule_workers!notification_logs_schedule_worker_id_fkey(recipient_full_name, status)
+      `)
+      .eq('schedule_id', scheduleId)
+      .order('created_at', { ascending: false })
+    if (fallbackRes.error) {
+      throw new Error(`Could not list notifications: ${fallbackRes.error.message}`)
+    }
+
+    const mappedRows = (fallbackRes.data ?? []).map((row: Record<string, unknown>) => {
+      const workerJoin = Array.isArray(row.schedule_workers) ? row.schedule_workers[0] : row.schedule_workers
+      const workerObj = (workerJoin ?? {}) as Record<string, unknown>
+      return {
+        ...row,
+        recipient_full_name: workerObj.recipient_full_name ?? null,
+        worker_status: workerObj.status ?? null
+      }
+    })
+    return this.normalizeNotificationLogs(mappedRows)
   }
 
   async getMyProfileSignatureDefaults(): Promise<{ full_name: string | null; email: string | null }> {

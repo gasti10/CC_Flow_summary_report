@@ -6,6 +6,7 @@ import { safetyApi } from '../../../services/safetyApi'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import type { SafetyActiveProfile, SafetyProjectMember, SafetyProjectMemberRole } from '../../../types/safety'
 import ProjectMembersTable from './ProjectMembersTable'
+import { safetyProjectsPath } from '../utils/safetyProjectsPath'
 import ProjectMembersAddPanel from './ProjectMembersAddPanel'
 
 export default function ProjectMembersPage() {
@@ -137,10 +138,24 @@ export default function ProjectMembersPage() {
     })
   }
 
-  const handleRemoveMember = (member: SafetyProjectMember) => {
+  const handleRemoveMember = async (member: SafetyProjectMember) => {
     const label = member.full_name?.trim() || member.email?.trim() || 'this member'
+    let unsignedCount = 0
+
+    try {
+      unsignedCount = await safetyApi.countUnsignedAssignmentsForMember(member.member_id)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not check pending assignments.'
+      setFeedback({ type: 'error', message })
+      return
+    }
+
+    const pendingNote = unsignedCount > 0
+      ? `\n\n${label} has ${unsignedCount} unsigned SWMS assignment${unsignedCount === 1 ? '' : 's'} on this project. They will lose project access for new schedules, but can still open and sign those assignments until completed.`
+      : ''
+
     const confirmed = window.confirm(
-      `Remove ${label} from ${projectName}? They will lose project access. Assignment history is kept.`
+      `Remove ${label} from ${projectName}? They will lose project access for new schedules.${pendingNote}\n\nAssignment history is kept.`
     )
     if (!confirmed) return
     removeMemberMutation.mutate(member.member_id)
@@ -151,7 +166,7 @@ export default function ProjectMembersPage() {
       <SafetyLayout title="Project members" subtitle="No project selected.">
         <section className="safety-card">
           <p className="safety-muted">Missing project name in the URL.</p>
-          <Link className="safety-btn-secondary" to="/safety/projects">Back to projects</Link>
+          <Link className="safety-btn-secondary" to={safetyProjectsPath(projectName)}>Back to projects</Link>
         </section>
       </SafetyLayout>
     )
@@ -162,7 +177,7 @@ export default function ProjectMembersPage() {
       title="Project members"
       subtitle={`Manage members and roles for ${projectName}.`}
       subnavEnd={(
-        <Link className="safety-btn-secondary safety-btn-back" to="/safety/projects">
+        <Link className="safety-btn-secondary safety-btn-back" to={safetyProjectsPath(projectName)}>
           <span className="material-icons safety-btn-back-icon" aria-hidden>arrow_back</span>
           Back to projects
         </Link>
