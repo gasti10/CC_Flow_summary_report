@@ -5,7 +5,8 @@ import SafetyLayout from '../SafetyLayout'
 import { safetyApi } from '../../../services/safetyApi'
 import ScheduleWorkersTable from './ScheduleWorkersTable'
 import ExtendDueDateModal from './ExtendDueDateModal'
-import type { SafetyNotificationLog, SafetyScheduleWorkerRow, SafetyWorkerStatus } from '../../../types/safety'
+import ScheduleAddWorkersModal from './ScheduleAddWorkersModal'
+import type { SafetyNotificationLog, SafetyScheduleRecipientInput, SafetyScheduleWorkerRow, SafetyWorkerStatus } from '../../../types/safety'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { safetyProjectsPath } from '../utils/safetyProjectsPath'
 import '../../SiteOrdersPlanner/SiteOrdersPlanner.css'
@@ -46,6 +47,7 @@ export default function ScheduleDetailPage() {
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState<'all' | SafetyWorkerStatus>('all')
   const [showExtendModal, setShowExtendModal] = useState(false)
+  const [showAddWorkersModal, setShowAddWorkersModal] = useState(false)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useDocumentTitle('Safety Schedule Detail - Cladding Creations')
@@ -141,11 +143,71 @@ export default function ScheduleDetailPage() {
     : null
 
   const handleResendWorker = (worker: SafetyScheduleWorkerRow) => {
+    const hasNotificationLog = Boolean(latestNotificationByWorkerId[worker.schedule_worker_id])
     sendNotificationsMutation.mutate({
       scheduleWorkerIds: [worker.schedule_worker_id],
-      forceResend: true
+      forceResend: hasNotificationLog
     })
   }
+
+  const addWorkersMutation = useMutation({
+    mutationFn: async (recipients: SafetyScheduleRecipientInput[]) => {
+      if (!scheduleId) throw new Error('Schedule ID is missing.')
+      const beforeIds = new Set(
+        (detailQuery.data?.workers ?? []).map((row) => row.schedule_worker_id)
+      )
+      const addedCount = await safetyApi.addScheduleRecipients(scheduleId, recipients)
+      const refreshed = await safetyApi.getScheduleDetail(scheduleId)
+      const notifyIds = refreshed.workers
+        .filter((row) => !beforeIds.has(row.schedule_worker_id) && row.status !== 'signed')
+        .map((row) => row.schedule_worker_id)
+      if (notifyIds.length > 0) {
+        await safetyApi.queueAndSendScheduleNotifications({
+          scheduleId,
+          scheduleWorkerIds: notifyIds,
+          forceResend: false
+        })
+      }
+      return addedCount
+    },
+    onSuccess: async (addedCount) => {
+      setShowAddWorkersModal(false)
+      setFeedback({
+        type: 'success',
+        message: addedCount === 1 ? '1 worker added to this schedule.' : `${addedCount} workers added to this schedule.`
+      })
+      await queryClient.invalidateQueries({ queryKey: ['safety-schedule-detail', scheduleId] })
+      await queryClient.invalidateQueries({ queryKey: ['safety-schedule-notifications', scheduleId] })
+      await queryClient.invalidateQueries({ queryKey: ['safety-schedules-project'] })
+    },
+    onError: (error: Error) => {
+      setFeedback({ type: 'error', message: error.message })
+    }
+  })
+
+  const removeWorkerMutation = useMutation({
+    mutationFn: async (scheduleWorkerId: string) => {
+      if (!scheduleId) throw new Error('Schedule ID is missing.')
+      await safetyApi.removeScheduleWorker(scheduleWorkerId)
+    },
+    onSuccess: async () => {
+      setFeedback({ type: 'success', message: 'Worker removed from this schedule.' })
+      await queryClient.invalidateQueries({ queryKey: ['safety-schedule-detail', scheduleId] })
+      await queryClient.invalidateQueries({ queryKey: ['safety-schedules-project'] })
+    },
+    onError: (error: Error) => {
+      setFeedback({ type: 'error', message: error.message })
+    }
+  })
+
+  const handleRemoveWorker = (worker: SafetyScheduleWorkerRow) => {
+    const label = worker.recipient_full_name?.trim() || worker.recipient_email?.trim() || 'this worker'
+    if (!window.confirm(`Remove ${label} from this schedule?`)) return
+    removeWorkerMutation.mutate(worker.schedule_worker_id)
+  }
+
+  const isWorkerMutationPending = addWorkersMutation.isPending || removeWorkerMutation.isPending
+  const removingWorkerId = removeWorkerMutation.isPending ? removeWorkerMutation.variables ?? null : null
 
   const backProjectsPath = safetyProjectsPath(detailQuery.data?.schedule.project_name)
 
@@ -171,7 +233,7 @@ export default function ScheduleDetailPage() {
           </div>
         </section>
       ) : detailQuery.data ? (
-        <>
+        <div className="safety-schedule-detail">
           <section className="safety-card">
             <div className="safety-detail-header">
               <div className="safety-detail-meta">
@@ -192,9 +254,24 @@ export default function ScheduleDetailPage() {
                     <span className="safety-detail-meta-label">Late sign</span>
                     <strong className="safety-detail-meta-value">{detailQuery.data.schedule.allow_late_sign ? 'Allowed' : 'Not allowed'}</strong>
                   </div>
+                  <div className="safety-detail-meta-item">
+                    <span className="safety-detail-meta-label">Program</span>
+                    <strong className="safety-detail-meta-value">
+                      {detailQuery.data.schedule.series_id ? 'Recurring' : 'One-off'}
+                    </strong>
+                  </div>
                 </div>
               </div>
               <div className="safety-detail-actions">
+                {detailQuery.data.schedule.series_id ? (
+                  <Link
+                    className="safety-btn-link"
+                    to={`/safety/projects/${encodeURIComponent(detailQuery.data.schedule.project_name)}/series/${detailQuery.data.schedule.series_id}`}
+                  >
+                    <span className="material-icons safety-btn-link-icon" aria-hidden>repeat</span>
+                    Recurring
+                  </Link>
+                ) : null}
                 <span className={`safety-status-pill safety-status-pill--${detailQuery.data.schedule.status}`}>
                   {detailQuery.data.schedule.status}
                 </span>
@@ -259,6 +336,11 @@ export default function ScheduleDetailPage() {
             onResendWorkerNotification={handleResendWorker}
             isResendingWorkerId={currentResendingWorkerId}
             isNotificationSendPending={isNotificationSendPending}
+            canManageWorkers={detailQuery.data.schedule.status === 'active'}
+            onAddWorkers={() => setShowAddWorkersModal(true)}
+            onRemoveWorker={handleRemoveWorker}
+            isRemovingWorkerId={removingWorkerId}
+            isWorkerMutationPending={isWorkerMutationPending}
           />
 
           <section className="safety-card">
@@ -273,7 +355,7 @@ export default function ScheduleDetailPage() {
               </div>
             ) : (
               <div className="sop-mfg-table-wrap safety-schedule-mfg-wrap">
-                <table className="sop-mfg-table safety-schedule-mfg-table" aria-label="Email notification history">
+                <table className="sop-mfg-table safety-schedule-mfg-table safety-schedule-mfg-table--responsive" aria-label="Email notification history">
                   <colgroup>
                     <col style={{ width: '34%' }} />
                     <col style={{ width: '18%' }} />
@@ -295,20 +377,23 @@ export default function ScheduleDetailPage() {
                       </tr>
                     ) : notificationRows.map((row) => (
                       <tr key={row.notification_id}>
-                        <td className="sop-mfg-td sop-mfg-td--instr safety-schedule-td-worker">
+                        <td
+                          className="sop-mfg-td sop-mfg-td--instr safety-schedule-td-worker"
+                          data-label="Recipient"
+                        >
                           <div className="safety-docs-cell-primary">{row.recipient_full_name || 'Recipient'}</div>
                           <div className="safety-docs-cell-muted">{row.recipient_email || 'No email'}</div>
                         </td>
-                        <td className="sop-mfg-td sop-mfg-td--instr">
+                        <td className="sop-mfg-td sop-mfg-td--instr" data-label="Status">
                           <span className={`safety-status-pill safety-status-pill--${row.status}`}>
                             {row.status}
                           </span>
                           {row.error_message ? <div className="safety-docs-cell-muted">{row.error_message}</div> : null}
                         </td>
-                        <td className="sop-mfg-td sop-mfg-td--instr">
+                        <td className="sop-mfg-td sop-mfg-td--instr" data-label="Created at">
                           <time dateTime={row.created_at}>{formatLogDate(row.created_at)}</time>
                         </td>
-                        <td className="sop-mfg-td sop-mfg-td--instr">
+                        <td className="sop-mfg-td sop-mfg-td--instr" data-label="Sent at">
                           <time dateTime={row.sent_at ?? undefined}>{formatLogDate(row.sent_at)}</time>
                         </td>
                       </tr>
@@ -318,7 +403,7 @@ export default function ScheduleDetailPage() {
               </div>
             )}
           </section>
-        </>
+        </div>
       ) : (
         <section className="safety-card">
           <p className="safety-muted">Schedule not found.</p>
@@ -332,6 +417,18 @@ export default function ScheduleDetailPage() {
           onClose={() => setShowExtendModal(false)}
           onConfirm={async (dueAtLocal) => {
             extendMutation.mutate(dueAtLocal)
+          }}
+        />
+      ) : null}
+
+      {showAddWorkersModal && detailQuery.data ? (
+        <ScheduleAddWorkersModal
+          projectName={detailQuery.data.schedule.project_name}
+          existingWorkers={detailQuery.data.workers}
+          isPending={addWorkersMutation.isPending}
+          onClose={() => setShowAddWorkersModal(false)}
+          onConfirm={async (recipients) => {
+            await addWorkersMutation.mutateAsync(recipients)
           }}
         />
       ) : null}

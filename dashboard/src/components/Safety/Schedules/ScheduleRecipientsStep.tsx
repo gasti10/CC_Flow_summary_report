@@ -22,6 +22,8 @@ interface ScheduleRecipientsStepProps {
   onBackToDetails?: () => void
   onCreateSchedule?: () => void
   isCreatingSchedule?: boolean
+  primaryActionLabel?: string
+  primaryActionPendingLabel?: string
 }
 
 function recipientKey(recipient: SafetyScheduleRecipientInput): string {
@@ -49,7 +51,9 @@ export default function ScheduleRecipientsStep({
   onAddRecipientByEmail,
   onBackToDetails,
   onCreateSchedule,
-  isCreatingSchedule = false
+  isCreatingSchedule = false,
+  primaryActionLabel = 'Create schedule',
+  primaryActionPendingLabel = 'Creating...'
 }: ScheduleRecipientsStepProps) {
   const [inviteName, setInviteName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
@@ -120,6 +124,13 @@ export default function ScheduleRecipientsStep({
     setListFilter('all')
   }
 
+  function handleProfileSearchChange(value: string) {
+    if (value.trim() !== '' && listFilter !== 'all') {
+      setListFilter('all')
+    }
+    onProfileSearchChange(value)
+  }
+
   function submitInviteEmail() {
     const email = inviteEmail.trim().toLowerCase()
     if (!email) {
@@ -175,7 +186,7 @@ export default function ScheduleRecipientsStep({
                     className="safety-input"
                     value={profileSearch}
                     placeholder="Name or email…"
-                    onChange={(e) => onProfileSearchChange(e.target.value)}
+                    onChange={(e) => handleProfileSearchChange(e.target.value)}
                     autoComplete="off"
                   />
                 </div>
@@ -391,7 +402,7 @@ export default function ScheduleRecipientsStep({
                       disabled={isCreatingSchedule}
                       onClick={onCreateSchedule}
                     >
-                      {isCreatingSchedule ? 'Creating...' : 'Create schedule'}
+                      {isCreatingSchedule ? primaryActionPendingLabel : primaryActionLabel}
                     </button>
                   </div>
                 ) : null}

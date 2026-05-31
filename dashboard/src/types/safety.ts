@@ -4,13 +4,21 @@ export type SafetyWorkerStatus = 'pending' | 'signed' | 'overdue'
 export type SafetyRecipientMembershipState = 'project_member' | 'non_member'
 export type SafetyInvitationStatus = 'requested' | 'invited' | 'joined' | 'signed' | 'failed' | 'cancelled'
 export type SafetyNotificationStatus = 'queued' | 'sent' | 'failed'
+export type SafetyRecurrenceFrequency = 'daily' | 'weekdays' | 'weekly' | 'biweekly'
+export type SafetyScheduleCreateMode = 'one_off' | 'repeating'
+export type SafetySeriesStatus = 'active' | 'paused' | 'closed'
 
 export interface SafetyDocumentListItem {
   document_id: string
   title: string
   description: string | null
   status: SafetyDocumentStatus
+  is_template?: boolean | null
+  source_template_id?: string | null
+  project_name?: string | null
   created_by: string | null
+  /** Resuelto en cliente desde `profiles.full_name` por `created_by` (auth user id). */
+  created_by_full_name?: string | null
   updated_by: string | null
   created_at: string
   updated_at: string
@@ -52,6 +60,7 @@ export interface SafetyDocumentDetail {
     updated_by: string | null
     created_at: string
     updated_at: string
+    form_payload?: Record<string, unknown> | null
   }
   versions: SafetyDocumentVersion[]
 }
@@ -95,6 +104,8 @@ export interface SafetyActiveProfile {
 
 export interface SafetyScheduleSummary {
   schedule_id: string
+  series_id?: string | null
+  instance_id?: string | null
   project_name: string
   status: SafetyScheduleStatus
   due_at: string | null
@@ -232,6 +243,70 @@ export interface CreateSafetySchedulePayload {
   notes?: string | null
   allow_late_sign?: boolean
   recipients: SafetyScheduleRecipientInput[]
+}
+
+export interface CreateSafetyScheduleSeriesPayload {
+  project_name: string
+  document_id: string
+  frequency: SafetyRecurrenceFrequency
+  due_time_local: string
+  time_zone: string
+  start_date_local: string
+  end_date_local?: string | null
+  notes?: string | null
+  allow_late_sign?: boolean
+  materialize_today?: boolean
+  recipients: SafetyScheduleRecipientInput[]
+}
+
+export interface CreateSafetyScheduleSeriesResult {
+  series_id: string
+  schedule_id: string | null
+}
+
+export interface SafetySeriesSummary {
+  series_id: string
+  project_name: string
+  document_id: string
+  document_title: string
+  frequency: SafetyRecurrenceFrequency | string
+  status: SafetySeriesStatus
+  due_time_local: string
+  time_zone: string
+  start_date_local: string
+  end_date_local: string | null
+  allow_late_sign: boolean
+  notes: string | null
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+  materialized_instances: number
+  next_due_at: string | null
+}
+
+export interface SafetySeriesInstance {
+  instance_id: string
+  series_id: string
+  schedule_id: string | null
+  instance_date_local: string
+  due_at: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface SafetyGenerateTemplateDocumentPayload {
+  master_document_id: string
+  project_name: string
+  form_payload: Record<string, unknown>
+}
+
+export interface SafetyGenerateTemplateDocumentResult {
+  document_id: string
+  document_version_id: string
+  title: string
+  version_number: number
 }
 
 export interface SafetyScheduleRecipientInput {

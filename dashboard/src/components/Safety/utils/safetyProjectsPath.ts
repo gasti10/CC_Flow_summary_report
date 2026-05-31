@@ -1,4 +1,6 @@
 export const SAFETY_PROJECTS_SEARCH_PARAM = 'project'
+export const SAFETY_PROJECTS_FOLLOWUP_PARAM = 'followup'
+export const SAFETY_PROJECTS_PRESTART_PARAM = 'prestart'
 
 export function readSafetyProjectFromSearchParams(searchParams: URLSearchParams): string {
   const raw = searchParams.get(SAFETY_PROJECTS_SEARCH_PARAM)
@@ -10,9 +12,25 @@ export function readSafetyProjectFromSearchParams(searchParams: URLSearchParams)
   }
 }
 
-export function safetyProjectsPath(projectName?: string | null): string {
+export function readFollowUpFromSearchParams(searchParams: URLSearchParams): boolean {
+  return searchParams.get(SAFETY_PROJECTS_FOLLOWUP_PARAM) === '1'
+}
+
+export function readPreStartFromSearchParams(searchParams: URLSearchParams): boolean {
+  return searchParams.get(SAFETY_PROJECTS_PRESTART_PARAM) === '1'
+}
+
+export function safetyProjectsPath(
+  projectName?: string | null,
+  options?: { followUp?: boolean; preStart?: boolean }
+): string {
   const base = '/safety/projects'
   const trimmed = projectName?.trim()
-  if (!trimmed) return base
-  return `${base}?${SAFETY_PROJECTS_SEARCH_PARAM}=${encodeURIComponent(trimmed)}`
+  const params = new URLSearchParams()
+  if (trimmed) params.set(SAFETY_PROJECTS_SEARCH_PARAM, trimmed)
+  if (options?.followUp) params.set(SAFETY_PROJECTS_FOLLOWUP_PARAM, '1')
+  if (options?.preStart) params.set(SAFETY_PROJECTS_PRESTART_PARAM, '1')
+  const query = params.toString()
+  if (!query) return base
+  return `${base}?${query}`
 }

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { runScheduleSuccessEffect } from '../utils/scheduleSuccessEffect'
 
 interface ScheduleSuccessModalProps {
+  title?: string
   message: string
   projectName: string
   documentLabel?: string
@@ -14,6 +15,7 @@ interface ScheduleSuccessModalProps {
 }
 
 export default function ScheduleSuccessModal({
+  title = 'Schedule created',
   message,
   projectName,
   documentLabel,
@@ -86,7 +88,7 @@ export default function ScheduleSuccessModal({
             </svg>
           </div>
 
-          <h3 className="safety-schedule-success-title safety-schedule-success-fade-in">Schedule created</h3>
+          <h3 className="safety-schedule-success-title safety-schedule-success-fade-in">{title}</h3>
           <p className="safety-schedule-success-message safety-schedule-success-fade-in">{message}</p>
 
           <div className="safety-schedule-success-meta safety-schedule-success-fade-in">

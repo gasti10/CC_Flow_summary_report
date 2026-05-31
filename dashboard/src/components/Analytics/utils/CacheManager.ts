@@ -10,7 +10,7 @@ interface CacheOptions {
 }
 
 class CacheManager {
-  private memoryCache = new Map<string, CacheEntry<any>>();
+  private memoryCache = new Map<string, CacheEntry<unknown>>();
   private defaultTTL: number;
   private maxSize: number;
 
@@ -20,7 +20,7 @@ class CacheManager {
   }
 
   // Generar clave de cache basada en parámetros
-  private generateKey(prefix: string, params: Record<string, any>): string {
+  private generateKey(prefix: string, params: Record<string, unknown>): string {
     const sortedParams = Object.keys(params)
       .sort()
       .map(key => `${key}:${params[key]}`)
@@ -29,7 +29,7 @@ class CacheManager {
   }
 
   // Obtener datos del cache
-  get<T>(prefix: string, params: Record<string, any>): T | null {
+  get<T>(prefix: string, params: Record<string, unknown>): T | null {
     const key = this.generateKey(prefix, params);
     const entry = this.memoryCache.get(key);
 
@@ -47,7 +47,7 @@ class CacheManager {
   }
 
   // Guardar datos en el cache
-  set<T>(prefix: string, params: Record<string, any>, data: T, ttl?: number): void {
+  set<T>(prefix: string, params: Record<string, unknown>, data: T, ttl?: number): void {
     const key = this.generateKey(prefix, params);
     
     // Limpiar cache si excede el tamaño máximo

@@ -4,13 +4,20 @@ import type { Project } from '../types/appsheet'
 import type {
   CreateSafetyDocumentPayload,
   CreateSafetySchedulePayload,
+  CreateSafetyScheduleSeriesPayload,
+  CreateSafetyScheduleSeriesResult,
   ExtendSafetyScheduleDueDatePayload,
+  SafetyGenerateTemplateDocumentPayload,
+  SafetyGenerateTemplateDocumentResult,
   SafetyActiveProfile,
   SafetyDocumentDetail,
   SafetyDocumentListItem,
   SafetyNotificationDispatchResult,
   SafetyNotificationLog,
   SafetyDocumentVersion,
+  SafetySeriesInstance,
+  SafetySeriesStatus,
+  SafetySeriesSummary,
   SafetyProjectMember,
   SafetyProjectMemberRole,
   SafetyProjectMemberWorker,
@@ -24,6 +31,7 @@ import type {
   SafetyScheduleWorkerRow,
   UploadSafetyVersionPayload
 } from '../types/safety'
+import { buildFollowUpHubSummary, type SafetyFollowUpHubSummary } from '../components/Safety/utils/scheduleFollowUp'
 
 const SAFETY_BUCKET = 'safety-documents'
 const appSheetApi = new AppSheetAPI()
@@ -167,10 +175,43 @@ class SafetyAPI {
     return appSheetApi.getAllProjects()
   }
 
+  private async resolveFullNamesByUserIds(userIds: string[]): Promise<Map<string, string>> {
+    const nameByUserId = new Map<string, string>()
+    const uniqueIds = [...new Set(userIds.filter((id) => id.length > 0))]
+    if (uniqueIds.length === 0) return nameByUserId
+
+    const { data: profileRows, error: profilesError } = await supabaseClient
+      .from('profiles')
+      .select('user_id, full_name')
+      .in('user_id', uniqueIds)
+    if (!profilesError && profileRows) {
+      for (const row of profileRows) {
+        const uid = row.user_id as string | null
+        if (!uid) continue
+        const name = (row.full_name as string | null)?.trim()
+        nameByUserId.set(uid, name && name.length > 0 ? name : '—')
+      }
+    }
+    return nameByUserId
+  }
+
+  private async withCreatorFullNames(docs: SafetyDocumentListItem[]): Promise<SafetyDocumentListItem[]> {
+    const creatorIds = docs
+      .map((doc) => doc.created_by)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    const nameByUserId = await this.resolveFullNamesByUserIds(creatorIds)
+    return docs.map((doc) => ({
+      ...doc,
+      created_by_full_name: doc.created_by
+        ? (nameByUserId.get(doc.created_by) ?? 'Unknown user')
+        : null
+    }))
+  }
+
   async listDocuments(): Promise<SafetyDocumentListItem[]> {
     const rpcRes = await supabaseClient.rpc('safety_list_documents_latest')
     if (!rpcRes.error && Array.isArray(rpcRes.data)) {
-      return rpcRes.data as SafetyDocumentListItem[]
+      return this.withCreatorFullNames(rpcRes.data as SafetyDocumentListItem[])
     }
 
     const docsRes = await supabaseClient
@@ -197,13 +238,16 @@ class SafetyAPI {
       }
     }
 
-    return docs.map((doc) => {
+    return this.withCreatorFullNames(docs.map((doc) => {
       const latest = latestByDocument.get(doc.document_id)
       return {
         document_id: doc.document_id,
         title: doc.title,
         description: doc.description,
         status: doc.status,
+        is_template: typeof doc.is_template === 'boolean' ? doc.is_template : null,
+        source_template_id: typeof doc.source_template_id === 'string' ? doc.source_template_id : null,
+        project_name: typeof doc.project_name === 'string' ? doc.project_name : null,
         created_by: doc.created_by,
         updated_by: doc.updated_by,
         created_at: doc.created_at,
@@ -219,7 +263,7 @@ class SafetyAPI {
         latest_uploaded_by: latest?.uploaded_by ?? null,
         latest_uploaded_at: latest?.uploaded_at ?? null
       } satisfies SafetyDocumentListItem
-    })
+    }))
   }
 
   async getDocumentDetail(documentId: string): Promise<SafetyDocumentDetail> {
@@ -575,7 +619,7 @@ class SafetyAPI {
     const schedulesRes = await supabaseClient
       .from('schedules')
       .select(`
-        schedule_id, project_name, status, due_at, allow_late_sign, notes,
+        schedule_id, series_id, instance_id, project_name, status, due_at, allow_late_sign, notes,
         created_by, updated_by, created_at, updated_at, closed_at, document_version_id,
         safety_document_versions!schedules_document_version_id_fkey (
           document_version_id, document_id, version_number,
@@ -618,6 +662,8 @@ class SafetyAPI {
       const extraOverdue = dueAtMs && dueAtMs < Date.now() ? slot.pending : 0
       return {
         schedule_id: schedule.schedule_id,
+        series_id: schedule.series_id ?? null,
+        instance_id: schedule.instance_id ?? null,
         project_name: schedule.project_name,
         status: schedule.status,
         due_at: schedule.due_at,
@@ -737,6 +783,183 @@ class SafetyAPI {
     return scheduleId
   }
 
+  async createScheduleSeries(payload: CreateSafetyScheduleSeriesPayload): Promise<CreateSafetyScheduleSeriesResult> {
+    const recipients = payload.recipients
+      .map((recipient) => this.normalizeRecipientInput(recipient))
+      .filter((recipient): recipient is SafetyScheduleRecipientInput => Boolean(recipient))
+    if (recipients.length === 0) throw new Error('At least one recipient is required')
+
+    const rpcRes = await supabaseClient.rpc('safety_create_schedule_series_with_recipients', {
+      p_project_name: payload.project_name.trim(),
+      p_document_id: payload.document_id,
+      p_frequency: payload.frequency,
+      p_due_time_local: payload.due_time_local,
+      p_time_zone: payload.time_zone.trim(),
+      p_start_date_local: payload.start_date_local,
+      p_end_date_local: payload.end_date_local?.trim() || null,
+      p_notes: payload.notes?.trim() || null,
+      p_allow_late_sign: payload.allow_late_sign ?? true,
+      p_materialize_today: payload.materialize_today ?? true,
+      p_recipients: recipients
+    })
+    if (rpcRes.error) {
+      throw new Error(`Could not create recurring program: ${rpcRes.error.message}`)
+    }
+
+    const value = Array.isArray(rpcRes.data) ? rpcRes.data[0] : rpcRes.data
+    if (typeof value === 'string') {
+      return { series_id: value, schedule_id: null }
+    }
+    if (value && typeof value === 'object') {
+      const row = value as { series_id?: unknown; schedule_id?: unknown }
+      const series_id = typeof row.series_id === 'string' ? row.series_id : ''
+      if (!series_id) throw new Error('Recurring program creation returned no series_id.')
+      return {
+        series_id,
+        schedule_id: typeof row.schedule_id === 'string' ? row.schedule_id : null
+      }
+    }
+    throw new Error('Recurring program creation returned an invalid response.')
+  }
+
+  async listSeriesByProject(projectName: string): Promise<SafetySeriesSummary[]> {
+    const rpcRes = await supabaseClient.rpc('safety_list_series_by_project', {
+      p_project_name: projectName.trim()
+    })
+    if (rpcRes.error) throw new Error(`Could not list recurring programs: ${rpcRes.error.message}`)
+    return (rpcRes.data ?? []).map((row: Record<string, unknown>) => ({
+      series_id: String(row.series_id ?? ''),
+      project_name: String(row.project_name ?? projectName),
+      document_id: String(row.document_id ?? ''),
+      document_title: String(row.document_title ?? ''),
+      frequency: String(row.frequency ?? 'daily'),
+      status: String(row.status ?? 'active') as SafetySeriesStatus,
+      due_time_local: String(row.due_time_local ?? ''),
+      time_zone: String(row.time_zone ?? 'Australia/Brisbane'),
+      start_date_local: String(row.start_date_local ?? ''),
+      end_date_local: row.end_date_local ? String(row.end_date_local) : null,
+      allow_late_sign: Boolean(row.allow_late_sign),
+      notes: row.notes ? String(row.notes) : null,
+      created_by: row.created_by ? String(row.created_by) : null,
+      updated_by: row.updated_by ? String(row.updated_by) : null,
+      created_at: String(row.created_at ?? ''),
+      updated_at: String(row.updated_at ?? ''),
+      materialized_instances: Number(row.materialized_instances ?? 0),
+      next_due_at: row.next_due_at ? String(row.next_due_at) : null
+    })).filter((row: SafetySeriesSummary) => row.series_id.length > 0)
+  }
+
+  async listInstancesBySeries(seriesId: string): Promise<SafetySeriesInstance[]> {
+    const rpcRes = await supabaseClient.rpc('safety_list_instances_by_series', {
+      p_series_id: seriesId
+    })
+    if (rpcRes.error) throw new Error(`Could not list recurring instances: ${rpcRes.error.message}`)
+    return (rpcRes.data ?? []).map((row: Record<string, unknown>) => ({
+      instance_id: String(row.instance_id ?? ''),
+      series_id: String(row.series_id ?? ''),
+      schedule_id: row.schedule_id ? String(row.schedule_id) : null,
+      instance_date_local: String(row.instance_date_local ?? ''),
+      due_at: String(row.due_at ?? ''),
+      status: String(row.status ?? 'pending'),
+      created_at: String(row.created_at ?? ''),
+      updated_at: String(row.updated_at ?? '')
+    })).filter((row: SafetySeriesInstance) => row.instance_id.length > 0)
+  }
+
+  async updateSeriesStatus(seriesId: string, status: SafetySeriesStatus): Promise<SafetySeriesSummary['status']> {
+    const rpcRes = await supabaseClient.rpc('safety_update_series_status', {
+      p_series_id: seriesId,
+      p_status: status
+    })
+    if (rpcRes.error) throw new Error(`Could not update recurring program status: ${rpcRes.error.message}`)
+    const value = Array.isArray(rpcRes.data) ? rpcRes.data[0] : rpcRes.data
+    if (value && typeof value === 'object' && typeof value.status === 'string') {
+      return value.status as SafetySeriesSummary['status']
+    }
+    return status
+  }
+
+  async generateDocumentFromTemplate(
+    payload: SafetyGenerateTemplateDocumentPayload
+  ): Promise<SafetyGenerateTemplateDocumentResult> {
+    const rpcRes = await supabaseClient.rpc('safety_generate_document_from_template', {
+      p_master_document_id: payload.master_document_id,
+      p_project_name: payload.project_name.trim(),
+      p_form_payload: payload.form_payload ?? {}
+    })
+    if (rpcRes.error) throw new Error(`Could not generate pre-start document: ${rpcRes.error.message}`)
+    const value = Array.isArray(rpcRes.data) ? rpcRes.data[0] : rpcRes.data
+    if (!value || typeof value !== 'object') {
+      throw new Error('Document generation returned an invalid response.')
+    }
+    const result = {
+      document_id: String(value.document_id ?? ''),
+      document_version_id: String(value.document_version_id ?? ''),
+      title: String(value.title ?? ''),
+      version_number: Number(value.version_number ?? 1)
+    }
+    await this.invokePreStartPdfRenderer({
+      document_id: result.document_id,
+      document_version_id: result.document_version_id,
+      title: result.title,
+      project_name: payload.project_name.trim(),
+      form_payload: payload.form_payload ?? {}
+    })
+    return result
+  }
+
+  async regenerateDocumentFromTemplate(
+    documentId: string,
+    formPayload: Record<string, unknown>,
+    projectName?: string
+  ): Promise<SafetyGenerateTemplateDocumentResult> {
+    const rpcRes = await supabaseClient.rpc('safety_regenerate_document_from_template', {
+      p_document_id: documentId,
+      p_form_payload: formPayload ?? {}
+    })
+    if (rpcRes.error) throw new Error(`Could not regenerate pre-start document: ${rpcRes.error.message}`)
+    const value = Array.isArray(rpcRes.data) ? rpcRes.data[0] : rpcRes.data
+    if (!value || typeof value !== 'object') {
+      throw new Error('Document regeneration returned an invalid response.')
+    }
+    const result = {
+      document_id: String(value.document_id ?? ''),
+      document_version_id: String(value.document_version_id ?? ''),
+      title: String(value.title ?? ''),
+      version_number: Number(value.version_number ?? 1)
+    }
+    const resolvedProjectName = projectName?.trim()
+      || (await this.listDocuments()).find((doc) => doc.document_id === documentId)?.project_name?.trim()
+    if (!resolvedProjectName) {
+      throw new Error('Could not resolve project_name for pre-start PDF rendering.')
+    }
+    await this.invokePreStartPdfRenderer({
+      document_id: result.document_id,
+      document_version_id: result.document_version_id,
+      title: result.title,
+      project_name: resolvedProjectName,
+      form_payload: formPayload ?? {}
+    })
+    return result
+  }
+
+  private async invokePreStartPdfRenderer(body: {
+    document_id: string
+    document_version_id: string
+    title: string
+    project_name: string
+    form_payload: Record<string, unknown>
+  }): Promise<void> {
+    const edgeRes = await supabaseClient.functions.invoke('safety-generate-pre-start-pdf', { body })
+    if (edgeRes.error) {
+      throw new Error(`Could not render pre-start PDF: ${edgeRes.error.message}`)
+    }
+    const data = edgeRes.data as { ok?: boolean; error?: string } | null
+    if (data && data.ok !== true) {
+      throw new Error(data.error ?? 'Pre-start PDF rendering returned an invalid response.')
+    }
+  }
+
   async getScheduleDetail(scheduleId: string): Promise<SafetyScheduleDetail> {
     const rpcRes = await supabaseClient.rpc('safety_get_schedule_detail', {
       p_schedule_id: scheduleId
@@ -746,6 +969,8 @@ class SafetyAPI {
       const first = rows[0]
       const schedule: SafetyScheduleSummary = {
         schedule_id: first.schedule_id as string,
+        series_id: (first.series_id as string | null) ?? null,
+        instance_id: (first.instance_id as string | null) ?? null,
         project_name: first.project_name as string,
         status: first.status as 'active' | 'closed',
         due_at: first.due_at as string | null,
@@ -791,7 +1016,7 @@ class SafetyAPI {
     const scheduleRes = await supabaseClient
       .from('schedules')
       .select(`
-        schedule_id, project_name, status, due_at, allow_late_sign, notes,
+        schedule_id, series_id, instance_id, project_name, status, due_at, allow_late_sign, notes,
         created_by, updated_by, created_at, updated_at, closed_at, document_version_id,
         safety_document_versions!schedules_document_version_id_fkey(
           document_version_id, document_id, version_number,
@@ -866,6 +1091,8 @@ class SafetyAPI {
     return {
       schedule: {
         schedule_id: schedule.schedule_id,
+        series_id: schedule.series_id ?? null,
+        instance_id: schedule.instance_id ?? null,
         project_name: schedule.project_name,
         status: schedule.status,
         due_at: schedule.due_at,
@@ -886,6 +1113,93 @@ class SafetyAPI {
         total_count: workers.length
       },
       workers
+    }
+  }
+
+  async addScheduleRecipients(
+    scheduleId: string,
+    recipients: SafetyScheduleRecipientInput[]
+  ): Promise<number> {
+    const normalized = recipients
+      .map((recipient) => this.normalizeRecipientInput(recipient))
+      .filter((recipient): recipient is SafetyScheduleRecipientInput => Boolean(recipient))
+    if (normalized.length === 0) throw new Error('At least one recipient is required.')
+
+    const rpcRes = await supabaseClient.rpc('safety_add_schedule_recipients', {
+      p_schedule_id: scheduleId,
+      p_recipients: normalized
+    })
+    if (!rpcRes.error) {
+      return Number(rpcRes.data ?? normalized.length)
+    }
+
+    const uid = await this.getAuthUid()
+    const scheduleRes = await supabaseClient
+      .from('schedules')
+      .select('schedule_id, project_name, status')
+      .eq('schedule_id', scheduleId)
+      .single()
+    if (scheduleRes.error) throw new Error(`Could not load schedule: ${scheduleRes.error.message}`)
+    if (scheduleRes.data.status !== 'active') {
+      throw new Error('Workers can only be added to active schedules.')
+    }
+
+    const manualRecipients = normalized.map((recipient) => ({
+      schedule_id: scheduleId,
+      recipient_user_id: recipient.recipient_user_id ?? null,
+      profile_id: recipient.profile_id ?? null,
+      recipient_email: recipient.recipient_email ?? null,
+      recipient_full_name: recipient.recipient_full_name ?? null,
+      membership_state: recipient.membership_state ?? 'non_member',
+      invitation_status: recipient.invitation_status ?? (recipient.recipient_user_id ? 'requested' : 'invited'),
+      status: 'pending',
+      assigned_by: uid
+    }))
+
+    const insertRes = await supabaseClient
+      .from('schedule_workers')
+      .insert(manualRecipients)
+      .select('schedule_worker_id')
+
+    if (insertRes.error) {
+      throw new Error(`Could not add workers: ${insertRes.error.message || rpcRes.error.message}`)
+    }
+
+    return insertRes.data?.length ?? 0
+  }
+
+  async removeScheduleWorker(scheduleWorkerId: string): Promise<void> {
+    const rpcRes = await supabaseClient.rpc('safety_remove_schedule_worker', {
+      p_schedule_worker_id: scheduleWorkerId
+    })
+    if (!rpcRes.error) return
+
+    const workerRes = await supabaseClient
+      .from('schedule_workers')
+      .select('schedule_worker_id, status, schedule_id, schedules(status)')
+      .eq('schedule_worker_id', scheduleWorkerId)
+      .single()
+    if (workerRes.error) {
+      throw new Error(`Could not remove worker: ${workerRes.error.message || rpcRes.error.message}`)
+    }
+
+    const worker = workerRes.data as Record<string, unknown>
+    if (worker.status === 'signed') {
+      throw new Error('Cannot remove a worker who has already signed.')
+    }
+    const scheduleJoin = worker.schedules as { status?: string } | { status?: string }[] | null
+    const scheduleStatus = Array.isArray(scheduleJoin) ? scheduleJoin[0]?.status : scheduleJoin?.status
+    if (scheduleStatus !== 'active') {
+      throw new Error('Workers can only be removed from active schedules.')
+    }
+
+    const deleteRes = await supabaseClient
+      .from('schedule_workers')
+      .delete()
+      .eq('schedule_worker_id', scheduleWorkerId)
+
+    if (deleteRes.error) {
+      throw new Error(`Could not remove worker: ${deleteRes.error.message || rpcRes.error.message}`)
     }
   }
 
@@ -1216,6 +1530,32 @@ class SafetyAPI {
       .eq('schedule_id', payload.schedule_id)
       .eq('status', 'active')
     if (res.error) throw new Error(`Could not extend due date: ${res.error.message}`)
+  }
+
+  async getFollowUpHubSummary(): Promise<SafetyFollowUpHubSummary> {
+    const schedulesRes = await supabaseClient
+      .from('schedules')
+      .select('schedule_id, project_name, status, due_at')
+      .eq('status', 'active')
+    if (schedulesRes.error) {
+      throw new Error(`Could not load follow-up summary: ${schedulesRes.error.message}`)
+    }
+
+    const schedules = schedulesRes.data ?? []
+    if (schedules.length === 0) {
+      return { scheduleCount: 0, projects: [] }
+    }
+
+    const scheduleIds = schedules.map(row => row.schedule_id)
+    const workersRes = await supabaseClient
+      .from('schedule_workers')
+      .select('schedule_id, status')
+      .in('schedule_id', scheduleIds)
+    if (workersRes.error) {
+      throw new Error(`Could not load follow-up workers: ${workersRes.error.message}`)
+    }
+
+    return buildFollowUpHubSummary(schedules, workersRes.data ?? [])
   }
 }
 

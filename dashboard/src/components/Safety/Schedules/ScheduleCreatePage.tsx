@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import SafetyLayout from '../SafetyLayout'
 import { safetyApi } from '../../../services/safetyApi'
@@ -7,9 +7,22 @@ import ScheduleCreateForm from './ScheduleCreateForm'
 import ScheduleRecipientsStep from './ScheduleRecipientsStep'
 import ScheduleSuccessModal from './ScheduleSuccessModal'
 import { validateScheduleBasics, validateScheduleCreate } from '../utils/scheduleValidation'
+import {
+  SAFETY_SCHEDULE_TIME_ZONE,
+  getDefaultRecurringEndDate,
+  getTodayDateLocal,
+  presetToFrequency,
+  type RecurrencePresetKey
+} from '../utils/recurrenceUi'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
-import type { SafetyActiveProfile, SafetyScheduleRecipientInput } from '../../../types/safety'
+import type {
+  SafetyActiveProfile,
+  SafetyRecurrenceFrequency,
+  SafetyScheduleCreateMode,
+  SafetyScheduleRecipientInput
+} from '../../../types/safety'
 import { formatSafetyEnumLabel, recipientFromActiveProfile } from './scheduleRecipientFromProfile'
+import { defaultPreStartDueAtIso } from '../utils/preStartToday'
 import { safetyProjectsPath } from '../utils/safetyProjectsPath'
 
 /** Valor inicial para `datetime-local`: hoy 07:00 si aún no son las 07:00; si ya pasaron, mañana 07:00 (hora local). */
@@ -27,6 +40,13 @@ function getDefaultDueAtDatetimeLocal(): string {
   return `${y}-${m}-${d}T${h}:${min}`
 }
 
+function isoToDatetimeLocal(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return getDefaultDueAtDatetimeLocal()
+  const offsetMs = date.getTimezoneOffset() * 60000
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
+}
+
 function recipientKey(recipient: SafetyScheduleRecipientInput): string {
   return recipient.recipient_user_id
     ? `user:${recipient.recipient_user_id}`
@@ -36,12 +56,18 @@ function recipientKey(recipient: SafetyScheduleRecipientInput): string {
 }
 
 interface ScheduleCreateSuccessState {
-  scheduleId: string
+  createMode: SafetyScheduleCreateMode
+  scheduleId: string | null
+  seriesId: string | null
   projectName: string
   documentLabel?: string
   recipientCount: number
   dueAtLabel?: string
   notificationSummary?: string
+}
+
+function getTodayDateLocalFromPage(): string {
+  return getTodayDateLocal()
 }
 
 function formatDueAtForSuccess(value: string): string | undefined {
@@ -53,11 +79,24 @@ function formatDueAtForSuccess(value: string): string | undefined {
 
 export default function ScheduleCreatePage() {
   const { projectName } = useParams<{ projectName: string }>()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const initialProject = projectName ? decodeURIComponent(projectName) : ''
-  const [projectInput, setProjectInput] = useState(initialProject)
-  const [selectedVersionId, setSelectedVersionId] = useState('')
-  const [dueAt, setDueAt] = useState(() => getDefaultDueAtDatetimeLocal())
+  const initialProjectFromQuery = (searchParams.get('project') ?? '').trim()
+  const initialDocumentVersionFromQuery = (searchParams.get('documentVersionId') ?? '').trim()
+  const fromPreStartFlow = searchParams.get('from') === 'pre-start' && initialDocumentVersionFromQuery.length > 0
+  const [projectInput, setProjectInput] = useState(initialProject || initialProjectFromQuery)
+  const [selectedVersionId, setSelectedVersionId] = useState(initialDocumentVersionFromQuery)
+  const [createMode, setCreateMode] = useState<SafetyScheduleCreateMode>('one_off')
+  const [recurrencePreset, setRecurrencePreset] = useState<RecurrencePresetKey>('none')
+  const [useNoDueDate, setUseNoDueDate] = useState(false)
+  const [dueAt, setDueAt] = useState(() => (
+    fromPreStartFlow ? isoToDatetimeLocal(defaultPreStartDueAtIso()) : getDefaultDueAtDatetimeLocal()
+  ))
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<SafetyRecurrenceFrequency>('daily')
+  const [dueTimeLocal, setDueTimeLocal] = useState('07:00')
+  const [startDateLocal, setStartDateLocal] = useState(() => getTodayDateLocalFromPage())
+  const [endDateLocal, setEndDateLocal] = useState(() => getDefaultRecurringEndDate(getTodayDateLocalFromPage()))
   const [notes, setNotes] = useState('')
   const [createStep, setCreateStep] = useState<1 | 2>(1)
   const [selectedRecipients, setSelectedRecipients] = useState<SafetyScheduleRecipientInput[]>([])
@@ -75,8 +114,8 @@ export default function ScheduleCreatePage() {
   useDocumentTitle('New Safety Schedule - Cladding Creations')
 
   useEffect(() => {
-    setProjectInput(initialProject)
-  }, [initialProject])
+    setProjectInput(initialProject || initialProjectFromQuery)
+  }, [initialProject, initialProjectFromQuery])
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebouncedProfileSearch(profileSearch), 320)
@@ -96,6 +135,53 @@ export default function ScheduleCreatePage() {
   }, [projectInput])
 
   useEffect(() => {
+    if (createMode !== 'one_off') return
+    setUseNoDueDate(!dueAt.trim())
+  }, [createMode, dueAt])
+
+  const handleRecurrencePresetChange = (preset: RecurrencePresetKey) => {
+    setRecurrencePreset(preset)
+    if (preset === 'none') {
+      setCreateMode('one_off')
+      return
+    }
+
+    setCreateMode('repeating')
+    const nextFrequency = preset === 'custom' ? recurrenceFrequency : presetToFrequency(preset)
+    if (nextFrequency) setRecurrenceFrequency(nextFrequency)
+
+    const start = startDateLocal.trim() || getTodayDateLocalFromPage()
+    if (!startDateLocal.trim()) setStartDateLocal(start)
+
+    const resolvedFrequency = preset === 'custom' ? recurrenceFrequency : presetToFrequency(preset)
+    const endDefault = getDefaultRecurringEndDate(start, resolvedFrequency ?? preset)
+    if (preset === 'weekly' || preset === 'biweekly' || !endDateLocal.trim()) {
+      setEndDateLocal(endDefault)
+    }
+  }
+
+  const handleStartDateLocalChange = (value: string) => {
+    setStartDateLocal(value)
+    if (createMode !== 'repeating') return
+    const endMs = endDateLocal.trim() ? new Date(`${endDateLocal}T00:00:00`).getTime() : NaN
+    const startMs = value.trim() ? new Date(`${value}T00:00:00`).getTime() : NaN
+    if (!Number.isNaN(startMs) && (Number.isNaN(endMs) || endMs < startMs)) {
+      setEndDateLocal(getDefaultRecurringEndDate(value, recurrenceFrequency))
+    }
+  }
+
+  const handleRecurrenceFrequencyChange = (value: SafetyRecurrenceFrequency) => {
+    setRecurrenceFrequency(value)
+    if (createMode === 'repeating') {
+      setRecurrencePreset('custom')
+      if (value === 'weekly' || value === 'biweekly') {
+        const start = startDateLocal.trim() || getTodayDateLocalFromPage()
+        setEndDateLocal(getDefaultRecurringEndDate(start, value))
+      }
+    }
+  }
+
+  useEffect(() => {
     if (errors.length === 0) return
     document.getElementById('safety-schedule-validate-errors')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [errors])
@@ -104,6 +190,11 @@ export default function ScheduleCreatePage() {
     if (createStep !== 1 || !selectedVersionId) return
     continueButtonRef.current?.focus()
   }, [createStep, selectedVersionId])
+
+  useEffect(() => {
+    if (!fromPreStartFlow || createStep !== 1) return
+    continueButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [fromPreStartFlow, createStep])
 
   const documentsQuery = useQuery({
     queryKey: ['safety-documents-for-create'],
@@ -130,24 +221,60 @@ export default function ScheduleCreatePage() {
       const validationErrors = validateScheduleCreate({
         projectName: projectInput,
         documentVersionId: selectedVersionId,
+        createMode,
         dueAt,
+        recurrenceFrequency,
+        dueTimeLocal,
+        timeZone: SAFETY_SCHEDULE_TIME_ZONE,
+        startDateLocal,
+        endDateLocal,
         recipients: selectedRecipients
       })
       if (validationErrors.length > 0) {
         setErrors(validationErrors)
         throw new Error('Validation failed')
       }
-      const dueAtIso = dueAt ? new Date(dueAt).toISOString() : ''
-      return safetyApi.createSchedule({
+
+      if (createMode === 'one_off') {
+        const dueAtIso = dueAt ? new Date(dueAt).toISOString() : ''
+        const scheduleId = await safetyApi.createSchedule({
+          project_name: projectInput,
+          document_version_id: selectedVersionId,
+          due_at: dueAtIso || null,
+          notes,
+          allow_late_sign: true,
+          recipients: selectedRecipients
+        })
+        return { createMode, scheduleId, seriesId: null as string | null }
+      }
+
+      const selectedDoc = (documentsQuery.data ?? []).find(
+        (doc) => doc.latest_document_version_id === selectedVersionId
+      )
+      if (!selectedDoc?.document_id) {
+        throw new Error('Selected document is invalid for recurring program.')
+      }
+
+      const createSeriesRes = await safetyApi.createScheduleSeries({
         project_name: projectInput,
-        document_version_id: selectedVersionId,
-        due_at: dueAtIso || null,
+        document_id: selectedDoc.document_id,
+        frequency: recurrenceFrequency,
+        due_time_local: dueTimeLocal,
+        time_zone: SAFETY_SCHEDULE_TIME_ZONE,
+        start_date_local: startDateLocal,
+        end_date_local: endDateLocal || null,
         notes,
         allow_late_sign: true,
+        materialize_today: true,
         recipients: selectedRecipients
       })
+      return {
+        createMode,
+        scheduleId: createSeriesRes.schedule_id,
+        seriesId: createSeriesRes.series_id
+      }
     },
-    onSuccess: async (scheduleId) => {
+    onSuccess: async (result) => {
       setErrors([])
       setShowCreateConfirmModal(false)
       const selectedDoc = (documentsQuery.data ?? []).find(
@@ -157,28 +284,33 @@ export default function ScheduleCreatePage() {
         ? `${selectedDoc.title} (v${selectedDoc.latest_version_number ?? 1})`
         : undefined
       let notificationSummary = 'not sent'
-      try {
-        const sendResult = await safetyApi.queueAndSendScheduleNotifications({ scheduleId })
-        if (sendResult.failed_count > 0) {
-          notificationSummary = `${sendResult.sent_count} sent / ${sendResult.failed_count} failed`
-        } else {
-          notificationSummary = `${sendResult.sent_count} sent`
+      if (result.scheduleId) {
+        try {
+          const sendResult = await safetyApi.queueAndSendScheduleNotifications({ scheduleId: result.scheduleId })
+          if (sendResult.failed_count > 0) {
+            notificationSummary = `${sendResult.sent_count} sent / ${sendResult.failed_count} failed`
+          } else {
+            notificationSummary = `${sendResult.sent_count} sent`
+          }
+        } catch (error) {
+          notificationSummary = 'failed'
+          setFeedback({
+            type: 'error',
+            message: error instanceof Error
+              ? `Created successfully, but email dispatch failed: ${error.message}`
+              : 'Created successfully, but email dispatch failed.'
+          })
         }
-      } catch (error) {
-        notificationSummary = 'failed'
-        setFeedback({
-          type: 'error',
-          message: error instanceof Error
-            ? `Schedule created, but email dispatch failed: ${error.message}`
-            : 'Schedule created, but email dispatch failed.'
-        })
       }
+
       setCreateSuccess({
-        scheduleId,
+        createMode: result.createMode,
+        scheduleId: result.scheduleId,
+        seriesId: result.seriesId,
         projectName: projectInput,
         documentLabel,
         recipientCount: selectedRecipients.length,
-        dueAtLabel: formatDueAtForSuccess(dueAt),
+        dueAtLabel: result.createMode === 'one_off' ? formatDueAtForSuccess(dueAt) : undefined,
         notificationSummary
       })
     },
@@ -215,7 +347,13 @@ export default function ScheduleCreatePage() {
     const stepErrors = validateScheduleBasics({
       projectName: projectInput,
       documentVersionId: selectedVersionId,
-      dueAt
+      createMode,
+      dueAt,
+      recurrenceFrequency,
+      dueTimeLocal,
+      timeZone: SAFETY_SCHEDULE_TIME_ZONE,
+      startDateLocal,
+      endDateLocal
     })
     if (stepErrors.length > 0) {
       setErrors(stepErrors)
@@ -227,7 +365,11 @@ export default function ScheduleCreatePage() {
 
   function goToCreatedSchedule() {
     if (!createSuccess) return
-    navigate(`/safety/schedules/${createSuccess.scheduleId}`)
+    if (createSuccess.scheduleId) {
+      navigate(`/safety/schedules/${createSuccess.scheduleId}`)
+      return
+    }
+    navigate(safetyProjectsPath(createSuccess.projectName))
   }
 
   function recipientDisplayLabel(recipient: SafetyScheduleRecipientInput): string {
@@ -240,13 +382,31 @@ export default function ScheduleCreatePage() {
 
   const backProjectsPath = safetyProjectsPath(projectInput.trim() || initialProject)
 
+  const preStartGuideProjectLabel = projectInput.trim() || initialProject || 'Selected project'
+  const preStartGuideLead = useMemo(() => {
+    if (createStep === 1) {
+      return `Project: ${preStartGuideProjectLabel} · PDF saved. Confirm due time, then assign workers.`
+    }
+    return `Project: ${preStartGuideProjectLabel} · Choose who must sign today's pre-start.`
+  }, [createStep, preStartGuideProjectLabel])
+  const preStartGuideAction = useMemo(() => {
+    if (createStep === 1) {
+      return 'Next up: scroll to Due at, adjust if needed, then tap Continue to recipients at the bottom.'
+    }
+    return 'Next up: add workers on site today, then Create schedule to email signature requests.'
+  }, [createStep])
+
   return (
     <SafetyLayout
-      title="New schedule"
+      title={fromPreStartFlow ? "Today's Daily Pre-Start" : 'New schedule'}
       subtitle={
-        createStep === 1
-          ? `Project: ${initialProject || 'Select a project'} · Define schedule details.`
-          : `Project: ${projectInput || 'Select a project'} · Choose recipients and review selection.`
+        fromPreStartFlow
+          ? createStep === 1
+            ? `Project: ${projectInput || initialProject || 'Select a project'} · Checklist saved. Confirm due time, then assign workers.`
+            : `Project: ${projectInput || 'Select a project'} · Choose who must sign today's pre-start.`
+          : createStep === 1
+            ? `Project: ${initialProject || 'Select a project'} · Define schedule or recurring program details.`
+            : `Project: ${projectInput || 'Select a project'} · Choose recipients and review selection.`
       }
       subnavEnd={(
         <Link className="safety-btn-secondary safety-btn-back" to={backProjectsPath}>
@@ -259,6 +419,52 @@ export default function ScheduleCreatePage() {
         <div className="safety-alert safety-alert--error">
           <p>{feedback.message}</p>
         </div>
+      ) : null}
+
+      {fromPreStartFlow && !createSuccess ? (
+        <>
+          <section
+            className="safety-card safety-prestart-schedule-guide safety-prestart-schedule-guide--fixed safety-prestart-schedule-guide--attention"
+            aria-label="Daily Pre-Start next steps"
+          >
+            <div className="safety-prestart-schedule-guide-inner">
+              <div className="safety-prestart-schedule-guide-copy">
+                <span className="material-icons safety-prestart-schedule-guide-icon" aria-hidden>task_alt</span>
+                <div className="safety-prestart-schedule-guide-text">
+                  <p className="safety-prestart-schedule-guide-title">Checklist saved — finish today&apos;s schedule</p>
+                  <p className="safety-prestart-schedule-guide-lead">{preStartGuideLead}</p>
+                </div>
+              </div>
+              <ol className="safety-prestart-schedule-guide-steps" aria-label="Progress">
+                <li className="is-done" title="Complete the pre-start checklist">
+                  <span className="safety-prestart-schedule-guide-step-index" aria-hidden>✓</span>
+                  <span className="safety-prestart-schedule-guide-step-label">Checklist</span>
+                </li>
+                <li className={createStep === 1 ? 'is-current' : 'is-done'} title="Confirm due time">
+                  <span className="safety-prestart-schedule-guide-step-index">2</span>
+                  <span className="safety-prestart-schedule-guide-step-label">Due time</span>
+                </li>
+                <li className={createStep === 2 ? 'is-current' : undefined} title="Select workers">
+                  <span className="safety-prestart-schedule-guide-step-index">3</span>
+                  <span className="safety-prestart-schedule-guide-step-label">Workers</span>
+                </li>
+                <li title="Create schedule and send emails">
+                  <span className="safety-prestart-schedule-guide-step-index">4</span>
+                  <span className="safety-prestart-schedule-guide-step-label">Create &amp; send</span>
+                </li>
+              </ol>
+              <p
+                key={createStep}
+                className="safety-prestart-schedule-guide-action"
+                aria-live="polite"
+              >
+                <span className="material-icons safety-prestart-schedule-guide-action-icon" aria-hidden>arrow_downward</span>
+                {preStartGuideAction}
+              </p>
+            </div>
+          </section>
+          <div className="safety-prestart-schedule-guide-spacer" aria-hidden />
+        </>
       ) : null}
 
       <section className="safety-card safety-create-steps-card">
@@ -289,7 +495,14 @@ export default function ScheduleCreatePage() {
       {createStep === 1 ? (
         <ScheduleCreateForm
           projectName={projectInput}
+          createMode={createMode}
+          recurrencePreset={recurrencePreset}
+          useNoDueDate={useNoDueDate}
           dueAt={dueAt}
+          recurrenceFrequency={recurrenceFrequency}
+          dueTimeLocal={dueTimeLocal}
+          startDateLocal={startDateLocal}
+          endDateLocal={endDateLocal}
           notes={notes}
           selectedDocumentVersionId={selectedVersionId}
           documents={documentsQuery.data ?? []}
@@ -299,10 +512,32 @@ export default function ScheduleCreatePage() {
             setProjectInput(value)
             setSelectedRecipients([])
           }}
+          onRecurrencePresetChange={handleRecurrencePresetChange}
+          onUseNoDueDateChange={(value) => {
+            setUseNoDueDate(value)
+            if (value) {
+              setDueAt('')
+            } else if (!dueAt.trim()) {
+              setDueAt(getDefaultDueAtDatetimeLocal())
+            }
+          }}
           onDueAtChange={setDueAt}
+          onRecurrenceFrequencyChange={handleRecurrenceFrequencyChange}
+          onDueTimeLocalChange={setDueTimeLocal}
+          onStartDateLocalChange={handleStartDateLocalChange}
+          onEndDateLocalChange={setEndDateLocal}
           onNotesChange={setNotes}
           onDocumentVersionChange={setSelectedVersionId}
           onDocumentChosen={() => continueButtonRef.current?.focus()}
+          skipInitialDocumentFocus={fromPreStartFlow}
+          restrictToProjectPreStartDocuments={fromPreStartFlow}
+          onStartTemplateFlow={() => {
+            if (!projectInput.trim()) {
+              setFeedback({ type: 'error', message: 'Choose a project first to start the Daily Pre-Start form.' })
+              return
+            }
+            navigate(`/safety/pre-start/new?project=${encodeURIComponent(projectInput.trim())}&return=schedule-create`)
+          }}
         />
       ) : (
         <ScheduleRecipientsStep
@@ -356,9 +591,9 @@ export default function ScheduleCreatePage() {
       ) : null}
 
       <section className="safety-card">
-        <div className="safety-modal-footer safety-modal-footer--center">
-          {createStep === 1 ? (
-            <>
+        {createStep === 1 ? (
+          <div className="safety-schedule-create-footer">
+            <div className="safety-modal-footer safety-modal-footer--center">
               <button type="button" className="safety-btn-secondary" onClick={() => navigate(backProjectsPath)}>
                 Cancel
               </button>
@@ -370,23 +605,28 @@ export default function ScheduleCreatePage() {
               >
                 Continue to recipients
               </button>
-            </>
-          ) : (
-            <>
-              <button type="button" className="safety-btn-secondary" onClick={() => setCreateStep(1)}>
-                Back to details
-              </button>
-              <button
-                type="button"
-                className="safety-btn-primary"
-                disabled={createMutation.isPending}
-                onClick={() => setShowCreateConfirmModal(true)}
-              >
-                {createMutation.isPending ? 'Creating...' : 'Create schedule'}
-              </button>
-            </>
-          )}
-        </div>
+            </div>
+            {fromPreStartFlow ? (
+              <p className="safety-muted safety-prestart-schedule-continue-hint">
+                Next: pick workers on site today, then create the schedule to email them.
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div className="safety-modal-footer safety-modal-footer--center">
+            <button type="button" className="safety-btn-secondary" onClick={() => setCreateStep(1)}>
+              Back to details
+            </button>
+            <button
+              type="button"
+              className="safety-btn-primary"
+              disabled={createMutation.isPending}
+              onClick={() => setShowCreateConfirmModal(true)}
+            >
+              {createMutation.isPending ? 'Creating...' : createMode === 'one_off' ? 'Create schedule' : 'Create recurring program'}
+            </button>
+          </div>
+        )}
       </section>
 
       {showCreateConfirmModal ? (
@@ -400,9 +640,13 @@ export default function ScheduleCreatePage() {
           >
             <header className="safety-modal-header">
               <div className="safety-modal-header-copy">
-                <h3 id="safety-create-confirm-title" className="safety-modal-title">Confirm schedule creation</h3>
+                <h3 id="safety-create-confirm-title" className="safety-modal-title">
+                  {createMode === 'one_off' ? 'Confirm schedule creation' : 'Confirm recurring program creation'}
+                </h3>
                 <p className="safety-modal-subtitle">
-                  Review recipients before creating the schedule.
+                  {createMode === 'one_off'
+                    ? 'Review recipients before creating the schedule.'
+                    : 'Review recipients before creating the recurring program.'}
                 </p>
               </div>
               <button
@@ -446,7 +690,11 @@ export default function ScheduleCreatePage() {
                   createMutation.mutate()
                 }}
               >
-                {createMutation.isPending ? 'Creating...' : 'Confirm and create'}
+                {createMutation.isPending
+                  ? 'Creating...'
+                  : createMode === 'one_off'
+                    ? 'Confirm and create schedule'
+                    : 'Confirm and create program'}
               </button>
             </footer>
           </section>
@@ -455,7 +703,12 @@ export default function ScheduleCreatePage() {
 
       {createSuccess ? (
         <ScheduleSuccessModal
-          message="Assignments were created and recipients can now sign the SWMS."
+          title={createSuccess.createMode === 'one_off' ? 'Schedule created' : 'Recurring program created'}
+          message={
+            createSuccess.createMode === 'one_off'
+              ? 'Assignments were created and recipients can now sign the SWMS.'
+              : 'Recurring program was created. If today applies, assignments were materialized and notifications were queued.'
+          }
           projectName={createSuccess.projectName}
           documentLabel={createSuccess.documentLabel}
           recipientCount={createSuccess.recipientCount}
@@ -463,6 +716,7 @@ export default function ScheduleCreatePage() {
           notificationSummary={createSuccess.notificationSummary}
           onClose={goToCreatedSchedule}
           onContinue={goToCreatedSchedule}
+          continueLabel={createSuccess.scheduleId ? 'View schedule' : 'Back to project schedules'}
         />
       ) : null}
     </SafetyLayout>

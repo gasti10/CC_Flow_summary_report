@@ -24,10 +24,13 @@ import DocumentsListPage from './components/Safety/Documents/DocumentsListPage'
 import DocumentDetailPage from './components/Safety/Documents/DocumentDetailPage'
 import ProjectsSchedulesPage from './components/Safety/Projects/ProjectsSchedulesPage'
 import ProjectMembersPage from './components/Safety/Projects/ProjectMembersPage'
+import SeriesDetailPage from './components/Safety/Projects/SeriesDetailPage'
 import ScheduleCreatePage from './components/Safety/Schedules/ScheduleCreatePage'
 import ScheduleDetailPage from './components/Safety/Schedules/ScheduleDetailPage'
 import WorkerHomePage from './components/Safety/Worker/WorkerHomePage'
 import WorkerAssignmentPage from './components/Safety/Worker/WorkerAssignmentPage'
+import PreStartFormPage from './components/Safety/PreStart/PreStartFormPage'
+import PreStartEntryPage from './components/Safety/PreStart/PreStartEntryPage'
 
 // Configurar QueryClient con optimizaciones
 const queryClient = new QueryClient({
@@ -286,6 +289,14 @@ function AppContent() {
                   }
                 />
                 <Route
+                  path="/safety/projects/:projectName/series/:seriesId"
+                  element={
+                    <ProtectedRoute>
+                      <SeriesDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="/safety/projects/:projectName/schedules/new"
                   element={
                     <ProtectedRoute>
@@ -298,6 +309,22 @@ function AppContent() {
                   element={
                     <ProtectedRoute>
                       <ScheduleCreatePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/pre-start"
+                  element={
+                    <ProtectedRoute>
+                      <PreStartEntryPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/pre-start/new"
+                  element={
+                    <ProtectedRoute>
+                      <PreStartFormPage />
                     </ProtectedRoute>
                   }
                 />

@@ -1,41 +1,75 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import SafetyLayout from '../SafetyLayout'
 import { safetyApi } from '../../../services/safetyApi'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import {
+  readFollowUpFromSearchParams,
+  readPreStartFromSearchParams,
   readSafetyProjectFromSearchParams,
+  SAFETY_PROJECTS_FOLLOWUP_PARAM,
   SAFETY_PROJECTS_SEARCH_PARAM
 } from '../utils/safetyProjectsPath'
+import { buildPreStartEntryPath } from '../utils/preStartToday'
+import {
+  filterSchedulesByListFilter,
+  scheduleFollowUpRowClass,
+  scheduleNeedsFollowUp,
+  type SafetyScheduleListFilter
+} from '../utils/scheduleFollowUp'
 
 export default function ProjectsSchedulesPage() {
   useDocumentTitle('Safety Projects - Cladding Creations')
+  const navigate = useNavigate()
   const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
   const selectedPanelNewScheduleRef = useRef<HTMLAnchorElement | null>(null)
+  const followUpFilterRef = useRef<HTMLButtonElement | null>(null)
   const selectedProjectPanelRef = useRef<HTMLDivElement | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const projectName = readSafetyProjectFromSearchParams(searchParams)
+  const preStartLauncherMode = readPreStartFromSearchParams(searchParams)
   const [projectSearch, setProjectSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active'>('all')
+  const [statusFilter, setStatusFilter] = useState<SafetyScheduleListFilter>(() => (
+    readFollowUpFromSearchParams(searchParams) ? 'followup' : 'all'
+  ))
   const [showProjectContact, setShowProjectContact] = useState(false)
+
+  useEffect(() => {
+    if (readFollowUpFromSearchParams(searchParams)) {
+      setStatusFilter('followup')
+    }
+  }, [searchParams])
 
   useEffect(() => {
     setShowProjectContact(false)
   }, [projectName])
 
   useEffect(() => {
-    if (!projectName.trim()) return
-    const panel = selectedProjectPanelRef.current
-    panel?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    window.setTimeout(() => {
-      selectedPanelNewScheduleRef.current?.focus()
-    }, panel ? 220 : 0)
-  }, [projectName])
+    if (!preStartLauncherMode || !projectName.trim()) return
+    navigate(buildPreStartEntryPath(projectName), { replace: true })
+  }, [preStartLauncherMode, projectName, navigate])
 
   useEffect(() => {
-    projectSearchInputRef.current?.focus()
-  }, [])
+    if (preStartLauncherMode) return
+    if (!projectName.trim()) return
+    const panel = selectedProjectPanelRef.current
+    const isFollowUp = readFollowUpFromSearchParams(searchParams) || statusFilter === 'followup'
+    panel?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    window.setTimeout(() => {
+      if (isFollowUp) {
+        followUpFilterRef.current?.focus({ preventScroll: true })
+        return
+      }
+      selectedPanelNewScheduleRef.current?.focus({ preventScroll: true })
+    }, panel ? 220 : 0)
+  }, [projectName, searchParams, statusFilter, preStartLauncherMode])
+
+  useEffect(() => {
+    if (preStartLauncherMode) return
+    if (projectName.trim()) return
+    projectSearchInputRef.current?.focus({ preventScroll: true })
+  }, [projectName])
 
   const projectsQuery = useQuery({
     queryKey: ['safety-projects-list'],
@@ -48,11 +82,21 @@ export default function ProjectsSchedulesPage() {
     enabled: !!projectName.trim()
   })
 
-  const rows = useMemo(() => {
-    const source = schedulesQuery.data ?? []
-    if (statusFilter === 'active') return source.filter(r => r.status === 'active')
-    return source
-  }, [schedulesQuery.data, statusFilter])
+  const seriesQuery = useQuery({
+    queryKey: ['safety-series-project', projectName],
+    queryFn: () => safetyApi.listSeriesByProject(projectName),
+    enabled: !!projectName.trim()
+  })
+
+  const rows = useMemo(
+    () => filterSchedulesByListFilter(schedulesQuery.data ?? [], statusFilter),
+    [schedulesQuery.data, statusFilter]
+  )
+
+  const followUpCount = useMemo(
+    () => (schedulesQuery.data ?? []).filter(scheduleNeedsFollowUp).length,
+    [schedulesQuery.data]
+  )
 
   const filteredProjects = useMemo(() => {
     const q = projectSearch.trim().toLowerCase()
@@ -82,12 +126,29 @@ export default function ProjectsSchedulesPage() {
   }, [filteredProjects, projectName, projectsQuery.data])
 
   function selectProject(name: string) {
-    const next = new URLSearchParams(searchParams)
     const trimmed = name.trim()
+    if (preStartLauncherMode) {
+      if (!trimmed) return
+      navigate(buildPreStartEntryPath(trimmed))
+      return
+    }
+
+    const next = new URLSearchParams(searchParams)
     if (!trimmed) {
       next.delete(SAFETY_PROJECTS_SEARCH_PARAM)
     } else {
       next.set(SAFETY_PROJECTS_SEARCH_PARAM, trimmed)
+    }
+    setSearchParams(next, { replace: true })
+  }
+
+  function setScheduleListFilter(nextFilter: SafetyScheduleListFilter) {
+    setStatusFilter(nextFilter)
+    const next = new URLSearchParams(searchParams)
+    if (nextFilter === 'followup') {
+      next.set(SAFETY_PROJECTS_FOLLOWUP_PARAM, '1')
+    } else {
+      next.delete(SAFETY_PROJECTS_FOLLOWUP_PARAM)
     }
     setSearchParams(next, { replace: true })
   }
@@ -99,8 +160,12 @@ export default function ProjectsSchedulesPage() {
 
   return (
     <SafetyLayout
-      title="Projects"
-      subtitle="Select a project, create schedules, and keep signature compliance on track."
+      title={preStartLauncherMode ? "Today's pre-start" : 'Projects'}
+      subtitle={
+        preStartLauncherMode
+          ? 'Select a project to open or create today\'s Daily Pre-Start.'
+          : 'Select a project and use Needs follow-up to see active schedules that still require signatures.'
+      }
       actions={
         <>
           <Link className="safety-btn-secondary" to="/safety/documents">Documents</Link>
@@ -128,14 +193,6 @@ export default function ProjectsSchedulesPage() {
             onChange={(e) => setProjectSearch(e.target.value)}
             autoComplete="off"
           />
-          <select
-            className="safety-input"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active')}
-          >
-            <option value="all">All schedules</option>
-            <option value="active">Only active</option>
-          </select>
           <button
             type="button"
             className="safety-sync-btn"
@@ -185,8 +242,12 @@ export default function ProjectsSchedulesPage() {
             <h3 className="safety-card-title">Selected project</h3>
             {!projectName ? (
               <p className="safety-muted safety-context-copy">
-                Choose a project from the list above to see details and schedules.
+                {preStartLauncherMode
+                  ? 'Choose a project from the list to open today\'s Daily Pre-Start.'
+                  : 'Choose a project from the list above to see details and schedules.'}
               </p>
+            ) : preStartLauncherMode ? (
+              <p className="safety-muted safety-context-copy">Opening today&apos;s Daily Pre-Start…</p>
             ) : (
               <>
                 <p className="safety-selected-project-title">{projectName}</p>
@@ -201,6 +262,34 @@ export default function ProjectsSchedulesPage() {
                 ) : (
                   <p className="safety-muted safety-context-copy">Loading project details…</p>
                 )}
+
+                <div className="safety-project-quick-actions" role="group" aria-label="Project actions">
+                  <p className="safety-project-quick-actions-label">Quick actions</p>
+                  <div className="safety-project-quick-actions-row">
+                    <Link
+                      className="safety-btn-primary safety-project-action-btn safety-project-action-btn--primary"
+                      to={`/safety/projects/${encodeURIComponent(projectName)}/schedules/new`}
+                      ref={selectedPanelNewScheduleRef}
+                    >
+                      <span className="material-icons" aria-hidden>add_circle_outline</span>
+                      New schedule
+                    </Link>
+                    <Link
+                      className="safety-btn-secondary safety-project-action-btn"
+                      to={`/safety/projects/${encodeURIComponent(projectName)}/members`}
+                    >
+                      <span className="material-icons" aria-hidden>group</span>
+                      Manage members
+                    </Link>
+                    <Link
+                      className="safety-btn-secondary safety-project-action-btn safety-project-action-btn--center-row"
+                      to={`/safety/pre-start?project=${encodeURIComponent(projectName)}`}
+                    >
+                      <span className="material-icons" aria-hidden>today</span>
+                      Today's pre-start
+                    </Link>
+                  </div>
+                </div>
 
                 {selectedProjectInfo ? (
                   <>
@@ -227,20 +316,41 @@ export default function ProjectsSchedulesPage() {
                   </>
                 ) : null}
 
-                <div className="safety-modal-footer safety-context-footer-cta">
-                  <Link
-                    className="safety-btn-secondary"
-                    to={`/safety/projects/${encodeURIComponent(projectName)}/members`}
-                  >
-                    Manage members
-                  </Link>
-                  <Link
-                    className="safety-btn-primary"
-                    to={`/safety/projects/${encodeURIComponent(projectName)}/schedules/new`}
-                    ref={selectedPanelNewScheduleRef}
-                  >
-                    New schedule
-                  </Link>
+                <div className="safety-schedule-list-filters" role="group" aria-label="Schedule filters">
+                  <p className="safety-schedule-list-filters-label">Schedules</p>
+                  <div className="safety-schedule-list-filters-row">
+                    <button
+                      type="button"
+                      className={`safety-schedule-list-filter${statusFilter === 'all' ? ' is-active' : ''}`}
+                      aria-pressed={statusFilter === 'all'}
+                      onClick={() => setScheduleListFilter('all')}
+                    >
+                      <span className="safety-schedule-list-filter-text safety-schedule-list-filter-text--full">All schedules</span>
+                      <span className="safety-schedule-list-filter-text safety-schedule-list-filter-text--compact">All</span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`safety-schedule-list-filter${statusFilter === 'active' ? ' is-active' : ''}`}
+                      aria-pressed={statusFilter === 'active'}
+                      onClick={() => setScheduleListFilter('active')}
+                    >
+                      <span className="safety-schedule-list-filter-text safety-schedule-list-filter-text--full">Active only</span>
+                      <span className="safety-schedule-list-filter-text safety-schedule-list-filter-text--compact">Active</span>
+                    </button>
+                    <button
+                      ref={followUpFilterRef}
+                      type="button"
+                      className={`safety-schedule-list-filter safety-schedule-list-filter--followup${statusFilter === 'followup' ? ' is-active' : ''}`}
+                      aria-pressed={statusFilter === 'followup'}
+                      onClick={() => setScheduleListFilter('followup')}
+                    >
+                      <span className="safety-schedule-list-filter-text safety-schedule-list-filter-text--full">Needs follow-up</span>
+                      <span className="safety-schedule-list-filter-text safety-schedule-list-filter-text--compact">Follow-up</span>
+                      {followUpCount > 0 ? (
+                        <span className="safety-schedule-list-filter-count">{followUpCount}</span>
+                      ) : null}
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -256,10 +366,21 @@ export default function ProjectsSchedulesPage() {
             <p>{schedulesQuery.error instanceof Error ? schedulesQuery.error.message : 'Could not load schedules.'}</p>
           </div>
         ) : rows.length === 0 ? (
-          <p className="safety-muted">No schedules for this project.</p>
+          <p className="safety-muted">
+            {statusFilter === 'followup'
+              ? 'No active schedules need follow-up right now.'
+              : statusFilter === 'active'
+                ? 'No active schedules for this project.'
+                : 'No schedules for this project.'}
+          </p>
         ) : (
           <div className="safety-table-wrap">
-            <table className="safety-table safety-table--compact">
+            {statusFilter === 'followup' ? (
+              <p className="safety-schedule-followup-hint safety-muted">
+                Sorted by urgency: overdue first, then pending. Open a schedule to resend emails or review workers.
+              </p>
+            ) : null}
+            <table className="safety-table safety-table--compact safety-schedule-followup-table">
               <thead>
                 <tr>
                   <th>Document</th>
@@ -272,7 +393,7 @@ export default function ProjectsSchedulesPage() {
               </thead>
               <tbody>
                 {rows.map(row => (
-                  <tr key={row.schedule_id}>
+                  <tr key={row.schedule_id} className={scheduleFollowUpRowClass(row)}>
                     <td>
                       <div className="safety-cell-title">{row.document_title}</div>
                       <div className="safety-schedule-doc-meta">
@@ -299,6 +420,77 @@ export default function ProjectsSchedulesPage() {
             </table>
           </div>
         )}
+
+        {projectName ? (
+          <section className="safety-series-section">
+            <div className="safety-workers-header">
+              <h3>Recurring programs</h3>
+              <button
+                type="button"
+                className="safety-sync-btn"
+                onClick={() => seriesQuery.refetch()}
+                disabled={seriesQuery.isFetching}
+              >
+                <span className={`material-icons${seriesQuery.isFetching ? ' safety-spin' : ''}`} aria-hidden>
+                  sync
+                </span>
+                {seriesQuery.isFetching ? 'Refreshing...' : ''}
+              </button>
+            </div>
+
+            {seriesQuery.isLoading ? (
+              <p className="safety-muted">Loading recurring programs...</p>
+            ) : seriesQuery.isError ? (
+              <div className="safety-alert safety-alert--error">
+                <p>{seriesQuery.error instanceof Error ? seriesQuery.error.message : 'Could not load recurring programs.'}</p>
+              </div>
+            ) : (seriesQuery.data ?? []).length === 0 ? (
+              <p className="safety-muted">No recurring programs for this project yet.</p>
+            ) : (
+              <div className="safety-table-wrap">
+                <table className="safety-table safety-table--compact">
+                  <thead>
+                    <tr>
+                      <th>Document</th>
+                      <th>Frequency</th>
+                      <th>Status</th>
+                      <th>Next due</th>
+                      <th>Instances</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(seriesQuery.data ?? []).map((series) => (
+                      <tr key={series.series_id}>
+                        <td>
+                          <div className="safety-cell-title">{series.document_title}</div>
+                          <div className="safety-schedule-doc-meta">{series.due_time_local} ({series.time_zone})</div>
+                        </td>
+                        <td>{series.frequency}</td>
+                        <td>
+                          <span className={`safety-status-pill safety-status-pill--${series.status}`}>
+                            {series.status}
+                          </span>
+                        </td>
+                        <td>{series.next_due_at ? new Date(series.next_due_at).toLocaleString('en-AU') : '—'}</td>
+                        <td>{series.materialized_instances}</td>
+                        <td>
+                          <Link
+                            className="safety-btn-link"
+                            to={`/safety/projects/${encodeURIComponent(projectName)}/series/${series.series_id}`}
+                          >
+                            <span className="material-icons safety-btn-link-icon" aria-hidden>open_in_new</span>
+                            Open
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        ) : null}
       </section>
     </SafetyLayout>
   )
