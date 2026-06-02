@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react'
 import type { Project } from '../../../types/appsheet'
 import type {
   SafetyDocumentListItem,
@@ -14,7 +14,15 @@ import {
   getRecurrenceRepeatOptions,
   dateLocalForIsoWeekday
 } from '../utils/recurrenceUi'
-import { listPreStartDocumentsForProject } from '../utils/preStartToday'
+import {
+  isProjectPreStartDocumentVersion,
+  listPreStartDocumentsForProject,
+  resolveDailyPreStartMaster
+} from '../utils/preStartToday'
+import {
+  listToolboxTalkDocumentsForProject,
+  resolveToolboxTalkMaster
+} from '../utils/toolboxTalkToday'
 import RecurrenceSignaturePreview from './RecurrenceSignaturePreview'
 
 function documentOptionLabel(doc: SafetyDocumentListItem): string {
@@ -47,6 +55,24 @@ function formatCreatedByLabel(doc: SafetyDocumentListItem): string {
   return ''
 }
 
+function isDailyPreStartDocumentOption(
+  doc: SafetyDocumentListItem,
+  dailyPreStartMasterId: string | null
+): boolean {
+  if (doc.is_template === true) return false
+  if (dailyPreStartMasterId && doc.source_template_id === dailyPreStartMasterId) return true
+  return doc.title.trim().toLowerCase().startsWith('daily pre-start')
+}
+
+function isToolboxTalkDocumentOption(
+  doc: SafetyDocumentListItem,
+  toolboxTalkMasterId: string | null
+): boolean {
+  if (doc.is_template === true) return false
+  if (toolboxTalkMasterId && doc.source_template_id === toolboxTalkMasterId) return true
+  return doc.title.trim().toLowerCase().startsWith('toolbox talk')
+}
+
 interface ScheduleCreateFormProps {
   projectName: string
   createMode: SafetyScheduleCreateMode
@@ -73,9 +99,13 @@ interface ScheduleCreateFormProps {
   onNotesChange: (value: string) => void
   onDocumentVersionChange: (value: string) => void
   onDocumentChosen?: () => void
+  projectSearchFocusRef?: MutableRefObject<(() => void) | null>
   skipInitialDocumentFocus?: boolean
   restrictToProjectPreStartDocuments?: boolean
+  restrictToProjectToolboxTalkDocuments?: boolean
   onStartTemplateFlow?: () => void
+  onStartToolboxTalkFlow?: () => void
+  onOpenDocumentsUpload?: () => void
 }
 
 export default function ScheduleCreateForm({
@@ -104,31 +134,66 @@ export default function ScheduleCreateForm({
   onNotesChange,
   onDocumentVersionChange,
   onDocumentChosen,
+  projectSearchFocusRef,
   skipInitialDocumentFocus = false,
   restrictToProjectPreStartDocuments = false,
-  onStartTemplateFlow
+  restrictToProjectToolboxTalkDocuments = false,
+  onStartTemplateFlow,
+  onStartToolboxTalkFlow,
+  onOpenDocumentsUpload
 }: ScheduleCreateFormProps) {
-  const templateDocumentsCount = useMemo(
-    () => documents.filter((doc) => doc.is_template === true).length,
+  const dailyPreStartMasterId = useMemo(
+    () => resolveDailyPreStartMaster(documents)?.document_id ?? null,
     [documents]
   )
+  const toolboxTalkMasterId = useMemo(
+    () => resolveToolboxTalkMaster(documents)?.document_id ?? null,
+    [documents]
+  )
+  const hasDailyPreStartMaster = dailyPreStartMasterId !== null
+  const hasToolboxTalkMaster = toolboxTalkMasterId !== null
   const selectableDocuments = useMemo(
     () => documents.filter((doc) => (
       doc.status === 'available'
       && doc.latest_document_version_id
       && doc.is_template !== true
+      && !isDailyPreStartDocumentOption(doc, dailyPreStartMasterId)
+      && !isToolboxTalkDocumentOption(doc, toolboxTalkMasterId)
     )),
-    [documents]
+    [documents, dailyPreStartMasterId, toolboxTalkMasterId]
   )
 
+  const showPreStartDocumentPicker = useMemo(() => {
+    if (restrictToProjectPreStartDocuments) return true
+    if (!projectName.trim() || !selectedDocumentVersionId.trim()) return false
+    return isProjectPreStartDocumentVersion(documents, projectName, selectedDocumentVersionId)
+  }, [restrictToProjectPreStartDocuments, documents, projectName, selectedDocumentVersionId])
+
+  const showToolboxTalkDocumentPicker = useMemo(() => {
+    if (restrictToProjectToolboxTalkDocuments) return true
+    if (!projectName.trim() || !selectedDocumentVersionId.trim()) return false
+    return listToolboxTalkDocumentsForProject(documents, projectName)
+      .some((doc) => doc.latest_document_version_id === selectedDocumentVersionId)
+  }, [restrictToProjectToolboxTalkDocuments, documents, projectName, selectedDocumentVersionId])
+
+  const showGeneratedFlowDocumentPicker = showPreStartDocumentPicker || showToolboxTalkDocumentPicker
+
   const documentsForPicker = useMemo(() => {
-    if (!restrictToProjectPreStartDocuments) return selectableDocuments
-    if (!projectName.trim()) return []
-    return listPreStartDocumentsForProject(documents, projectName)
-  }, [restrictToProjectPreStartDocuments, selectableDocuments, documents, projectName])
+    if (showPreStartDocumentPicker) {
+      if (!projectName.trim()) return []
+      return listPreStartDocumentsForProject(documents, projectName)
+    }
+    if (showToolboxTalkDocumentPicker) {
+      if (!projectName.trim()) return []
+      return listToolboxTalkDocumentsForProject(documents, projectName)
+    }
+    return selectableDocuments
+  }, [showPreStartDocumentPicker, showToolboxTalkDocumentPicker, selectableDocuments, documents, projectName])
+
   const [projectSearch, setProjectSearch] = useState(projectName)
   const [documentSearch, setDocumentSearch] = useState('')
   const [notesOpen, setNotesOpen] = useState(() => notes.trim().length > 0)
+  const projectSearchInputRef = useRef<HTMLInputElement | null>(null)
   const documentSearchInputRef = useRef<HTMLInputElement | null>(null)
 
   const recurrenceOptions = useMemo(
@@ -143,6 +208,16 @@ export default function ScheduleCreateForm({
   useEffect(() => {
     setProjectSearch(projectName)
   }, [projectName])
+
+  useEffect(() => {
+    if (!projectSearchFocusRef) return
+    projectSearchFocusRef.current = () => {
+      projectSearchInputRef.current?.focus({ preventScroll: false })
+    }
+    return () => {
+      projectSearchFocusRef.current = null
+    }
+  }, [projectSearchFocusRef])
 
   useEffect(() => {
     if (skipInitialDocumentFocus) return
@@ -216,6 +291,7 @@ export default function ScheduleCreateForm({
             ) : null}
             <input
               id="safety-project-search"
+              ref={projectSearchInputRef}
               className={`safety-input${projectSearch.trim() ? ' safety-input--with-clear' : ''}`}
               value={projectSearch}
               placeholder="Search by project, number, PM, or Supervisor..."
@@ -260,9 +336,11 @@ export default function ScheduleCreateForm({
 
         <div className="safety-form-section">
           <label className="safety-label" htmlFor="safety-document-search">
-            {restrictToProjectPreStartDocuments
+            {showPreStartDocumentPicker
               ? 'Daily Pre-Start (this project)'
-              : 'Document version (search & select)'}
+              : showToolboxTalkDocumentPicker
+                ? 'Toolbox Talk (this project)'
+                : 'Document version (search & select)'}
           </label>
           <input
             id="safety-document-search"
@@ -270,9 +348,11 @@ export default function ScheduleCreateForm({
             className="safety-input"
             value={documentSearch}
             placeholder={
-              restrictToProjectPreStartDocuments
+              showPreStartDocumentPicker
                 ? 'Filter pre-start versions for this project…'
-                : 'Type to filter by title, description or version…'
+                : showToolboxTalkDocumentPicker
+                  ? 'Filter toolbox talk versions for this project…'
+                  : 'Type to filter by title, description or version…'
             }
             onChange={(e) => {
               const next = e.target.value
@@ -282,13 +362,19 @@ export default function ScheduleCreateForm({
             autoComplete="off"
           />
           <div className="safety-doc-pick-list" role="listbox" aria-label="Available documents">
-            {!projectName.trim() && restrictToProjectPreStartDocuments ? (
-              <p className="safety-muted" style={{ padding: '12px' }}>Select a project to see its Daily Pre-Start documents.</p>
+            {!projectName.trim() && showGeneratedFlowDocumentPicker ? (
+              <p className="safety-muted" style={{ padding: '12px' }}>
+                {showPreStartDocumentPicker
+                  ? 'Select a project to see its Daily Pre-Start documents.'
+                  : 'Select a project to see its Toolbox Talk documents.'}
+              </p>
             ) : documentsForPicker.length === 0 ? (
               <p className="safety-muted" style={{ padding: '12px' }}>
-                {restrictToProjectPreStartDocuments
+                {showPreStartDocumentPicker
                   ? 'No Daily Pre-Start documents for this project yet.'
-                  : 'No available documents with a version. Upload one in Documents first.'}
+                  : showToolboxTalkDocumentPicker
+                    ? 'No Toolbox Talk documents for this project yet.'
+                    : 'No available documents with a version. Upload one in Documents first.'}
               </p>
             ) : filteredDocuments.length === 0 ? (
               <p className="safety-muted" style={{ padding: '12px' }}>No documents match your search.</p>
@@ -347,22 +433,44 @@ export default function ScheduleCreateForm({
               })
             )}
           </div>
-          {templateDocumentsCount > 0 && !restrictToProjectPreStartDocuments ? (
-            <p className="safety-muted">
-              Daily Pre-Start and Toolbox Talk are visible in Documents. Use the dedicated Daily Pre-Start form flow.
-            </p>
-          ) : null}
-          {templateDocumentsCount > 0 && !restrictToProjectPreStartDocuments ? (
-            <div className="safety-project-quick-actions-row">
+          <div className="safety-schedule-create-quick-actions-row">
+            {hasDailyPreStartMaster && !showGeneratedFlowDocumentPicker ? (
               <button
                 type="button"
-                className="safety-btn-secondary"
+                className="safety-btn-secondary safety-prestart-quick-btn"
                 onClick={() => onStartTemplateFlow?.()}
               >
-                Create Daily Pre-Start from template
+                <span className="safety-prestart-quick-btn-icon-wrap" aria-hidden>
+                  <span className="material-icons">assignment</span>
+                  <span className="safety-prestart-quick-btn-spark" />
+                </span>
+                <span className="safety-prestart-quick-btn-label">Create daily pre-start</span>
               </button>
-            </div>
-          ) : null}
+            ) : null}
+            {hasToolboxTalkMaster && !showGeneratedFlowDocumentPicker ? (
+              <button
+                type="button"
+                className="safety-btn-secondary safety-toolbox-quick-btn"
+                onClick={() => onStartToolboxTalkFlow?.()}
+              >
+                <span className="safety-toolbox-quick-btn-icon-wrap" aria-hidden>
+                  <span className="material-icons">record_voice_over</span>
+                  <span className="safety-toolbox-quick-btn-spark" />
+                </span>
+                <span className="safety-toolbox-quick-btn-label">Create toolbox talk</span>
+              </button>
+            ) : null}
+            {!showGeneratedFlowDocumentPicker ? (
+              <button
+                type="button"
+                className="safety-btn-secondary safety-schedule-add-document-btn"
+                onClick={() => onOpenDocumentsUpload?.()}
+              >
+                <span className="material-icons" aria-hidden>upload_file</span>
+                Add document
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="safety-form-section safety-form-section--recurrence">

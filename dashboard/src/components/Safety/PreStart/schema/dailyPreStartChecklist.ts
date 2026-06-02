@@ -62,7 +62,7 @@ export const dailyPreStartChecklist = {
       id: 'section_5',
       title: '5. Personnel and Contractor Supervision',
       fields: [
-        { id: 'personnel_signed_in', type: 'tri_state', label: 'All personnel signed in and present on site' },
+        { id: 'personnel_signed_in', type: 'tri_state', label: 'All personnel expected on site are ready to receive and sign' },
         { id: 'licences_verified', type: 'tri_state', label: 'High-risk work licences and white cards verified' },
         { id: 'toolbox_talk_delivered', type: 'tri_state', label: 'Toolbox talk delivered if required' },
         { id: 'swms_reviewed_signed', type: 'tri_state', label: 'Safe Work Method Statements (SWMS) reviewed, signed and followed' },

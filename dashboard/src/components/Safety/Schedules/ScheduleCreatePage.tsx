@@ -22,7 +22,8 @@ import type {
   SafetyScheduleRecipientInput
 } from '../../../types/safety'
 import { formatSafetyEnumLabel, recipientFromActiveProfile } from './scheduleRecipientFromProfile'
-import { defaultPreStartDueAtIso } from '../utils/preStartToday'
+import { defaultPreStartDueAtIso, shouldRestrictScheduleCreateToProjectPreStart } from '../utils/preStartToday'
+import { shouldRestrictScheduleCreateToProjectToolboxTalk } from '../utils/toolboxTalkToday'
 import { safetyProjectsPath } from '../utils/safetyProjectsPath'
 
 /** Valor inicial para `datetime-local`: hoy 07:00 si aún no son las 07:00; si ya pasaron, mañana 07:00 (hora local). */
@@ -84,15 +85,28 @@ export default function ScheduleCreatePage() {
   const initialProject = projectName ? decodeURIComponent(projectName) : ''
   const initialProjectFromQuery = (searchParams.get('project') ?? '').trim()
   const initialDocumentVersionFromQuery = (searchParams.get('documentVersionId') ?? '').trim()
-  const fromPreStartFlow = searchParams.get('from') === 'pre-start' && initialDocumentVersionFromQuery.length > 0
+  const fromPreStartQuery = searchParams.get('from') === 'pre-start'
+  const fromToolboxTalkQuery = searchParams.get('from') === 'toolbox-talk'
+  const initialDueAtFromQuery = (searchParams.get('dueAt') ?? '').trim()
+  const fromPreStartFlow = fromPreStartQuery && (
+    initialDocumentVersionFromQuery.length > 0
+    || !!(initialProject || initialProjectFromQuery)
+  )
+  const fromToolboxTalkFlow = fromToolboxTalkQuery && (
+    initialDocumentVersionFromQuery.length > 0
+    || !!(initialProject || initialProjectFromQuery)
+  )
+  const fromGeneratedDocumentFlow = fromPreStartFlow || fromToolboxTalkFlow
   const [projectInput, setProjectInput] = useState(initialProject || initialProjectFromQuery)
   const [selectedVersionId, setSelectedVersionId] = useState(initialDocumentVersionFromQuery)
   const [createMode, setCreateMode] = useState<SafetyScheduleCreateMode>('one_off')
   const [recurrencePreset, setRecurrencePreset] = useState<RecurrencePresetKey>('none')
   const [useNoDueDate, setUseNoDueDate] = useState(false)
-  const [dueAt, setDueAt] = useState(() => (
-    fromPreStartFlow ? isoToDatetimeLocal(defaultPreStartDueAtIso()) : getDefaultDueAtDatetimeLocal()
-  ))
+  const [dueAt, setDueAt] = useState(() => {
+    if (initialDueAtFromQuery) return isoToDatetimeLocal(initialDueAtFromQuery)
+    if (fromPreStartFlow) return isoToDatetimeLocal(defaultPreStartDueAtIso())
+    return getDefaultDueAtDatetimeLocal()
+  })
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<SafetyRecurrenceFrequency>('daily')
   const [dueTimeLocal, setDueTimeLocal] = useState('07:00')
   const [startDateLocal, setStartDateLocal] = useState(() => getTodayDateLocalFromPage())
@@ -105,6 +119,7 @@ export default function ScheduleCreatePage() {
   const [createSuccess, setCreateSuccess] = useState<ScheduleCreateSuccessState | null>(null)
   const [showCreateConfirmModal, setShowCreateConfirmModal] = useState(false)
   const continueButtonRef = useRef<HTMLButtonElement | null>(null)
+  const projectSearchFocusRef = useRef<(() => void) | null>(null)
 
   const [profileSearch, setProfileSearch] = useState('')
   const [debouncedProfileSearch, setDebouncedProfileSearch] = useState('')
@@ -196,10 +211,51 @@ export default function ScheduleCreatePage() {
     continueButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [fromPreStartFlow, createStep])
 
+  useEffect(() => {
+    if (!fromToolboxTalkFlow || createStep !== 1) return
+    continueButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [fromToolboxTalkFlow, createStep])
+
   const documentsQuery = useQuery({
     queryKey: ['safety-documents-for-create'],
     queryFn: () => safetyApi.listDocuments()
   })
+
+  const restrictToProjectPreStartDocuments = useMemo(() => (
+    shouldRestrictScheduleCreateToProjectPreStart({
+      fromPreStartQuery,
+      projectName: projectInput.trim() || initialProject || initialProjectFromQuery,
+      selectedDocumentVersionId: selectedVersionId,
+      initialDocumentVersionId: initialDocumentVersionFromQuery,
+      documents: documentsQuery.data ?? []
+    })
+  ), [
+    fromPreStartQuery,
+    projectInput,
+    initialProject,
+    initialProjectFromQuery,
+    selectedVersionId,
+    initialDocumentVersionFromQuery,
+    documentsQuery.data
+  ])
+
+  const restrictToProjectToolboxTalkDocuments = useMemo(() => (
+    shouldRestrictScheduleCreateToProjectToolboxTalk({
+      fromToolboxTalkQuery,
+      projectName: projectInput.trim() || initialProject || initialProjectFromQuery,
+      selectedDocumentVersionId: selectedVersionId,
+      initialDocumentVersionId: initialDocumentVersionFromQuery,
+      documents: documentsQuery.data ?? []
+    })
+  ), [
+    fromToolboxTalkQuery,
+    projectInput,
+    initialProject,
+    initialProjectFromQuery,
+    selectedVersionId,
+    initialDocumentVersionFromQuery,
+    documentsQuery.data
+  ])
 
   const projectsQuery = useQuery({
     queryKey: ['safety-projects-list'],
@@ -383,13 +439,17 @@ export default function ScheduleCreatePage() {
   const backProjectsPath = safetyProjectsPath(projectInput.trim() || initialProject)
 
   const preStartGuideProjectLabel = projectInput.trim() || initialProject || 'Selected project'
-  const preStartGuideLead = useMemo(() => {
+  const generatedFlowGuideLead = useMemo(() => {
     if (createStep === 1) {
-      return `Project: ${preStartGuideProjectLabel} · PDF saved. Confirm due time, then assign workers.`
+      return fromToolboxTalkFlow
+        ? `Project: ${preStartGuideProjectLabel} · Toolbox Talk saved. Confirm due time, then assign workers.`
+        : `Project: ${preStartGuideProjectLabel} · PDF saved. Confirm due time, then assign workers.`
     }
-    return `Project: ${preStartGuideProjectLabel} · Choose who must sign today's pre-start.`
-  }, [createStep, preStartGuideProjectLabel])
-  const preStartGuideAction = useMemo(() => {
+    return fromToolboxTalkFlow
+      ? `Project: ${preStartGuideProjectLabel} · Choose who must sign this Toolbox Talk.`
+      : `Project: ${preStartGuideProjectLabel} · Choose who must sign today's pre-start.`
+  }, [createStep, preStartGuideProjectLabel, fromToolboxTalkFlow])
+  const generatedFlowGuideAction = useMemo(() => {
     if (createStep === 1) {
       return 'Next up: scroll to Due at, adjust if needed, then tap Continue to recipients at the bottom.'
     }
@@ -398,12 +458,22 @@ export default function ScheduleCreatePage() {
 
   return (
     <SafetyLayout
-      title={fromPreStartFlow ? "Today's Daily Pre-Start" : 'New schedule'}
+      title={
+        fromToolboxTalkFlow
+          ? 'Toolbox Talk schedule'
+          : fromPreStartFlow
+            ? "Today's Daily Pre-Start"
+            : 'New schedule'
+      }
       subtitle={
-        fromPreStartFlow
+        fromGeneratedDocumentFlow
           ? createStep === 1
-            ? `Project: ${projectInput || initialProject || 'Select a project'} · Checklist saved. Confirm due time, then assign workers.`
-            : `Project: ${projectInput || 'Select a project'} · Choose who must sign today's pre-start.`
+            ? fromToolboxTalkFlow
+              ? `Project: ${projectInput || initialProject || 'Select a project'} · Session saved. Confirm due time, then assign workers.`
+              : `Project: ${projectInput || initialProject || 'Select a project'} · Checklist saved. Confirm due time, then assign workers.`
+            : fromToolboxTalkFlow
+              ? `Project: ${projectInput || 'Select a project'} · Choose who must sign this Toolbox Talk.`
+              : `Project: ${projectInput || 'Select a project'} · Choose who must sign today's pre-start.`
           : createStep === 1
             ? `Project: ${initialProject || 'Select a project'} · Define schedule or recurring program details.`
             : `Project: ${projectInput || 'Select a project'} · Choose recipients and review selection.`
@@ -421,24 +491,30 @@ export default function ScheduleCreatePage() {
         </div>
       ) : null}
 
-      {fromPreStartFlow && !createSuccess ? (
+      {fromGeneratedDocumentFlow && !createSuccess ? (
         <>
           <section
             className="safety-card safety-prestart-schedule-guide safety-prestart-schedule-guide--fixed safety-prestart-schedule-guide--attention"
-            aria-label="Daily Pre-Start next steps"
+            aria-label={fromToolboxTalkFlow ? 'Toolbox Talk next steps' : 'Daily Pre-Start next steps'}
           >
             <div className="safety-prestart-schedule-guide-inner">
               <div className="safety-prestart-schedule-guide-copy">
                 <span className="material-icons safety-prestart-schedule-guide-icon" aria-hidden>task_alt</span>
                 <div className="safety-prestart-schedule-guide-text">
-                  <p className="safety-prestart-schedule-guide-title">Checklist saved — finish today&apos;s schedule</p>
-                  <p className="safety-prestart-schedule-guide-lead">{preStartGuideLead}</p>
+                  <p className="safety-prestart-schedule-guide-title">
+                    {fromToolboxTalkFlow
+                      ? 'Toolbox Talk saved — finish the schedule'
+                      : 'Checklist saved — finish today\'s schedule'}
+                  </p>
+                  <p className="safety-prestart-schedule-guide-lead">{generatedFlowGuideLead}</p>
                 </div>
               </div>
               <ol className="safety-prestart-schedule-guide-steps" aria-label="Progress">
-                <li className="is-done" title="Complete the pre-start checklist">
+                <li className="is-done" title={fromToolboxTalkFlow ? 'Complete the toolbox talk form' : 'Complete the pre-start checklist'}>
                   <span className="safety-prestart-schedule-guide-step-index" aria-hidden>✓</span>
-                  <span className="safety-prestart-schedule-guide-step-label">Checklist</span>
+                  <span className="safety-prestart-schedule-guide-step-label">
+                    {fromToolboxTalkFlow ? 'Session' : 'Checklist'}
+                  </span>
                 </li>
                 <li className={createStep === 1 ? 'is-current' : 'is-done'} title="Confirm due time">
                   <span className="safety-prestart-schedule-guide-step-index">2</span>
@@ -459,7 +535,7 @@ export default function ScheduleCreatePage() {
                 aria-live="polite"
               >
                 <span className="material-icons safety-prestart-schedule-guide-action-icon" aria-hidden>arrow_downward</span>
-                {preStartGuideAction}
+                {generatedFlowGuideAction}
               </p>
             </div>
           </section>
@@ -529,14 +605,28 @@ export default function ScheduleCreatePage() {
           onNotesChange={setNotes}
           onDocumentVersionChange={setSelectedVersionId}
           onDocumentChosen={() => continueButtonRef.current?.focus()}
-          skipInitialDocumentFocus={fromPreStartFlow}
-          restrictToProjectPreStartDocuments={fromPreStartFlow}
+          projectSearchFocusRef={projectSearchFocusRef}
+          skipInitialDocumentFocus={fromGeneratedDocumentFlow}
+          restrictToProjectPreStartDocuments={restrictToProjectPreStartDocuments}
+          restrictToProjectToolboxTalkDocuments={restrictToProjectToolboxTalkDocuments}
           onStartTemplateFlow={() => {
             if (!projectInput.trim()) {
               setFeedback({ type: 'error', message: 'Choose a project first to start the Daily Pre-Start form.' })
+              requestAnimationFrame(() => projectSearchFocusRef.current?.())
               return
             }
             navigate(`/safety/pre-start/new?project=${encodeURIComponent(projectInput.trim())}&return=schedule-create`)
+          }}
+          onStartToolboxTalkFlow={() => {
+            if (!projectInput.trim()) {
+              setFeedback({ type: 'error', message: 'Choose a project first to start the Toolbox Talk form.' })
+              requestAnimationFrame(() => projectSearchFocusRef.current?.())
+              return
+            }
+            navigate(`/safety/toolbox-talk/new?project=${encodeURIComponent(projectInput.trim())}&return=schedule-create`)
+          }}
+          onOpenDocumentsUpload={() => {
+            navigate('/safety/documents?openUpload=1')
           }}
         />
       ) : (
@@ -606,9 +696,11 @@ export default function ScheduleCreatePage() {
                 Continue to recipients
               </button>
             </div>
-            {fromPreStartFlow ? (
+            {fromGeneratedDocumentFlow ? (
               <p className="safety-muted safety-prestart-schedule-continue-hint">
-                Next: pick workers on site today, then create the schedule to email them.
+                {fromToolboxTalkFlow
+                  ? 'Next: pick workers who attended the talk, then create the schedule to email them.'
+                  : 'Next: pick workers on site today, then create the schedule to email them.'}
               </p>
             ) : null}
           </div>

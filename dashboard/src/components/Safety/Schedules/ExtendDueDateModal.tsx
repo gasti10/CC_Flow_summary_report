@@ -36,11 +36,27 @@ export default function ExtendDueDateModal({
   }
 
   return (
-    <div className="safety-modal-backdrop" role="dialog" aria-modal="true" aria-label="Extend due date">
-      <div className="safety-modal">
+    <div className="safety-modal-backdrop" role="presentation" onClick={isPending ? undefined : onClose}>
+      <div
+        className="safety-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="safety-extend-due-date-title"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="safety-modal-header">
-          <h3>Extend due date</h3>
-          <button type="button" className="safety-btn-icon" onClick={onClose} disabled={isPending}>✕</button>
+          <div className="safety-modal-header-copy">
+            <h3 id="safety-extend-due-date-title" className="safety-modal-title">Extend due date</h3>
+          </div>
+          <button
+            type="button"
+            className="safety-modal-close"
+            onClick={onClose}
+            disabled={isPending}
+            aria-label="Close"
+          >
+            <span className="material-icons" aria-hidden>close</span>
+          </button>
         </div>
         <label className="safety-label" htmlFor="safety-extend-due-at">New due at</label>
         <input

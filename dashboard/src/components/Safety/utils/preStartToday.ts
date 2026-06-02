@@ -84,6 +84,23 @@ export function resolveDailyPreStartMaster(documents: SafetyDocumentListItem[]):
   )) ?? null
 }
 
+function normalizeProjectName(value: string | null | undefined): string {
+  return value?.trim().toLowerCase() ?? ''
+}
+
+function isDailyPreStartProjectDocument(
+  doc: SafetyDocumentListItem,
+  projectName: string,
+  masterDocumentId: string | null
+): boolean {
+  if (doc.is_template === true) return false
+  if (doc.status !== 'available') return false
+  if (!doc.latest_document_version_id) return false
+  if (normalizeProjectName(doc.project_name) !== normalizeProjectName(projectName)) return false
+  if (masterDocumentId && doc.source_template_id === masterDocumentId) return true
+  return doc.title.toLowerCase().startsWith(PRE_START_TITLE_PREFIX.toLowerCase())
+}
+
 export function suggestPreStartDocument(
   documents: SafetyDocumentListItem[],
   masterDocumentId: string | null,
@@ -109,16 +126,64 @@ export function listPreStartDocumentsForProject(
   documents: SafetyDocumentListItem[],
   projectName: string
 ): SafetyDocumentListItem[] {
+  if (!projectName.trim()) return []
   const master = resolveDailyPreStartMaster(documents)
-  if (!master || !projectName.trim()) return []
-  const normalizedProject = projectName.trim().toLowerCase()
-  return documents.filter((doc) => (
-    doc.is_template !== true
-    && doc.status === 'available'
-    && !!doc.latest_document_version_id
-    && doc.source_template_id === master.document_id
-    && doc.project_name?.trim().toLowerCase() === normalizedProject
-  ))
+  return documents
+    .filter((doc) => isDailyPreStartProjectDocument(doc, projectName, master?.document_id ?? null))
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+}
+
+export function isPreStartDocumentLinkedToSchedule(
+  documentId: string,
+  schedules: SafetyScheduleSummary[]
+): boolean {
+  return schedules.some((schedule) => schedule.document_id === documentId)
+}
+
+/** Regenerate only when the latest project pre-start has no schedule yet; otherwise create a new document. */
+export function resolvePreStartDocumentSaveTarget(params: {
+  documents: SafetyDocumentListItem[]
+  projectName: string
+  schedules: SafetyScheduleSummary[]
+}): { mode: 'generate' } | { mode: 'regenerate'; documentId: string } {
+  const latestDoc = listPreStartDocumentsForProject(params.documents, params.projectName)[0]
+  if (!latestDoc) return { mode: 'generate' }
+  if (isPreStartDocumentLinkedToSchedule(latestDoc.document_id, params.schedules)) {
+    return { mode: 'generate' }
+  }
+  return { mode: 'regenerate', documentId: latestDoc.document_id }
+}
+
+
+export function isProjectPreStartDocumentVersion(
+  documents: SafetyDocumentListItem[],
+  projectName: string,
+  documentVersionId: string
+): boolean {
+  if (!documentVersionId.trim() || !projectName.trim()) return false
+  if (listPreStartDocumentsForProject(documents, projectName)
+    .some((doc) => doc.latest_document_version_id === documentVersionId)) {
+    return true
+  }
+  const master = resolveDailyPreStartMaster(documents)
+  const matched = documents.find((doc) => doc.latest_document_version_id === documentVersionId)
+  if (!matched) return false
+  return isDailyPreStartProjectDocument(matched, projectName, master?.document_id ?? null)
+}
+
+export function shouldRestrictScheduleCreateToProjectPreStart(params: {
+  fromPreStartQuery: boolean
+  projectName: string
+  selectedDocumentVersionId: string
+  initialDocumentVersionId: string
+  documents: SafetyDocumentListItem[]
+}): boolean {
+  const project = params.projectName.trim()
+  if (params.fromPreStartQuery && project) return true
+  if (!project) return false
+  const versionId = params.selectedDocumentVersionId.trim() || params.initialDocumentVersionId.trim()
+  if (!versionId) return false
+  return isProjectPreStartDocumentVersion(params.documents, project, versionId)
 }
 
 export function listPreStartDocumentIdsForProject(

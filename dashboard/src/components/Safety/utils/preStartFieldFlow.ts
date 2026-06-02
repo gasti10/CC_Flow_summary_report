@@ -51,6 +51,13 @@ export function getUnansweredRequiredFieldIds(
   return ids
 }
 
+export function getNextFieldId(currentFieldId: string): string | null {
+  const fields = flattenPreStartFields()
+  const currentIndex = fields.findIndex((field) => field.id === currentFieldId)
+  if (currentIndex === -1 || currentIndex >= fields.length - 1) return null
+  return fields[currentIndex + 1].id
+}
+
 export function getNextUnansweredFieldId(
   currentFieldId: string,
   triStateValues: Record<string, TriState>,
@@ -73,6 +80,29 @@ export function getNextUnansweredFieldId(
   }
 
   return null
+}
+
+/** Next field in checklist order; skips fields already answered (e.g. autofill). */
+export function getNextFieldInFlow(
+  currentFieldId: string,
+  triStateValues: Record<string, TriState>,
+  textValues: Record<string, string>,
+  treeValues: Record<string, string[]>
+): string | null {
+  const nextId = getNextFieldId(currentFieldId)
+  if (!nextId) return null
+
+  const section = dailyPreStartChecklist.sections.find((entry) => (
+    entry.fields.some((field) => field.id === nextId)
+  ))
+  const field = section?.fields.find((entry) => entry.id === nextId)
+  if (!field) return nextId
+
+  if (isFieldAnswered(field, triStateValues, textValues, treeValues)) {
+    return getNextFieldInFlow(nextId, triStateValues, textValues, treeValues)
+  }
+
+  return nextId
 }
 
 export function buildCollapsedOpenSections(): Record<string, boolean> {

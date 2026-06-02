@@ -12,6 +12,7 @@ interface SafetyLayoutProps {
   actions?: ReactNode
   /** Contenido a la derecha del subnav (p. ej. enlace Back). */
   subnavEnd?: ReactNode
+  focusPageHeadOnMount?: boolean
 }
 
 function getEmailInitial(email: string | undefined): string {
@@ -21,10 +22,18 @@ function getEmailInitial(email: string | undefined): string {
   return letter.toUpperCase()
 }
 
-export default function SafetyLayout({ title, subtitle, children, actions, subnavEnd }: SafetyLayoutProps) {
+export default function SafetyLayout({
+  title,
+  subtitle,
+  children,
+  actions,
+  subnavEnd,
+  focusPageHeadOnMount = false
+}: SafetyLayoutProps) {
   const { user, signOut } = useAuth()
   const location = useLocation()
   const subnavLinksRef = useRef<HTMLDivElement>(null)
+  const pageHeadTopRef = useRef<HTMLDivElement>(null)
   const isSafetyHub = title.trim().toLowerCase() === 'safety hub'
   const documentsNavActive =
     location.pathname === '/safety/documents' || /^\/safety\/documents\/.+/.test(location.pathname)
@@ -54,6 +63,14 @@ export default function SafetyLayout({ title, subtitle, children, actions, subna
     const frame = requestAnimationFrame(scrollActiveIntoCenter)
     return () => cancelAnimationFrame(frame)
   }, [location.pathname])
+
+  useEffect(() => {
+    if (!focusPageHeadOnMount) return
+    const frame = requestAnimationFrame(() => {
+      pageHeadTopRef.current?.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [focusPageHeadOnMount, location.key])
 
   const userEmail = user?.email
   const emailInitial = getEmailInitial(userEmail)
@@ -108,7 +125,11 @@ export default function SafetyLayout({ title, subtitle, children, actions, subna
               ) : null}
             </ol>
           </nav>
-          <div className="safety-page-head-top">
+          <div
+            className="safety-page-head-top"
+            ref={pageHeadTopRef}
+            tabIndex={focusPageHeadOnMount ? -1 : undefined}
+          >
             <div className="page-heading safety-page-heading">
               <h2 className="page-heading-title safety-page-title">{title}</h2>
               {subtitle ? <p className="page-heading-desc safety-page-desc">{subtitle}</p> : null}

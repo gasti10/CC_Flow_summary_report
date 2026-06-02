@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import SafetyLayout from './SafetyLayout'
@@ -24,6 +25,8 @@ export default function SafetyHomePage() {
   const followUp = followUpQuery.data
   const followUpCount = followUp?.scheduleCount ?? 0
   const followUpProjects = followUp?.projects ?? []
+  const [followUpExpanded, setFollowUpExpanded] = useState(false)
+  const followUpPanelId = 'safety-hub-followup-projects'
 
   return (
     <SafetyLayout
@@ -32,8 +35,17 @@ export default function SafetyHomePage() {
     >
       <section className="safety-card">
         {followUpCount > 0 ? (
-          <div className="safety-hub-followup-banner" role="status">
-            <div className="safety-hub-followup-banner-head">
+          <div
+            className={`safety-hub-followup-banner${followUpExpanded ? '' : ' is-collapsed'}`}
+            role="status"
+          >
+            <button
+              type="button"
+              className="safety-hub-followup-banner-head"
+              aria-expanded={followUpExpanded}
+              aria-controls={followUpPanelId}
+              onClick={() => setFollowUpExpanded((prev) => !prev)}
+            >
               <span className="material-icons safety-hub-followup-banner-icon" aria-hidden>
                 notification_important
               </span>
@@ -49,26 +61,31 @@ export default function SafetyHomePage() {
                     : `${followUpProjects.length} projects require attention.`}
                 </p>
               </div>
-            </div>
+              <span className="material-icons safety-hub-followup-banner-toggle" aria-hidden>
+                {followUpExpanded ? 'expand_less' : 'expand_more'}
+              </span>
+            </button>
 
-            <ul className="safety-hub-followup-project-list">
-              {followUpProjects.map(project => (
-                <li key={project.projectName} className="safety-hub-followup-project-item">
-                  <div className="safety-hub-followup-project-copy">
-                    <p className="safety-hub-followup-project-name">{project.projectName}</p>
-                    <p className="safety-hub-followup-project-meta safety-muted">
-                      {formatProjectFollowUpMeta(project.scheduleCount, project.overdueCount)}
-                    </p>
-                  </div>
-                  <Link
-                    className="safety-btn-secondary safety-hub-followup-project-link"
-                    to={safetyProjectsPath(project.projectName, { followUp: true })}
-                  >
-                    Review in Project
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {followUpExpanded ? (
+              <ul id={followUpPanelId} className="safety-hub-followup-project-list">
+                {followUpProjects.map(project => (
+                  <li key={project.projectName} className="safety-hub-followup-project-item">
+                    <div className="safety-hub-followup-project-copy">
+                      <p className="safety-hub-followup-project-name">{project.projectName}</p>
+                      <p className="safety-hub-followup-project-meta safety-muted">
+                        {formatProjectFollowUpMeta(project.scheduleCount, project.overdueCount)}
+                      </p>
+                    </div>
+                    <Link
+                      className="safety-btn-secondary safety-hub-followup-project-link"
+                      to={safetyProjectsPath(project.projectName, { followUp: true })}
+                    >
+                      Review in Project
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         ) : null}
 
@@ -98,9 +115,17 @@ export default function SafetyHomePage() {
           </article>
 
           <article className="safety-hub-card">
-            <h3>Today's pre-start</h3>
+            <h3>Today&apos;s pre-start</h3>
             <p>Quick launcher to open or create today&apos;s Daily Pre-Start for a selected project.</p>
             <Link to={safetyProjectsPath(undefined, { preStart: true })} className="safety-btn-primary">
+              Open Launcher
+            </Link>
+          </article>
+
+          <article className="safety-hub-card safety-hub-card--toolbox">
+            <h3>Toolbox Talk</h3>
+            <p>Create a new Toolbox Talk session, generate the document, and request worker signatures.</p>
+            <Link to={safetyProjectsPath(undefined, { toolbox: true })} className="safety-btn-primary">
               Open Launcher
             </Link>
           </article>

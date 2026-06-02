@@ -56,6 +56,8 @@ export interface SafetyDocumentDetail {
     title: string
     description: string | null
     status: SafetyDocumentStatus
+    is_template?: boolean | null
+    source_template_id?: string | null
     created_by: string | null
     updated_by: string | null
     created_at: string
@@ -141,6 +143,15 @@ export interface SafetyScheduleWorkerRow {
   invited_at: string | null
   joined_at: string | null
   signed_at: string | null
+  signed_name: string | null
+  signature_payload: Record<string, unknown> | null
+}
+
+export interface SafetyScheduleWorkerSignatureEvidence {
+  schedule_worker_id: string
+  signed_at: string | null
+  signed_name: string | null
+  signature_payload: Record<string, unknown> | null
 }
 
 export interface SafetyNotificationLog {

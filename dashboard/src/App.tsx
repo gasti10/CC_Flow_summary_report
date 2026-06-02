@@ -31,6 +31,7 @@ import WorkerHomePage from './components/Safety/Worker/WorkerHomePage'
 import WorkerAssignmentPage from './components/Safety/Worker/WorkerAssignmentPage'
 import PreStartFormPage from './components/Safety/PreStart/PreStartFormPage'
 import PreStartEntryPage from './components/Safety/PreStart/PreStartEntryPage'
+import ToolboxTalkFormPage from './components/Safety/ToolboxTalk/ToolboxTalkFormPage'
 
 // Configurar QueryClient con optimizaciones
 const queryClient = new QueryClient({
@@ -325,6 +326,14 @@ function AppContent() {
                   element={
                     <ProtectedRoute>
                       <PreStartFormPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/toolbox-talk/new"
+                  element={
+                    <ProtectedRoute>
+                      <ToolboxTalkFormPage />
                     </ProtectedRoute>
                   }
                 />

@@ -1,3 +1,5 @@
+import { dailyPreStartChecklist } from '../PreStart/schema/dailyPreStartChecklist'
+
 type TriState = 'yes' | 'no' | 'na' | ''
 
 export interface PreStartFormStateSlice {
@@ -10,34 +12,62 @@ export interface PreStartAutofillResult extends PreStartFormStateSlice {
   sourceLabel: string | null
 }
 
-const GENERAL_CARRY_FORWARD = new Set(['injury_concerns', 'ppe_checked'])
+function checklistTriStateFieldIds(): string[] {
+  return dailyPreStartChecklist.sections.flatMap((section) => (
+    section.fields
+      .filter((field) => field.type === 'tri_state')
+      .map((field) => field.id)
+  ))
+}
+
+function checklistNotesTextKeys(): string[] {
+  return dailyPreStartChecklist.sections.flatMap((section) => (
+    section.fields
+      .filter((field) => field.type === 'tri_state' && 'notes_if_yes' in field && field.notes_if_yes)
+      .map((field) => `${field.id}_notes`)
+  ))
+}
 
 function isTriState(value: unknown): value is TriState {
   return value === 'yes' || value === 'no' || value === 'na'
 }
 
+function parsePayloadSection(value: unknown): Record<string, unknown> {
+  if (!value) return {}
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as unknown
+      if (parsed && typeof parsed === 'object') return parsed as Record<string, unknown>
+    } catch {
+      return {}
+    }
+  }
+  if (typeof value === 'object') return value as Record<string, unknown>
+  return {}
+}
+
 function parseStringRecord(value: unknown): Record<string, string> {
-  if (!value || typeof value !== 'object') return {}
+  const source = parsePayloadSection(value)
   const out: Record<string, string> = {}
-  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+  for (const [key, raw] of Object.entries(source)) {
     if (typeof raw === 'string') out[key] = raw
   }
   return out
 }
 
 function parseTriRecord(value: unknown): Record<string, TriState> {
-  if (!value || typeof value !== 'object') return {}
+  const source = parsePayloadSection(value)
   const out: Record<string, TriState> = {}
-  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+  for (const [key, raw] of Object.entries(source)) {
     if (isTriState(raw)) out[key] = raw
   }
   return out
 }
 
 function parseTreeRecord(value: unknown): Record<string, string[]> {
-  if (!value || typeof value !== 'object') return {}
+  const source = parsePayloadSection(value)
   const out: Record<string, string[]> = {}
-  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+  for (const [key, raw] of Object.entries(source)) {
     if (!Array.isArray(raw)) continue
     const ids = raw.filter((entry): entry is string => typeof entry === 'string')
     if (ids.length > 0) out[key] = ids
@@ -45,9 +75,21 @@ function parseTreeRecord(value: unknown): Record<string, string[]> {
   return out
 }
 
+function normalizePreStartStoredPayload(value: unknown): Record<string, unknown> | null {
+  if (!value) return null
+  const root = parsePayloadSection(value)
+  if (!Object.keys(root).length) return null
+  if (root.form_payload !== undefined) {
+    const nested = parsePayloadSection(root.form_payload)
+    if (Object.keys(nested).length > 0) return nested
+  }
+  return root
+}
+
 export function buildPreStartAutofill(
-  previousPayload: Record<string, unknown> | null
+  previousPayloadInput: Record<string, unknown> | null
 ): PreStartAutofillResult {
+  const previousPayload = normalizePreStartStoredPayload(previousPayloadInput)
   const triStateValues: Record<string, TriState> = {}
   const textValues: Record<string, string> = {}
   const treeValues: Record<string, string[]> = {
@@ -60,13 +102,20 @@ export function buildPreStartAutofill(
 
   if (previousPayload) {
     const previousAnswers = parseTriRecord(previousPayload.answers)
-    for (const fieldId of GENERAL_CARRY_FORWARD) {
+    for (const fieldId of checklistTriStateFieldIds()) {
       if (previousAnswers[fieldId]) triStateValues[fieldId] = previousAnswers[fieldId]
     }
 
     const previousText = parseStringRecord(previousPayload.text)
-    if (previousText.todays_work_activities?.trim()) {
-      textValues.todays_work_activities = previousText.todays_work_activities
+    const previousAutofill = parseStringRecord(previousPayload.autofill)
+    const carriedActivities = previousText.todays_work_activities?.trim()
+      || previousAutofill.todays_work_activities?.trim()
+    if (carriedActivities) {
+      textValues.todays_work_activities = carriedActivities
+    }
+    for (const notesKey of checklistNotesTextKeys()) {
+      const notes = previousText[notesKey]?.trim()
+      if (notes) textValues[notesKey] = notes
     }
 
     const previousTrees = parseTreeRecord(previousPayload.trees)
@@ -97,4 +146,15 @@ export function buildPreStartAutofill(
     treeValues,
     sourceLabel
   }
+}
+
+export function buildPreStartSubmitAutofill(params: {
+  textValues: Record<string, string>
+  workersPresent?: string | null
+}): Record<string, string> {
+  const autofill: Record<string, string> = {}
+  const activities = params.textValues.todays_work_activities?.trim()
+  if (activities) autofill.todays_work_activities = activities
+  if (params.workersPresent?.trim()) autofill.workers_present = params.workersPresent.trim()
+  return autofill
 }

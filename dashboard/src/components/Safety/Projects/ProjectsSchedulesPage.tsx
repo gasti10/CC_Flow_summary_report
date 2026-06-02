@@ -7,11 +7,13 @@ import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import {
   readFollowUpFromSearchParams,
   readPreStartFromSearchParams,
+  readToolboxFromSearchParams,
   readSafetyProjectFromSearchParams,
   SAFETY_PROJECTS_FOLLOWUP_PARAM,
   SAFETY_PROJECTS_SEARCH_PARAM
 } from '../utils/safetyProjectsPath'
 import { buildPreStartEntryPath } from '../utils/preStartToday'
+import { buildToolboxTalkFormPath } from '../utils/toolboxTalkToday'
 import {
   filterSchedulesByListFilter,
   scheduleFollowUpRowClass,
@@ -29,6 +31,8 @@ export default function ProjectsSchedulesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const projectName = readSafetyProjectFromSearchParams(searchParams)
   const preStartLauncherMode = readPreStartFromSearchParams(searchParams)
+  const toolboxLauncherMode = readToolboxFromSearchParams(searchParams)
+  const launcherMode = preStartLauncherMode || toolboxLauncherMode
   const [projectSearch, setProjectSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<SafetyScheduleListFilter>(() => (
     readFollowUpFromSearchParams(searchParams) ? 'followup' : 'all'
@@ -51,7 +55,12 @@ export default function ProjectsSchedulesPage() {
   }, [preStartLauncherMode, projectName, navigate])
 
   useEffect(() => {
-    if (preStartLauncherMode) return
+    if (!toolboxLauncherMode || !projectName.trim()) return
+    navigate(buildToolboxTalkFormPath(projectName), { replace: true })
+  }, [toolboxLauncherMode, projectName, navigate])
+
+  useEffect(() => {
+    if (launcherMode) return
     if (!projectName.trim()) return
     const panel = selectedProjectPanelRef.current
     const isFollowUp = readFollowUpFromSearchParams(searchParams) || statusFilter === 'followup'
@@ -63,10 +72,10 @@ export default function ProjectsSchedulesPage() {
       }
       selectedPanelNewScheduleRef.current?.focus({ preventScroll: true })
     }, panel ? 220 : 0)
-  }, [projectName, searchParams, statusFilter, preStartLauncherMode])
+  }, [projectName, searchParams, statusFilter, launcherMode])
 
   useEffect(() => {
-    if (preStartLauncherMode) return
+    if (launcherMode) return
     if (projectName.trim()) return
     projectSearchInputRef.current?.focus({ preventScroll: true })
   }, [projectName])
@@ -132,6 +141,11 @@ export default function ProjectsSchedulesPage() {
       navigate(buildPreStartEntryPath(trimmed))
       return
     }
+    if (toolboxLauncherMode) {
+      if (!trimmed) return
+      navigate(buildToolboxTalkFormPath(trimmed))
+      return
+    }
 
     const next = new URLSearchParams(searchParams)
     if (!trimmed) {
@@ -160,11 +174,19 @@ export default function ProjectsSchedulesPage() {
 
   return (
     <SafetyLayout
-      title={preStartLauncherMode ? "Today's pre-start" : 'Projects'}
+      title={
+        preStartLauncherMode
+          ? "Today's pre-start"
+          : toolboxLauncherMode
+            ? 'Toolbox Talk'
+            : 'Projects'
+      }
       subtitle={
         preStartLauncherMode
           ? 'Select a project to open or create today\'s Daily Pre-Start.'
-          : 'Select a project and use Needs follow-up to see active schedules that still require signatures.'
+          : toolboxLauncherMode
+            ? 'Select a project to create a new Toolbox Talk and schedule.'
+            : 'Select a project and use Needs follow-up to see active schedules that still require signatures.'
       }
       actions={
         <>
@@ -244,10 +266,14 @@ export default function ProjectsSchedulesPage() {
               <p className="safety-muted safety-context-copy">
                 {preStartLauncherMode
                   ? 'Choose a project from the list to open today\'s Daily Pre-Start.'
-                  : 'Choose a project from the list above to see details and schedules.'}
+                  : toolboxLauncherMode
+                    ? 'Choose a project from the list to start a new Toolbox Talk.'
+                    : 'Choose a project from the list above to see details and schedules.'}
               </p>
             ) : preStartLauncherMode ? (
               <p className="safety-muted safety-context-copy">Opening today&apos;s Daily Pre-Start…</p>
+            ) : toolboxLauncherMode ? (
+              <p className="safety-muted safety-context-copy">Opening Toolbox Talk form…</p>
             ) : (
               <>
                 <p className="safety-selected-project-title">{projectName}</p>
@@ -281,12 +307,21 @@ export default function ProjectsSchedulesPage() {
                       <span className="material-icons" aria-hidden>group</span>
                       Manage members
                     </Link>
+                  </div>
+                  <div className="safety-project-quick-actions-row safety-project-quick-actions-row--generated-flows">
                     <Link
-                      className="safety-btn-secondary safety-project-action-btn safety-project-action-btn--center-row"
+                      className="safety-btn-secondary safety-project-action-btn"
                       to={`/safety/pre-start?project=${encodeURIComponent(projectName)}`}
                     >
                       <span className="material-icons" aria-hidden>today</span>
-                      Today's pre-start
+                      Today&apos;s pre-start
+                    </Link>
+                    <Link
+                      className="safety-btn-secondary safety-project-action-btn safety-project-action-btn--toolbox"
+                      to={buildToolboxTalkFormPath(projectName)}
+                    >
+                      <span className="material-icons" aria-hidden>record_voice_over</span>
+                      Toolbox Talk
                     </Link>
                   </div>
                 </div>

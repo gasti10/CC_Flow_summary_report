@@ -20,13 +20,15 @@ import {
 
   resolveDailyPreStartMaster,
 
+  resolvePreStartDocumentSaveTarget,
+
   suggestPreStartDocument
 
 } from '../utils/preStartToday'
 
 import { formProgress, sectionProgress } from '../utils/preStartFormProgress'
 
-import { buildPreStartAutofill } from '../utils/preStartAutofill'
+import { buildPreStartAutofill, buildPreStartSubmitAutofill } from '../utils/preStartAutofill'
 
 import {
 
@@ -36,9 +38,11 @@ import {
 
   findSectionIdForField,
 
-  getNextUnansweredFieldId,
+  getNextFieldInFlow,
 
-  getUnansweredRequiredFieldIds
+  getUnansweredRequiredFieldIds,
+
+  PRESTART_ENTRY_SECTION_ID
 
 } from '../utils/preStartFieldFlow'
 
@@ -66,6 +70,15 @@ function getReturnPath(
     return `/safety/schedules/new?project=${encodeURIComponent(projectName)}`
   }
   return safetyProjectsPath(projectName)
+}
+
+function formatPreStartSaveError(message: string): string {
+  const normalized = message.trim()
+  if (normalized.includes('linked to schedules')) {
+    return 'Could not update the previous pre-start because it is already linked to a schedule. Please try again.'
+  }
+  if (normalized.startsWith('Could not ')) return normalized
+  return `Could not save the Daily Pre-Start: ${normalized}`
 }
 
 function getBackPath(_returnTarget: string, projectName: string): string {
@@ -102,8 +115,6 @@ export default function PreStartFormPage() {
 
   })
 
-  const [generatedVersionId, setGeneratedVersionId] = useState<string | null>(null)
-
   const [feedback, setFeedback] = useState<string | null>(null)
 
   const [activeFieldId, setActiveFieldId] = useState<string | null>(null)
@@ -111,8 +122,11 @@ export default function PreStartFormPage() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(buildInitialOpenSections)
 
   const [autofillHint, setAutofillHint] = useState<string | null>(null)
+  const [autofillReady, setAutofillReady] = useState(false)
 
-  const autofillAppliedRef = useRef(false)
+  const autofillAppliedKeyRef = useRef<string | null>(null)
+  const initialFocusAppliedRef = useRef(false)
+  const prestartActionsRef = useRef<HTMLDivElement>(null)
   const formHeaderRef = useRef<HTMLElement>(null)
   const incompleteHighlightTimerRef = useRef<number | null>(null)
 
@@ -129,15 +143,21 @@ export default function PreStartFormPage() {
 
   })
 
+  const schedulesQuery = useQuery({
+    queryKey: ['safety-schedules-project', projectName],
+    queryFn: () => safetyApi.listSchedulesByProject(projectName),
+    enabled: projectName.trim().length > 0
+  })
 
 
-  const buildFormPayload = () => ({
+
+  const buildFormPayload = (submitAutofill: Record<string, string> = {}) => ({
 
     template_key: dailyPreStartChecklist.template_key,
 
     template_label: dailyPreStartChecklist.template_label,
 
-    autofill: {},
+    autofill: submitAutofill,
 
     answers: triStateValues,
 
@@ -154,10 +174,14 @@ export default function PreStartFormPage() {
 
 
   const suggestedDocument = useMemo(
-    () => suggestPreStartDocument(
-      documentsQuery.data ?? [],
-      masterDocument?.document_id ?? null,
-      projectName
+    () => (
+      projectName.trim()
+        ? suggestPreStartDocument(
+          documentsQuery.data ?? [],
+          masterDocument?.document_id ?? null,
+          projectName
+        )
+        : null
     ),
     [documentsQuery.data, masterDocument?.document_id, projectName]
   )
@@ -178,7 +202,7 @@ export default function PreStartFormPage() {
 
     },
 
-    enabled: !!suggestedDocument?.document_id
+    enabled: Boolean(projectName.trim() && suggestedDocument?.document_id)
 
   })
 
@@ -246,6 +270,14 @@ export default function PreStartFormPage() {
     setActiveFieldId(fieldId)
     const sectionId = findSectionIdForField(fieldId)
     if (sectionId) openSectionOnly(sectionId)
+    requestAnimationFrame(() => {
+      const fieldRoot = document.getElementById(`prestart-field-${fieldId}`)
+      const focusTarget = (
+        document.getElementById(fieldId)
+        ?? fieldRoot?.querySelector<HTMLElement>('textarea, button, input, [tabindex]')
+      )
+      focusTarget?.focus({ preventScroll: true })
+    })
   }, [openSectionOnly])
 
   const isIncompleteHighlight = useCallback(
@@ -291,62 +323,72 @@ export default function PreStartFormPage() {
     }
   }, [])
 
-  function finishFieldAdvance(nextFieldId: string | null) {
-
+  function finishFieldAdvance(
+    currentFieldId: string,
+    triState: Record<string, TriState>,
+    text: Record<string, string>,
+    trees: Record<string, string[]>
+  ) {
+    const nextFieldId = getNextFieldInFlow(currentFieldId, triState, text, trees)
     queueMicrotask(() => {
-
       if (nextFieldId) focusField(nextFieldId)
-
       else {
-
         setOpenSections(buildCollapsedOpenSections())
-
         setActiveFieldId(null)
-
       }
-
     })
-
   }
 
 
 
   useEffect(() => {
-
-    if (autofillAppliedRef.current) return
-
+    if (!projectName.trim()) return
     if (documentsQuery.isLoading) return
 
-    if (suggestedDocument && suggestedPayloadQuery.isLoading) return
+    const needsPayload = Boolean(suggestedDocument?.document_id)
+    if (needsPayload) {
+      if (suggestedPayloadQuery.isLoading || suggestedPayloadQuery.isFetching) return
+      if (!suggestedPayloadQuery.isSuccess && !suggestedPayloadQuery.isError) return
+    }
 
+    const payloadData = needsPayload ? (suggestedPayloadQuery.data ?? null) : null
+    const autofillKey = [
+      projectName.trim(),
+      suggestedDocument?.document_id ?? 'none',
+      needsPayload ? String(suggestedPayloadQuery.dataUpdatedAt) : 'no-payload'
+    ].join('|')
 
+    if (autofillAppliedKeyRef.current === autofillKey) return
+    autofillAppliedKeyRef.current = autofillKey
 
-    autofillAppliedRef.current = true
+    const autofill = buildPreStartAutofill(payloadData)
 
-    const autofill = buildPreStartAutofill(suggestedPayloadQuery.data ?? null)
-
-
-
-    setTriStateValues((prev) => ({ ...prev, ...autofill.triStateValues }))
-
-    setTextValues((prev) => ({ ...prev, ...autofill.textValues }))
-
-    setTreeValues((prev) => ({ ...prev, ...autofill.treeValues }))
-
+    setTriStateValues(autofill.triStateValues)
+    setTextValues(autofill.textValues)
+    setTreeValues(autofill.treeValues)
     setAutofillHint(autofill.sourceLabel)
+    setOpenSections(buildInitialOpenSections())
+    setActiveFieldId(null)
+
+    initialFocusAppliedRef.current = false
+    setAutofillReady(true)
   }, [
+    projectName,
     documentsQuery.isLoading,
     suggestedDocument,
     suggestedPayloadQuery.data,
-    suggestedPayloadQuery.isLoading
+    suggestedPayloadQuery.dataUpdatedAt,
+    suggestedPayloadQuery.isLoading,
+    suggestedPayloadQuery.isFetching,
+    suggestedPayloadQuery.isSuccess,
+    suggestedPayloadQuery.isError
   ])
 
   useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      formHeaderRef.current?.focus({ preventScroll: true })
-    })
-    return () => cancelAnimationFrame(frame)
-  }, [])
+    if (!autofillReady || initialFocusAppliedRef.current) return
+    initialFocusAppliedRef.current = true
+    openSectionOnly(PRESTART_ENTRY_SECTION_ID)
+  }, [autofillReady, openSectionOnly])
 
 
 
@@ -376,7 +418,7 @@ export default function PreStartFormPage() {
 
   const requestSignatureMutation = useMutation({
 
-    mutationFn: async (existingVersionId: string | null) => {
+    mutationFn: async () => {
 
       if (overallProgress.answered < overallProgress.total) {
 
@@ -388,33 +430,27 @@ export default function PreStartFormPage() {
 
       if (!masterDocument) throw new Error('Daily Pre-Start master template was not found.')
 
-      const payload = buildFormPayload()
+      const payload = buildFormPayload(buildPreStartSubmitAutofill({ textValues }))
 
-
-
-      if (existingVersionId) {
-
-        const generatedDoc = (documentsQuery.data ?? []).find(
-
-          (doc) => doc.latest_document_version_id === existingVersionId
-
-        )
-
-        if (!generatedDoc) throw new Error('Could not update the pre-start document. Try again.')
-
-        return safetyApi.regenerateDocumentFromTemplate(
-
-          generatedDoc.document_id,
-
-          payload,
-
-          projectName
-
-        )
-
+      const documents = documentsQuery.data ?? []
+      let schedules = schedulesQuery.data
+      if (schedules === undefined) {
+        schedules = await safetyApi.listSchedulesByProject(projectName)
       }
 
+      const saveTarget = resolvePreStartDocumentSaveTarget({
+        documents,
+        projectName,
+        schedules: schedules ?? []
+      })
 
+      if (saveTarget.mode === 'regenerate') {
+        return safetyApi.regenerateDocumentFromTemplate(
+          saveTarget.documentId,
+          payload,
+          projectName
+        )
+      }
 
       return safetyApi.generateDocumentFromTemplate({
 
@@ -430,22 +466,28 @@ export default function PreStartFormPage() {
 
     onSuccess: (result) => {
 
-      setGeneratedVersionId(result.document_version_id)
+      setFeedback(null)
 
       navigate(getReturnPath(returnTarget, projectName, result.document_version_id))
 
     },
 
-    onError: (error: Error) => setFeedback(error.message)
+    onError: (error: Error) => {
+      setFeedback(formatPreStartSaveError(error.message))
+      requestAnimationFrame(() => {
+        prestartActionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      })
+    }
 
   })
 
   function handleRequestSignatureClick() {
+    setFeedback(null)
     if (overallProgress.answered < overallProgress.total) {
       revealIncompleteChecklist()
       return
     }
-    requestSignatureMutation.mutate(generatedVersionId)
+    requestSignatureMutation.mutate()
   }
 
   const backPath = getBackPath(returnTarget, projectName)
@@ -472,19 +514,9 @@ export default function PreStartFormPage() {
 
       )}
 
+      focusPageHeadOnMount
+
     >
-
-      {feedback ? (
-
-        <div className={`safety-alert${feedback.toLowerCase().includes('error') || feedback.toLowerCase().includes('could not') ? ' safety-alert--error' : ''}`}>
-
-          <p>{feedback}</p>
-
-        </div>
-
-      ) : null}
-
-
 
       <div className="safety-prestart-layout">
 
@@ -618,21 +650,7 @@ export default function PreStartFormPage() {
                             const next = { ...prev, [field.id]: value }
 
                             if (value) {
-
-                              const nextFieldId = getNextUnansweredFieldId(
-
-                                field.id,
-
-                                next,
-
-                                textValues,
-
-                                treeValues
-
-                              )
-
-                              finishFieldAdvance(nextFieldId)
-
+                              finishFieldAdvance(field.id, next, textValues, treeValues)
                             }
 
                             return next
@@ -711,53 +729,28 @@ export default function PreStartFormPage() {
 
                           onChange={(e) => {
 
-                            const nextValue = e.target.value
+                            setTextValues((prev) => ({
 
-                            setTextValues((prev) => {
+                              ...prev,
 
-                              const next = { ...prev, [field.id]: nextValue }
+                              [field.id]: e.target.value
 
-                              if (nextValue.trim()) {
-
-                                const nextFieldId = getNextUnansweredFieldId(
-
-                                  field.id,
-
-                                  triStateValues,
-
-                                  next,
-
-                                  treeValues
-
-                                )
-
-                                finishFieldAdvance(nextFieldId)
-
-                              }
-
-                              return next
-
-                            })
+                            }))
 
                           }}
 
                           onBlur={(e) => {
 
-                            if (!e.target.value.trim()) return
+                            const value = e.target.value.trim()
+                            const isOptional = 'optional' in field && field.optional === true
+                            if (!value && !isOptional) return
 
-                            const nextFieldId = getNextUnansweredFieldId(
-
+                            finishFieldAdvance(
                               field.id,
-
                               triStateValues,
-
                               { ...textValues, [field.id]: e.target.value },
-
                               treeValues
-
                             )
-
-                            if (nextFieldId) focusField(nextFieldId)
 
                           }}
 
@@ -791,6 +784,8 @@ export default function PreStartFormPage() {
 
                         isIncompleteHighlight={isIncompleteHighlight(field.id)}
 
+                        isOptional={'optional' in field && field.optional === true}
+
                         onChange={(nextIds) => {
 
                           setTreeValues((prev) => {
@@ -798,27 +793,17 @@ export default function PreStartFormPage() {
                             const next = { ...prev, [field.id]: nextIds }
 
                             if (nextIds.length > 0) {
-
-                              const nextFieldId = getNextUnansweredFieldId(
-
-                                field.id,
-
-                                triStateValues,
-
-                                textValues,
-
-                                next
-
-                              )
-
-                              finishFieldAdvance(nextFieldId)
-
+                              finishFieldAdvance(field.id, triStateValues, textValues, next)
                             }
 
                             return next
 
                           })
 
+                        }}
+
+                        onOptionalAdvance={() => {
+                          finishFieldAdvance(field.id, triStateValues, textValues, treeValues)
                         }}
 
                       />
@@ -847,7 +832,20 @@ export default function PreStartFormPage() {
 
       <section className="safety-card safety-prestart-actions-card">
 
-        <div className="safety-modal-footer safety-modal-footer--center safety-prestart-actions">
+        <div
+          ref={prestartActionsRef}
+          className="safety-modal-footer safety-modal-footer--center safety-prestart-actions"
+        >
+
+          {feedback ? (
+            <div
+              className="safety-alert safety-alert--error safety-alert--prestart-actions"
+              role="alert"
+              aria-live="polite"
+            >
+              <p>{feedback}</p>
+            </div>
+          ) : null}
 
           <button
 

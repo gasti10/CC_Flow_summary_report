@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { dailyPreStartTrees } from './schema/dailyPreStartTrees'
 import PreStartTreeSelectModal from './PreStartTreeSelectModal'
 
@@ -11,8 +11,10 @@ interface PreStartTreeSelectFieldProps {
   suggestedIds?: Set<string>
   isActive?: boolean
   isIncompleteHighlight?: boolean
+  isOptional?: boolean
   onChange: (nextIds: string[]) => void
   onAnswered?: () => void
+  onOptionalAdvance?: () => void
 }
 
 function resolveSelectedLabels(treeKey: TreeKey, selectedIds: string[]): string[] {
@@ -33,10 +35,14 @@ export default function PreStartTreeSelectField({
   suggestedIds,
   isActive = false,
   isIncompleteHighlight = false,
+  isOptional = false,
   onChange,
-  onAnswered
+  onAnswered,
+  onOptionalAdvance
 }: PreStartTreeSelectFieldProps) {
   const [open, setOpen] = useState(false)
+  const openRef = useRef(false)
+  openRef.current = open
   const tree = dailyPreStartTrees[treeKey]
   const selectedLabels = useMemo(
     () => resolveSelectedLabels(treeKey, selectedIds),
@@ -59,6 +65,13 @@ export default function PreStartTreeSelectField({
               id={fieldId}
               className="safety-btn-secondary safety-prestart-tree-select-btn"
               onClick={() => setOpen(true)}
+              onBlur={() => {
+                if (!isOptional || selectedIds.length > 0) return
+                window.setTimeout(() => {
+                  if (openRef.current) return
+                  onOptionalAdvance?.()
+                }, 0)
+              }}
             >
               <span className="material-icons" aria-hidden>checklist</span>
               Select multiple
@@ -81,7 +94,10 @@ export default function PreStartTreeSelectField({
           treeKey={treeKey}
           selectedIds={selectedIds}
           suggestedIds={suggestedIds}
-          onClose={() => setOpen(false)}
+          onClose={() => {
+            setOpen(false)
+            if (isOptional && selectedIds.length === 0) onOptionalAdvance?.()
+          }}
           onSave={(nextIds) => {
             onChange(nextIds)
             setOpen(false)

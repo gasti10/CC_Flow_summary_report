@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import SafetyLayout from '../SafetyLayout'
 import { safetyApi } from '../../../services/safetyApi'
@@ -11,10 +11,12 @@ import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 export default function DocumentsListPage() {
   useDocumentTitle('Safety Documents - Cladding Creations')
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | SafetyDocumentStatus>('all')
-  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [documentTypeFilter, setDocumentTypeFilter] = useState<'library' | 'generated' | 'all'>('library')
+  const [showUploadModal, setShowUploadModal] = useState(() => searchParams.get('openUpload') === '1')
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const documentsQuery = useQuery({
@@ -54,12 +56,18 @@ export default function DocumentsListPage() {
 
   const filteredRows = useMemo(() => {
     const rows = documentsQuery.data ?? []
+    const q = search.trim().toLowerCase()
     return rows.filter((row) => {
+      const isGenerated = Boolean(row.source_template_id)
+      const matchesSearch = !q || row.title.toLowerCase().includes(q)
+      if (!matchesSearch) return false
       if (statusFilter !== 'all' && row.status !== statusFilter) return false
-      if (!search.trim()) return true
-      return row.title.toLowerCase().includes(search.trim().toLowerCase())
+      if (q) return true
+      if (documentTypeFilter === 'library' && isGenerated) return false
+      if (documentTypeFilter === 'generated' && !isGenerated) return false
+      return true
     })
-  }, [documentsQuery.data, search, statusFilter])
+  }, [documentTypeFilter, documentsQuery.data, search, statusFilter])
 
   const counters = useMemo(() => {
     const rows = documentsQuery.data ?? []
@@ -75,6 +83,14 @@ export default function DocumentsListPage() {
   useEffect(() => {
     searchInputRef.current?.focus()
   }, [])
+
+  useEffect(() => {
+    if (searchParams.get('openUpload') !== '1') return
+    setShowUploadModal(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete('openUpload')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   return (
     <SafetyLayout
@@ -116,6 +132,16 @@ export default function DocumentsListPage() {
             <option value="all">All statuses</option>
             <option value="available">Available</option>
             <option value="disabled">Disabled</option>
+          </select>
+          <select
+            className="safety-input"
+            value={documentTypeFilter}
+            aria-label="Filter documents by type"
+            onChange={(e) => setDocumentTypeFilter(e.target.value as 'library' | 'generated' | 'all')}
+          >
+            <option value="library">Uploaded documents</option>
+            <option value="generated">Generated documents</option>
+            <option value="all">All document types</option>
           </select>
           <button type="button" className="safety-btn-primary" onClick={() => setShowUploadModal(true)}>
             Upload document

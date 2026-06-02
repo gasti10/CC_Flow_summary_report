@@ -72,6 +72,8 @@ export default function DocumentDetailPage() {
     }
   })
 
+  const isTemplateDocument = detailQuery.data?.document.is_template === true
+
   const layoutTitle = detailQuery.isLoading ? 'Loading…' : pageTitle
   const layoutSubtitle = 'Version history, PDF preview and uploads'
 
@@ -135,7 +137,13 @@ export default function DocumentDetailPage() {
                     Open PDF
                   </a>
                 ) : null}
-                <button type="button" className="safety-btn-primary" onClick={() => setShowUploadModal(true)}>
+                <button
+                  type="button"
+                  className="safety-btn-primary"
+                  onClick={() => setShowUploadModal(true)}
+                  disabled={isTemplateDocument}
+                  title={isTemplateDocument ? 'Template documents cannot receive manual uploads.' : undefined}
+                >
                   Upload new version
                 </button>
                 <button

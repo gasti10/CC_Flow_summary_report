@@ -6,7 +6,7 @@ import { safetyApi } from '../../../services/safetyApi'
 import ScheduleWorkersTable from './ScheduleWorkersTable'
 import ExtendDueDateModal from './ExtendDueDateModal'
 import ScheduleAddWorkersModal from './ScheduleAddWorkersModal'
-import type { SafetyNotificationLog, SafetyScheduleRecipientInput, SafetyScheduleWorkerRow, SafetyWorkerStatus } from '../../../types/safety'
+import type { SafetyNotificationLog, SafetyScheduleRecipientInput, SafetyScheduleWorkerRow, SafetyWorkerAssignmentListItem, SafetyWorkerStatus } from '../../../types/safety'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { safetyProjectsPath } from '../utils/safetyProjectsPath'
 import '../../SiteOrdersPlanner/SiteOrdersPlanner.css'
@@ -42,6 +42,17 @@ function buildLatestNotificationByWorkerId(logs: SafetyNotificationLog[]): Recor
   return map
 }
 
+function isMyPendingSignAssignment(
+  assignment: SafetyWorkerAssignmentListItem,
+  activeScheduleId: string
+): boolean {
+  if (assignment.schedule_id !== activeScheduleId) return false
+  if (assignment.schedule_status !== 'active') return false
+  if (assignment.worker_status === 'signed') return false
+  if (assignment.worker_status === 'overdue' && !assignment.allow_late_sign) return false
+  return assignment.worker_status === 'pending' || assignment.worker_status === 'overdue'
+}
+
 export default function ScheduleDetailPage() {
   const { scheduleId } = useParams<{ scheduleId: string }>()
   const queryClient = useQueryClient()
@@ -58,9 +69,35 @@ export default function ScheduleDetailPage() {
     enabled: !!scheduleId
   })
 
+  const schedule = detailQuery.data?.schedule
+  const schedulePdfQuery = useQuery({
+    queryKey: ['safety-schedule-pdf', schedule?.document_id, schedule?.document_version_id],
+    queryFn: async () => {
+      const documentId = schedule!.document_id
+      const documentVersionId = schedule!.document_version_id
+      const detail = await safetyApi.getDocumentDetail(documentId)
+      const version = detail.versions.find((entry) => entry.document_version_id === documentVersionId)
+      if (!version) throw new Error('Document file not found for this schedule.')
+      const signedUrl = await safetyApi.getVersionSignedViewUrl(version.storage_bucket, version.storage_path)
+      return { version, signedUrl }
+    },
+    enabled: Boolean(schedule?.document_id && schedule?.document_version_id)
+  })
+
+  const myAssignmentsQuery = useQuery({
+    queryKey: ['safety-my-assignments'],
+    queryFn: () => safetyApi.listMyAssignments()
+  })
+
   const notificationsQuery = useQuery({
     queryKey: ['safety-schedule-notifications', scheduleId],
     queryFn: () => safetyApi.listScheduleNotifications(scheduleId ?? ''),
+    enabled: !!scheduleId
+  })
+
+  const signatureEvidenceQuery = useQuery({
+    queryKey: ['safety-schedule-signatures', scheduleId],
+    queryFn: () => safetyApi.listScheduleWorkerSignatures(scheduleId ?? ''),
     enabled: !!scheduleId
   })
 
@@ -122,15 +159,49 @@ export default function ScheduleDetailPage() {
     ]
   }, [detailQuery.data?.schedule])
 
-  const pendingWorkerIds = useMemo(() => {
-    const workers = detailQuery.data?.workers ?? []
-    return workers.filter((row) => row.status !== 'signed').map((row) => row.schedule_worker_id)
-  }, [detailQuery.data?.workers])
-
   const latestNotificationByWorkerId = useMemo(
     () => buildLatestNotificationByWorkerId(notificationsQuery.data ?? []),
     [notificationsQuery.data]
   )
+
+  const signatureByWorkerId = useMemo(() => {
+    const map: Record<string, { signed_at: string | null; signed_name: string | null; signature_payload: Record<string, unknown> | null }> = {}
+    for (const row of signatureEvidenceQuery.data ?? []) {
+      if (!row.schedule_worker_id) continue
+      map[row.schedule_worker_id] = {
+        signed_at: row.signed_at,
+        signed_name: row.signed_name,
+        signature_payload: row.signature_payload
+      }
+    }
+    return map
+  }, [signatureEvidenceQuery.data])
+
+  const workersWithSignatureEvidence = useMemo(() => (
+    (detailQuery.data?.workers ?? []).map((worker) => {
+      const evidence = signatureByWorkerId[worker.schedule_worker_id]
+      if (!evidence) return worker
+      return {
+        ...worker,
+        signed_at: evidence.signed_at ?? worker.signed_at,
+        signed_name: evidence.signed_name ?? worker.signed_name,
+        signature_payload: evidence.signature_payload ?? worker.signature_payload
+      } satisfies SafetyScheduleWorkerRow
+    })
+  ), [detailQuery.data?.workers, signatureByWorkerId])
+
+  const pendingWorkerIds = useMemo(() => {
+    return workersWithSignatureEvidence
+      .filter((row) => row.status !== 'signed')
+      .map((row) => row.schedule_worker_id)
+  }, [workersWithSignatureEvidence])
+
+  const mySignAssignment = useMemo(() => {
+    if (!scheduleId) return null
+    return (myAssignmentsQuery.data ?? []).find((assignment) => (
+      isMyPendingSignAssignment(assignment, scheduleId)
+    )) ?? null
+  }, [myAssignmentsQuery.data, scheduleId])
 
   const notificationRows = notificationsQuery.data ?? []
 
@@ -240,14 +311,30 @@ export default function ScheduleDetailPage() {
                 <h3 className="safety-card-title safety-detail-doc-title">
                   {detailQuery.data.schedule.document_title}
                   <span className="safety-detail-doc-version">v{detailQuery.data.schedule.version_number}</span>
+                  <span className={`safety-status-pill safety-status-pill--${detailQuery.data.schedule.status}`}>
+                    {detailQuery.data.schedule.status}
+                  </span>
                 </h3>
                 <div className="safety-detail-meta-grid">
                   <div className="safety-detail-meta-item">
                     <span className="safety-detail-meta-label">Project</span>
                     <strong className="safety-detail-meta-value">{detailQuery.data.schedule.project_name}</strong>
                   </div>
-                  <div className="safety-detail-meta-item">
-                    <span className="safety-detail-meta-label">Due at</span>
+                  <div className="safety-detail-meta-item safety-detail-meta-item--due">
+                    <div className="safety-detail-meta-label-row">
+                      <span className="safety-detail-meta-label">Due at</span>
+                      {detailQuery.data.schedule.status === 'active' ? (
+                        <button
+                          type="button"
+                          className="safety-detail-meta-icon-action"
+                          onClick={() => setShowExtendModal(true)}
+                          aria-label="Extend due date"
+                          title="Extend due date"
+                        >
+                          <span className="material-icons" aria-hidden>event</span>
+                        </button>
+                      ) : null}
+                    </div>
                     <strong className="safety-detail-meta-value">{formatDueAt(detailQuery.data.schedule.due_at)}</strong>
                   </div>
                   <div className="safety-detail-meta-item">
@@ -272,41 +359,44 @@ export default function ScheduleDetailPage() {
                     Recurring
                   </Link>
                 ) : null}
-                <span className={`safety-status-pill safety-status-pill--${detailQuery.data.schedule.status}`}>
-                  {detailQuery.data.schedule.status}
-                </span>
-                <button
-                  type="button"
-                  className={`safety-btn-secondary safety-btn-notify${isBulkSending ? ' is-sending' : ''}`}
-                  title="Send signature request emails to all workers who have not signed yet"
-                  onClick={() => {
-                    sendNotificationsMutation.mutate({
-                      scheduleWorkerIds: pendingWorkerIds,
-                      forceResend: false
-                    })
-                  }}
-                  disabled={
-                    detailQuery.data.schedule.status !== 'active'
-                    || pendingWorkerIds.length === 0
-                    || isNotificationSendPending
-                  }
-                >
-                  <span className="safety-btn-notify-icon-wrap" aria-hidden>
-                    <span className="material-icons">{isBulkSending ? 'hourglass_top' : 'mail'}</span>
-                    {!isBulkSending ? <span className="safety-btn-notify-spark" /> : null}
-                  </span>
-                  <span className="safety-btn-notify-label">
-                    {isBulkSending ? 'Sending notifications...' : 'Send notifications'}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className="safety-btn-primary"
-                  onClick={() => setShowExtendModal(true)}
-                  disabled={detailQuery.data.schedule.status !== 'active'}
-                >
-                  Extend due date
-                </button>
+                {schedulePdfQuery.data?.signedUrl ? (
+                  <a
+                    className="safety-btn-secondary"
+                    href={schedulePdfQuery.data.signedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open the PDF document workers will sign"
+                  >
+                    <span className="material-icons safety-detail-open-icon" aria-hidden>open_in_new</span>
+                    Open document
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    className="safety-btn-secondary"
+                    title="Open the PDF document workers will sign"
+                    disabled={schedulePdfQuery.isFetching || schedulePdfQuery.isError}
+                  >
+                    <span className="material-icons safety-detail-open-icon" aria-hidden>
+                      {schedulePdfQuery.isFetching ? 'hourglass_top' : 'open_in_new'}
+                    </span>
+                    {schedulePdfQuery.isFetching ? 'Loading document…' : 'Open document'}
+                  </button>
+                )}
+                {mySignAssignment ? (
+                  <Link
+                    className="safety-btn-primary safety-btn-sign"
+                    to={`/safety/my-assignments/${mySignAssignment.schedule_worker_id}`}
+                    title="Go to your signature assignment for this schedule"
+                  >
+                    <span className="safety-btn-sign-icon-wrap" aria-hidden>
+                      <span className="material-icons">draw</span>
+                      <span className="safety-btn-sign-scribble" />
+                      <span className="safety-btn-sign-spark" />
+                    </span>
+                    <span className="safety-btn-sign-label">Sign document</span>
+                  </Link>
+                ) : null}
               </div>
             </div>
 
@@ -329,13 +419,22 @@ export default function ScheduleDetailPage() {
           </section>
 
           <ScheduleWorkersTable
-            rows={detailQuery.data.workers}
+            rows={workersWithSignatureEvidence}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
             latestNotificationByWorkerId={latestNotificationByWorkerId}
             onResendWorkerNotification={handleResendWorker}
             isResendingWorkerId={currentResendingWorkerId}
             isNotificationSendPending={isNotificationSendPending}
+            canSendNotifications={detailQuery.data.schedule.status === 'active'}
+            pendingNotifyCount={pendingWorkerIds.length}
+            isBulkSending={isBulkSending}
+            onSendNotifications={() => {
+              sendNotificationsMutation.mutate({
+                scheduleWorkerIds: pendingWorkerIds,
+                forceResend: false
+              })
+            }}
             canManageWorkers={detailQuery.data.schedule.status === 'active'}
             onAddWorkers={() => setShowAddWorkersModal(true)}
             onRemoveWorker={handleRemoveWorker}
@@ -432,6 +531,7 @@ export default function ScheduleDetailPage() {
           }}
         />
       ) : null}
+
     </SafetyLayout>
   )
 }

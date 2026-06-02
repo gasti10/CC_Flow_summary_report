@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import type { SafetyNotificationLog, SafetyScheduleWorkerRow, SafetyWorkerStatus } from '../../../types/safety'
+import ScheduleWorkerSignatureModal from './ScheduleWorkerSignatureModal'
 import '../../SiteOrdersPlanner/SiteOrdersPlanner.css'
 
 interface ScheduleWorkersTableProps {
@@ -14,6 +16,10 @@ interface ScheduleWorkersTableProps {
   onRemoveWorker?: (row: SafetyScheduleWorkerRow) => void
   isRemovingWorkerId?: string | null
   isWorkerMutationPending?: boolean
+  canSendNotifications?: boolean
+  pendingNotifyCount?: number
+  isBulkSending?: boolean
+  onSendNotifications?: () => void
 }
 
 function formatDate(iso: string | null): string {
@@ -50,15 +56,37 @@ export default function ScheduleWorkersTable({
   onAddWorkers,
   onRemoveWorker,
   isRemovingWorkerId,
-  isWorkerMutationPending = false
+  isWorkerMutationPending = false,
+  canSendNotifications = false,
+  pendingNotifyCount = 0,
+  isBulkSending = false,
+  onSendNotifications
 }: ScheduleWorkersTableProps) {
   const filtered = rows.filter(row => statusFilter === 'all' || row.status === statusFilter)
+  const [selectedSignatureWorker, setSelectedSignatureWorker] = useState<SafetyScheduleWorkerRow | null>(null)
 
   return (
     <section className="safety-card">
       <div className="safety-workers-header safety-workers-header--schedule-table">
         <h3>Workers status</h3>
         <div className="safety-workers-header-actions">
+          {canSendNotifications && onSendNotifications ? (
+            <button
+              type="button"
+              className={`safety-btn-secondary safety-btn-notify safety-workers-notify-btn${isBulkSending ? ' is-sending' : ''}`}
+              title="Send signature request emails to all workers who have not signed yet"
+              onClick={onSendNotifications}
+              disabled={pendingNotifyCount === 0 || isNotificationSendPending}
+            >
+              <span className="safety-btn-notify-icon-wrap" aria-hidden>
+                <span className="material-icons">{isBulkSending ? 'hourglass_top' : 'mail'}</span>
+                {!isBulkSending ? <span className="safety-btn-notify-spark" /> : null}
+              </span>
+              <span className="safety-btn-notify-label">
+                {isBulkSending ? 'Sending…' : 'Send notifications'}
+              </span>
+            </button>
+          ) : null}
           {canManageWorkers && onAddWorkers ? (
             <button
               type="button"
@@ -123,6 +151,8 @@ export default function ScheduleWorkersTable({
                 const canRemove = canManageWorkers
                   && row.status !== 'signed'
                   && !!onRemoveWorker
+                const canViewSignature = row.status === 'signed'
+                const canNotifyWorker = row.status !== 'signed'
 
                 return (
                   <tr key={row.schedule_worker_id}>
@@ -166,26 +196,42 @@ export default function ScheduleWorkersTable({
                     </td>
                     <td className="sop-mfg-td sop-mfg-td--actions" data-label="Actions">
                       <div className="sop-mfg-row-actions safety-schedule-row-actions" role="group" aria-label="Worker actions">
-                        <button
-                          type="button"
-                          className={`sop-btn-icon safety-resend-btn${isResending ? ' is-sending' : ''}`}
-                          title={notifyActionTitle}
-                          onClick={() => onResendWorkerNotification?.(row)}
-                          disabled={
-                            !onResendWorkerNotification
-                            || row.status === 'signed'
-                            || isResending
-                            || (isNotificationSendPending && !isResending)
-                            || isWorkerMutationPending
-                          }
-                        >
-                          <span className="safety-resend-btn-icon-wrap" aria-hidden>
-                            <span className="material-icons">{isResending ? 'hourglass_top' : 'send'}</span>
-                            {!isResending ? <span className="safety-resend-btn-trail" /> : null}
-                          </span>
-                          <span className="safety-resend-btn-label">{notifyActionLabel}</span>
-                          <span className="sop-mfg-sr-only">{notifyActionTitle}</span>
-                        </button>
+                        {canViewSignature ? (
+                          <button
+                            type="button"
+                            className="sop-btn-icon safety-view-signature-btn"
+                            title="View signature"
+                            onClick={() => setSelectedSignatureWorker(row)}
+                            disabled={isWorkerMutationPending}
+                          >
+                            <span className="safety-view-signature-icon-wrap" aria-hidden>
+                              <span className="material-icons">visibility</span>
+                              <span className="safety-view-signature-glint" />
+                            </span>
+                            <span className="safety-view-signature-label">View signature</span>
+                          </button>
+                        ) : null}
+                        {canNotifyWorker ? (
+                          <button
+                            type="button"
+                            className={`sop-btn-icon safety-resend-btn${isResending ? ' is-sending' : ''}`}
+                            title={notifyActionTitle}
+                            onClick={() => onResendWorkerNotification?.(row)}
+                            disabled={
+                              !onResendWorkerNotification
+                              || isResending
+                              || (isNotificationSendPending && !isResending)
+                              || isWorkerMutationPending
+                            }
+                          >
+                            <span className="safety-resend-btn-icon-wrap" aria-hidden>
+                              <span className="material-icons">{isResending ? 'hourglass_top' : 'send'}</span>
+                              {!isResending ? <span className="safety-resend-btn-trail" /> : null}
+                            </span>
+                            <span className="safety-resend-btn-label">{notifyActionLabel}</span>
+                            <span className="sop-mfg-sr-only">{notifyActionTitle}</span>
+                          </button>
+                        ) : null}
                         {canRemove ? (
                           <button
                             type="button"
@@ -211,6 +257,12 @@ export default function ScheduleWorkersTable({
           </tbody>
         </table>
       </div>
+      {selectedSignatureWorker ? (
+        <ScheduleWorkerSignatureModal
+          worker={selectedSignatureWorker}
+          onClose={() => setSelectedSignatureWorker(null)}
+        />
+      ) : null}
     </section>
   )
 }

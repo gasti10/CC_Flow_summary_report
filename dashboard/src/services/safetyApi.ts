@@ -28,6 +28,7 @@ import type {
   SafetyScheduleDetail,
   SafetyScheduleRecipientInput,
   SafetyScheduleSummary,
+  SafetyScheduleWorkerSignatureEvidence,
   SafetyScheduleWorkerRow,
   UploadSafetyVersionPayload
 } from '../types/safety'
@@ -37,6 +38,8 @@ const SAFETY_BUCKET = 'safety-documents'
 const appSheetApi = new AppSheetAPI()
 
 class SafetyAPI {
+  private supportsScheduleWorkerSignaturesRpc: boolean | null = null
+
   private async getAuthUid(): Promise<string | null> {
     const { data } = await supabaseClient.auth.getUser()
     return data.user?.id ?? null
@@ -111,6 +114,20 @@ class SafetyAPI {
 
   private normalizeIsoOrNull(value: string | null | undefined): string | null {
     return value?.trim() ? value : null
+  }
+
+  private normalizeSignaturePayload(value: unknown): Record<string, unknown> | null {
+    if (!value) return null
+    if (typeof value === 'object') return value as Record<string, unknown>
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value) as unknown
+        return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null
+      } catch {
+        return null
+      }
+    }
+    return null
   }
 
   private normalizeNotificationLogs(rows: Array<Record<string, unknown>>): SafetyNotificationLog[] {
@@ -898,7 +915,36 @@ class SafetyAPI {
       title: String(value.title ?? ''),
       version_number: Number(value.version_number ?? 1)
     }
-    await this.invokePreStartPdfRenderer({
+    await this.invokeSafetyDocumentPdfRenderer({
+      document_id: result.document_id,
+      document_version_id: result.document_version_id,
+      title: result.title,
+      project_name: payload.project_name.trim(),
+      form_payload: payload.form_payload ?? {}
+    })
+    return result
+  }
+
+  async generateToolboxTalkDocument(
+    payload: SafetyGenerateTemplateDocumentPayload
+  ): Promise<SafetyGenerateTemplateDocumentResult> {
+    const rpcRes = await supabaseClient.rpc('safety_generate_document_from_template', {
+      p_master_document_id: payload.master_document_id,
+      p_project_name: payload.project_name.trim(),
+      p_form_payload: payload.form_payload ?? {}
+    })
+    if (rpcRes.error) throw new Error(`Could not generate Toolbox Talk document: ${rpcRes.error.message}`)
+    const value = Array.isArray(rpcRes.data) ? rpcRes.data[0] : rpcRes.data
+    if (!value || typeof value !== 'object') {
+      throw new Error('Document generation returned an invalid response.')
+    }
+    const result = {
+      document_id: String(value.document_id ?? ''),
+      document_version_id: String(value.document_version_id ?? ''),
+      title: String(value.title ?? ''),
+      version_number: Number(value.version_number ?? 1)
+    }
+    await this.invokeSafetyDocumentPdfRenderer({
       document_id: result.document_id,
       document_version_id: result.document_version_id,
       title: result.title,
@@ -933,7 +979,7 @@ class SafetyAPI {
     if (!resolvedProjectName) {
       throw new Error('Could not resolve project_name for pre-start PDF rendering.')
     }
-    await this.invokePreStartPdfRenderer({
+    await this.invokeSafetyDocumentPdfRenderer({
       document_id: result.document_id,
       document_version_id: result.document_version_id,
       title: result.title,
@@ -943,7 +989,7 @@ class SafetyAPI {
     return result
   }
 
-  private async invokePreStartPdfRenderer(body: {
+  private async invokeSafetyDocumentPdfRenderer(body: {
     document_id: string
     document_version_id: string
     title: string
@@ -952,11 +998,11 @@ class SafetyAPI {
   }): Promise<void> {
     const edgeRes = await supabaseClient.functions.invoke('safety-generate-pre-start-pdf', { body })
     if (edgeRes.error) {
-      throw new Error(`Could not render pre-start PDF: ${edgeRes.error.message}`)
+      throw new Error(`Could not render safety document PDF: ${edgeRes.error.message}`)
     }
     const data = edgeRes.data as { ok?: boolean; error?: string } | null
     if (data && data.ok !== true) {
-      throw new Error(data.error ?? 'Pre-start PDF rendering returned an invalid response.')
+      throw new Error(data.error ?? 'Safety document PDF rendering returned an invalid response.')
     }
   }
 
@@ -1007,7 +1053,9 @@ class SafetyAPI {
           assigned_by: (row.assigned_by as string | null) ?? null,
           invited_at: (row.invited_at as string | null) ?? null,
           joined_at: (row.joined_at as string | null) ?? null,
-          signed_at: (row.signed_at as string | null) ?? null
+          signed_at: (row.signed_at as string | null) ?? null,
+          signed_name: (row.signed_name as string | null) ?? null,
+          signature_payload: this.normalizeSignaturePayload(row.signature_payload)
         }))
 
       return { schedule, workers }
@@ -1030,7 +1078,8 @@ class SafetyAPI {
       .from('schedule_workers')
       .select(`
         schedule_worker_id, schedule_id, recipient_user_id, profile_id, recipient_email, recipient_full_name,
-        membership_state, invitation_status, status, assigned_at, assigned_by, invited_at, joined_at, signed_at
+        membership_state, invitation_status, status, assigned_at, assigned_by, invited_at, joined_at, signed_at,
+        signed_name, signature_payload
       `)
       .eq('schedule_id', scheduleId)
       .order('assigned_at', { ascending: true })
@@ -1068,7 +1117,9 @@ class SafetyAPI {
         assigned_by: (row.assigned_by as string | null) ?? null,
         invited_at: (row.invited_at as string | null) ?? null,
         joined_at: (row.joined_at as string | null) ?? null,
-        signed_at: (row.signed_at as string | null) ?? null
+        signed_at: (row.signed_at as string | null) ?? null,
+        signed_name: (row.signed_name as string | null) ?? null,
+        signature_payload: this.normalizeSignaturePayload(row.signature_payload)
       }
       if (worker.status === 'signed') {
         signed += 1
@@ -1114,6 +1165,53 @@ class SafetyAPI {
       },
       workers
     }
+  }
+
+  async listScheduleWorkerSignatures(scheduleId: string): Promise<SafetyScheduleWorkerSignatureEvidence[]> {
+    if (this.supportsScheduleWorkerSignaturesRpc !== false) {
+      const rpcRes = await supabaseClient.rpc('safety_list_schedule_worker_signatures', {
+        p_schedule_id: scheduleId
+      })
+      if (!rpcRes.error && Array.isArray(rpcRes.data)) {
+        this.supportsScheduleWorkerSignaturesRpc = true
+        return (rpcRes.data as Array<Record<string, unknown>>)
+          .map((row) => ({
+            schedule_worker_id: String(row.schedule_worker_id ?? ''),
+            signed_at: (row.signed_at as string | null) ?? null,
+            signed_name: (row.signed_name as string | null) ?? null,
+            signature_payload: this.normalizeSignaturePayload(row.signature_payload)
+          }))
+          .filter((row) => row.schedule_worker_id.length > 0)
+      }
+      const rpcErrorCode = (rpcRes.error as { code?: string } | null)?.code ?? ''
+      if (rpcErrorCode === 'PGRST202') {
+        this.supportsScheduleWorkerSignaturesRpc = false
+      }
+    }
+
+    const fallbackRes = await supabaseClient
+      .from('signatures')
+      .select('schedule_worker_id, signed_at, signed_name, signature_payload')
+      .eq('schedule_id', scheduleId)
+      .order('signed_at', { ascending: false })
+
+    if (fallbackRes.error) {
+      return []
+    }
+
+    const latestByWorker = new Map<string, SafetyScheduleWorkerSignatureEvidence>()
+    for (const rawRow of fallbackRes.data ?? []) {
+      const row = rawRow as Record<string, unknown>
+      const scheduleWorkerId = String(row.schedule_worker_id ?? '')
+      if (!scheduleWorkerId || latestByWorker.has(scheduleWorkerId)) continue
+      latestByWorker.set(scheduleWorkerId, {
+        schedule_worker_id: scheduleWorkerId,
+        signed_at: (row.signed_at as string | null) ?? null,
+        signed_name: (row.signed_name as string | null) ?? null,
+        signature_payload: this.normalizeSignaturePayload(row.signature_payload)
+      })
+    }
+    return [...latestByWorker.values()]
   }
 
   async addScheduleRecipients(
