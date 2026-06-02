@@ -125,6 +125,9 @@ export interface SafetyScheduleSummary {
   created_at: string
   updated_at: string
   closed_at: string | null
+  signed_pack_storage_path?: string | null
+  signed_pack_updated_at?: string | null
+  completion_notified_at?: string | null
   document_version_id: string
   document_id: string
   document_title: string
@@ -187,6 +190,16 @@ export interface SafetyNotificationDispatchResult {
   skipped_count: number
   notification_ids: string[]
   message?: string
+}
+
+export interface SafetyScheduleSignedPackResult {
+  schedule_id: string
+  storage_bucket: string
+  storage_path: string
+  signed_url: string | null
+  signature_count: number
+  is_fully_signed: boolean
+  completion_notification_id: string | null
 }
 
 export interface SafetyScheduleDetail {

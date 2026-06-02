@@ -1,4 +1,5 @@
 import type { SafetyActiveProfile, SafetyScheduleRecipientInput } from '../../../types/safety'
+import { scheduleRecipientKey } from './scheduleWorkerRecipientKey'
 
 /** UI: `project_member` → "Project Member" (sin guiones bajos). */
 export function formatSafetyEnumLabel(raw: string | undefined | null): string {
@@ -26,4 +27,17 @@ export function isActiveProfileSelected(
     return selected.some((r) => r.recipient_user_id === p.user_id)
   }
   return selected.some((r) => r.profile_id === p.profile_id)
+}
+
+/** Ensures the schedule creator is in the recipient list (e.g. pre-start / toolbox talk sign-off). */
+export function ensureCreatorInRecipients(
+  recipients: SafetyScheduleRecipientInput[],
+  creator: SafetyScheduleRecipientInput | null | undefined
+): SafetyScheduleRecipientInput[] {
+  if (!creator) return recipients
+  const creatorKey = scheduleRecipientKey(creator)
+  if (recipients.some((recipient) => scheduleRecipientKey(recipient) === creatorKey)) {
+    return recipients
+  }
+  return [...recipients, creator]
 }

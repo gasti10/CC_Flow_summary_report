@@ -12,6 +12,8 @@ import {
   listPreStartDocumentIdsForProject,
   resolveDailyPreStartMaster
 } from '../utils/preStartToday'
+import { useSafetyManagerProjectAccess } from '../hooks/useSafetyManagerProjectAccess'
+import SafetyManagerAccessDenied from '../SafetyManagerAccessDenied'
 
 export default function PreStartEntryPage() {
   useDocumentTitle('Daily Pre-Start - Cladding Creations')
@@ -19,6 +21,7 @@ export default function PreStartEntryPage() {
   const navigate = useNavigate()
   const projectName = (searchParams.get('project') ?? '').trim()
   const redirectedRef = useRef(false)
+  const { isChecking, isDenied } = useSafetyManagerProjectAccess(projectName)
 
   const documentsQuery = useQuery({
     queryKey: ['safety-documents-for-prestart-entry'],
@@ -32,7 +35,7 @@ export default function PreStartEntryPage() {
   })
 
   useEffect(() => {
-    if (!projectName || redirectedRef.current) return
+    if (!projectName || redirectedRef.current || isChecking || isDenied) return
     if (documentsQuery.isLoading || schedulesQuery.isLoading) return
 
     redirectedRef.current = true
@@ -60,7 +63,9 @@ export default function PreStartEntryPage() {
     documentsQuery.data,
     schedulesQuery.isLoading,
     schedulesQuery.data,
-    navigate
+    navigate,
+    isChecking,
+    isDenied
   ])
 
   if (!projectName) {
@@ -78,10 +83,24 @@ export default function PreStartEntryPage() {
     )
   }
 
+  if (isDenied) {
+    return (
+      <SafetyLayout title="Daily Pre-Start" subtitle={`Pre-start for ${projectName}`}>
+        <SafetyManagerAccessDenied
+          projectName={projectName}
+          backToProjectsPath={safetyProjectsPath(projectName)}
+          featureDescription="create and manage Daily Pre-Start checklists"
+        />
+      </SafetyLayout>
+    )
+  }
+
   return (
     <SafetyLayout title="Daily Pre-Start" subtitle={`Opening pre-start for ${projectName}…`}>
       <section className="safety-card">
-        <p className="safety-muted">Resolving today&apos;s Daily Pre-Start…</p>
+        <p className="safety-muted">
+          {isChecking ? 'Checking permissions…' : 'Resolving today&apos;s Daily Pre-Start…'}
+        </p>
       </section>
     </SafetyLayout>
   )

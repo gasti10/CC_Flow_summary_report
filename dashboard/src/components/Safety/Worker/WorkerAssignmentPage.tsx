@@ -136,6 +136,12 @@ export default function WorkerAssignmentPage() {
         await queryClient.refetchQueries({ queryKey: ['safety-my-assignment-detail', scheduleWorkerId] })
         await queryClient.refetchQueries({ queryKey: ['safety-my-assignments'] })
       }
+
+      if (result.schedule_id) {
+        void safetyApi.generateScheduleSignedPack(result.schedule_id).catch(() => {
+          // pg_net may already dispatch; ignore duplicate refresh failures here
+        })
+      }
     },
     onError: (error: Error) => {
       setModalFeedback({ type: 'error', message: error.message })

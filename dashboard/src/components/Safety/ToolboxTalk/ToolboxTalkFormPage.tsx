@@ -23,6 +23,7 @@ import {
   validateToolboxTalkForm,
   type ToolboxTalkFieldErrors
 } from '../utils/toolboxTalkValidation'
+import SafetyManagerAccessGate from '../SafetyManagerAccessGate'
 
 function getBackPath(projectName: string): string {
   return safetyProjectsPath(projectName)
@@ -295,6 +296,12 @@ export default function ToolboxTalkFormPage() {
       )}
       focusPageHeadOnMount
     >
+      <SafetyManagerAccessGate
+        projectName={projectName}
+        backToProjectsPath={getBackPath(projectName)}
+        featureDescription="create Toolbox Talk sessions and schedules"
+        loadingMessage="Checking Toolbox Talk permissions…"
+      >
       <div className="safety-toolbox-talk-page">
         <section className="safety-card safety-toolbox-talk-card">
           <header className="safety-toolbox-talk-hero">
@@ -413,6 +420,7 @@ export default function ToolboxTalkFormPage() {
           </footer>
         </section>
       </div>
+      </SafetyManagerAccessGate>
     </SafetyLayout>
   )
 }

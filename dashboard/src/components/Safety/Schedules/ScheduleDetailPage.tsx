@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import SafetyLayout from '../SafetyLayout'
@@ -69,21 +69,6 @@ export default function ScheduleDetailPage() {
     enabled: !!scheduleId
   })
 
-  const schedule = detailQuery.data?.schedule
-  const schedulePdfQuery = useQuery({
-    queryKey: ['safety-schedule-pdf', schedule?.document_id, schedule?.document_version_id],
-    queryFn: async () => {
-      const documentId = schedule!.document_id
-      const documentVersionId = schedule!.document_version_id
-      const detail = await safetyApi.getDocumentDetail(documentId)
-      const version = detail.versions.find((entry) => entry.document_version_id === documentVersionId)
-      if (!version) throw new Error('Document file not found for this schedule.')
-      const signedUrl = await safetyApi.getVersionSignedViewUrl(version.storage_bucket, version.storage_path)
-      return { version, signedUrl }
-    },
-    enabled: Boolean(schedule?.document_id && schedule?.document_version_id)
-  })
-
   const myAssignmentsQuery = useQuery({
     queryKey: ['safety-my-assignments'],
     queryFn: () => safetyApi.listMyAssignments()
@@ -100,6 +85,26 @@ export default function ScheduleDetailPage() {
     queryFn: () => safetyApi.listScheduleWorkerSignatures(scheduleId ?? ''),
     enabled: !!scheduleId
   })
+
+  const signedPackSignatureKey = useMemo(() => {
+    const rows = signatureEvidenceQuery.data ?? []
+    return rows
+      .map((row) => `${row.schedule_worker_id}:${row.signed_at ?? ''}`)
+      .join('|')
+  }, [signatureEvidenceQuery.data])
+
+  const signedPackQuery = useQuery({
+    queryKey: ['safety-schedule-signed-pack', scheduleId, signedPackSignatureKey],
+    queryFn: () => safetyApi.generateScheduleSignedPack(scheduleId ?? ''),
+    enabled: Boolean(scheduleId)
+  })
+
+  useEffect(() => {
+    if (!signedPackQuery.data?.is_fully_signed || !scheduleId) return
+    void queryClient.invalidateQueries({ queryKey: ['safety-schedule-detail', scheduleId] })
+    void queryClient.invalidateQueries({ queryKey: ['safety-schedule-notifications', scheduleId] })
+    void queryClient.invalidateQueries({ queryKey: ['safety-schedules-project'] })
+  }, [signedPackQuery.data?.is_fully_signed, scheduleId, queryClient])
 
   const extendMutation = useMutation({
     mutationFn: async (dueAtLocal: string) => {
@@ -359,13 +364,13 @@ export default function ScheduleDetailPage() {
                     Recurring
                   </Link>
                 ) : null}
-                {schedulePdfQuery.data?.signedUrl ? (
+                {signedPackQuery.data?.signed_url ? (
                   <a
                     className="safety-btn-secondary"
-                    href={schedulePdfQuery.data.signedUrl}
+                    href={signedPackQuery.data.signed_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="Open the PDF document workers will sign"
+                    title="Download the document with signature pages collected so far"
                   >
                     <span className="material-icons safety-detail-open-icon" aria-hidden>open_in_new</span>
                     Open document
@@ -374,13 +379,16 @@ export default function ScheduleDetailPage() {
                   <button
                     type="button"
                     className="safety-btn-secondary"
-                    title="Open the PDF document workers will sign"
-                    disabled={schedulePdfQuery.isFetching || schedulePdfQuery.isError}
+                    title="Download the document with signature pages collected so far"
+                    disabled={signedPackQuery.isFetching || signedPackQuery.isError}
+                    onClick={() => {
+                      void signedPackQuery.refetch()
+                    }}
                   >
                     <span className="material-icons safety-detail-open-icon" aria-hidden>
-                      {schedulePdfQuery.isFetching ? 'hourglass_top' : 'open_in_new'}
+                      {signedPackQuery.isFetching ? 'hourglass_top' : 'open_in_new'}
                     </span>
-                    {schedulePdfQuery.isFetching ? 'Loading document…' : 'Open document'}
+                    {signedPackQuery.isFetching ? 'Preparing document…' : 'Open document'}
                   </button>
                 )}
                 {mySignAssignment ? (

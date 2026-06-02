@@ -8,6 +8,7 @@ import type { SafetyActiveProfile, SafetyProjectMember, SafetyProjectMemberRole 
 import ProjectMembersTable from './ProjectMembersTable'
 import { safetyProjectsPath } from '../utils/safetyProjectsPath'
 import ProjectMembersAddPanel from './ProjectMembersAddPanel'
+import SafetyManagerAccessGate from '../SafetyManagerAccessGate'
 
 export default function ProjectMembersPage() {
   const { projectName: projectNameParam } = useParams<{ projectName: string }>()
@@ -207,6 +208,12 @@ export default function ProjectMembersPage() {
         </Link>
       )}
     >
+      <SafetyManagerAccessGate
+        projectName={projectName}
+        backToProjectsPath={safetyProjectsPath(projectName)}
+        featureDescription="manage project members and invitations"
+        loadingMessage="Checking member management permissions…"
+      >
       <section className="safety-card safety-stats-row">
         <div className="safety-kpi-card">
           <span className="safety-muted">Total members</span>
@@ -309,6 +316,7 @@ export default function ProjectMembersPage() {
           onAddByEmail={handleAddByEmail}
         />
       </section>
+      </SafetyManagerAccessGate>
     </SafetyLayout>
   )
 }

@@ -21,7 +21,7 @@ import type {
   SafetyScheduleCreateMode,
   SafetyScheduleRecipientInput
 } from '../../../types/safety'
-import { formatSafetyEnumLabel, recipientFromActiveProfile } from './scheduleRecipientFromProfile'
+import { formatSafetyEnumLabel, ensureCreatorInRecipients, recipientFromActiveProfile } from './scheduleRecipientFromProfile'
 import { defaultPreStartDueAtIso, shouldRestrictScheduleCreateToProjectPreStart } from '../utils/preStartToday'
 import { shouldRestrictScheduleCreateToProjectToolboxTalk } from '../utils/toolboxTalkToday'
 import { safetyProjectsPath } from '../utils/safetyProjectsPath'
@@ -48,13 +48,7 @@ function isoToDatetimeLocal(iso: string): string {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
 }
 
-function recipientKey(recipient: SafetyScheduleRecipientInput): string {
-  return recipient.recipient_user_id
-    ? `user:${recipient.recipient_user_id}`
-    : recipient.profile_id
-      ? `profile:${recipient.profile_id}`
-      : `email:${(recipient.recipient_email ?? '').trim().toLowerCase()}`
-}
+import { scheduleRecipientKey } from './scheduleWorkerRecipientKey'
 
 interface ScheduleCreateSuccessState {
   createMode: SafetyScheduleCreateMode
@@ -118,8 +112,34 @@ export default function ScheduleCreatePage() {
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [createSuccess, setCreateSuccess] = useState<ScheduleCreateSuccessState | null>(null)
   const [showCreateConfirmModal, setShowCreateConfirmModal] = useState(false)
+  const createAccessRef = useRef<HTMLDivElement>(null)
+  const createStepsRef = useRef<HTMLElement>(null)
   const continueButtonRef = useRef<HTMLButtonElement | null>(null)
   const projectSearchFocusRef = useRef<(() => void) | null>(null)
+
+  const resolvedProjectName = useMemo(
+    () => projectInput.trim() || initialProject || initialProjectFromQuery,
+    [projectInput, initialProject, initialProjectFromQuery]
+  )
+
+  const canCreateScheduleQuery = useQuery({
+    queryKey: ['safety-can-create-schedule', resolvedProjectName],
+    queryFn: () => (
+      resolvedProjectName
+        ? safetyApi.canManageProject(resolvedProjectName)
+        : safetyApi.canManageAnySafetyProject()
+    )
+  })
+
+  const isCreateAccessDenied = canCreateScheduleQuery.isSuccess && !canCreateScheduleQuery.data
+
+  useEffect(() => {
+    if (!isCreateAccessDenied) return
+    createAccessRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    window.requestAnimationFrame(() => {
+      createAccessRef.current?.focus({ preventScroll: true })
+    })
+  }, [isCreateAccessDenied])
 
   const [profileSearch, setProfileSearch] = useState('')
   const [debouncedProfileSearch, setDebouncedProfileSearch] = useState('')
@@ -216,6 +236,13 @@ export default function ScheduleCreatePage() {
     continueButtonRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [fromToolboxTalkFlow, createStep])
 
+  useEffect(() => {
+    if (createStep !== 2) return
+    window.requestAnimationFrame(() => {
+      createStepsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [createStep])
+
   const documentsQuery = useQuery({
     queryKey: ['safety-documents-for-create'],
     queryFn: () => safetyApi.listDocuments()
@@ -272,6 +299,27 @@ export default function ScheduleCreatePage() {
     enabled: !!projectInput.trim() && createStep === 2
   })
 
+  const creatorRecipientQuery = useQuery({
+    queryKey: ['safety-schedule-creator-recipient', projectInput],
+    queryFn: () => safetyApi.getMyScheduleCreatorRecipient(projectInput),
+    enabled: fromGeneratedDocumentFlow && !!projectInput.trim()
+  })
+
+  const recipientsForCreate = useMemo(
+    () => ensureCreatorInRecipients(
+      selectedRecipients,
+      fromGeneratedDocumentFlow ? creatorRecipientQuery.data : null
+    ),
+    [selectedRecipients, fromGeneratedDocumentFlow, creatorRecipientQuery.data]
+  )
+
+  useEffect(() => {
+    if (!fromGeneratedDocumentFlow || createStep !== 2) return
+    const creator = creatorRecipientQuery.data
+    if (!creator) return
+    setSelectedRecipients((prev) => ensureCreatorInRecipients(prev, creator))
+  }, [fromGeneratedDocumentFlow, createStep, creatorRecipientQuery.data])
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const validationErrors = validateScheduleCreate({
@@ -284,7 +332,7 @@ export default function ScheduleCreatePage() {
         timeZone: SAFETY_SCHEDULE_TIME_ZONE,
         startDateLocal,
         endDateLocal,
-        recipients: selectedRecipients
+        recipients: recipientsForCreate
       })
       if (validationErrors.length > 0) {
         setErrors(validationErrors)
@@ -299,7 +347,7 @@ export default function ScheduleCreatePage() {
           due_at: dueAtIso || null,
           notes,
           allow_late_sign: true,
-          recipients: selectedRecipients
+          recipients: recipientsForCreate
         })
         return { createMode, scheduleId, seriesId: null as string | null }
       }
@@ -322,7 +370,7 @@ export default function ScheduleCreatePage() {
         notes,
         allow_late_sign: true,
         materialize_today: true,
-        recipients: selectedRecipients
+        recipients: recipientsForCreate
       })
       return {
         createMode,
@@ -365,7 +413,7 @@ export default function ScheduleCreatePage() {
         seriesId: result.seriesId,
         projectName: projectInput,
         documentLabel,
-        recipientCount: selectedRecipients.length,
+        recipientCount: recipientsForCreate.length,
         dueAtLabel: result.createMode === 'one_off' ? formatDueAtForSuccess(dueAt) : undefined,
         notificationSummary
       })
@@ -379,8 +427,8 @@ export default function ScheduleCreatePage() {
 
   function mergeRecipient(recipient: SafetyScheduleRecipientInput) {
     setSelectedRecipients((prev) => {
-      const key = recipientKey(recipient)
-      const filtered = prev.filter((item) => recipientKey(item) !== key)
+      const key = scheduleRecipientKey(recipient)
+      const filtered = prev.filter((item) => scheduleRecipientKey(item) !== key)
       return [...filtered, recipient]
     })
   }
@@ -389,11 +437,11 @@ export default function ScheduleCreatePage() {
     setSelectedRecipients((prev) => {
       const map = new Map<string, SafetyScheduleRecipientInput>()
       for (const recipient of prev) {
-        map.set(recipientKey(recipient), recipient)
+        map.set(scheduleRecipientKey(recipient), recipient)
       }
       for (const profile of list) {
         const recipient = recipientFromActiveProfile(profile)
-        map.set(recipientKey(recipient), recipient)
+        map.set(scheduleRecipientKey(recipient), recipient)
       }
       return Array.from(map.values())
     })
@@ -491,6 +539,39 @@ export default function ScheduleCreatePage() {
         </div>
       ) : null}
 
+      {canCreateScheduleQuery.isLoading ? (
+        <section className="safety-card">
+          <p className="safety-muted">Checking schedule permissions…</p>
+        </section>
+      ) : isCreateAccessDenied ? (
+        <section
+          className="safety-card safety-create-access-denied"
+          ref={createAccessRef}
+          tabIndex={-1}
+          role="alert"
+          aria-live="polite"
+        >
+          <div className="safety-alert safety-alert--error safety-alert--reveal">
+            <p>
+              {resolvedProjectName
+                ? `You don't have manager access for ${resolvedProjectName}. Only project managers can create schedules and assign workers.`
+                : 'Only project managers can create schedules and assign workers.'}
+            </p>
+            <p className="safety-muted">
+              Your account is set up as a Worker. Open My assignments to review and sign SWMS documents assigned to you.
+            </p>
+          </div>
+          <div className="safety-create-access-denied-actions">
+            <Link className="safety-btn-primary" to="/safety/my-assignments">
+              Open My assignments
+            </Link>
+            <Link className="safety-btn-secondary" to={backProjectsPath}>
+              Back to projects
+            </Link>
+          </div>
+        </section>
+      ) : (
+        <>
       {fromGeneratedDocumentFlow && !createSuccess ? (
         <>
           <section
@@ -543,7 +624,7 @@ export default function ScheduleCreatePage() {
         </>
       ) : null}
 
-      <section className="safety-card safety-create-steps-card">
+      <section ref={createStepsRef} className="safety-card safety-create-steps-card">
         <div className="safety-create-steps" aria-label="Schedule creation steps">
           <button
             type="button"
@@ -638,22 +719,50 @@ export default function ScheduleCreatePage() {
           profileSearch={profileSearch}
           profileJobTitle={profileJobTitle}
           shouldAutoFocusSearch={createStep === 2}
+          initialListFilter={fromGeneratedDocumentFlow ? 'project_workers' : 'all'}
+          showGeneratedFlowHint={fromGeneratedDocumentFlow}
           onProfileSearchChange={setProfileSearch}
           onProfileJobTitleChange={setProfileJobTitle}
           onToggleProfile={(profile: SafetyActiveProfile) => {
             const next = recipientFromActiveProfile(profile)
-            const key = recipientKey(next)
+            const key = scheduleRecipientKey(next)
+            const isProtectedCreator = Boolean(
+              fromGeneratedDocumentFlow
+              && creatorRecipientQuery.data
+              && key === scheduleRecipientKey(creatorRecipientQuery.data)
+            )
             setSelectedRecipients((prev) => {
-              const exists = prev.some((r) => recipientKey(r) === key)
-              if (exists) return prev.filter((r) => recipientKey(r) !== key)
+              const exists = prev.some((r) => scheduleRecipientKey(r) === key)
+              if (exists) {
+                if (isProtectedCreator) return prev
+                return prev.filter((r) => scheduleRecipientKey(r) !== key)
+              }
               return [...prev, next]
             })
           }}
           onSelectVisibleProfiles={(profiles) => addProfilesToRecipients(profiles)}
-          onClearRecipients={() => setSelectedRecipients([])}
-          onRemoveRecipient={(recipientKeyStr) => {
-            setSelectedRecipients((prev) => prev.filter((item) => recipientKey(item) !== recipientKeyStr))
+          onClearRecipients={() => {
+            setSelectedRecipients(() => {
+              const creator = fromGeneratedDocumentFlow ? creatorRecipientQuery.data : null
+              if (!creator) return []
+              return ensureCreatorInRecipients([], creator)
+            })
           }}
+          onRemoveRecipient={(recipientKeyStr) => {
+            if (
+              fromGeneratedDocumentFlow
+              && creatorRecipientQuery.data
+              && recipientKeyStr === scheduleRecipientKey(creatorRecipientQuery.data)
+            ) {
+              return
+            }
+            setSelectedRecipients((prev) => prev.filter((item) => scheduleRecipientKey(item) !== recipientKeyStr))
+          }}
+          protectedRecipientKey={
+            fromGeneratedDocumentFlow && creatorRecipientQuery.data
+              ? scheduleRecipientKey(creatorRecipientQuery.data)
+              : undefined
+          }
           onAddRecipientByEmail={(email, displayName) => {
             const norm = email.trim().toLowerCase()
             if (!norm || !norm.includes('@')) return
@@ -680,7 +789,7 @@ export default function ScheduleCreatePage() {
         </div>
       ) : null}
 
-      <section className="safety-card">
+      <section className={`safety-card${createStep === 2 ? ' safety-schedule-recipients-footer safety-schedule-recipients-footer--sticky' : ''}`}>
         {createStep === 1 ? (
           <div className="safety-schedule-create-footer">
             <div className="safety-modal-footer safety-modal-footer--center">
@@ -705,19 +814,28 @@ export default function ScheduleCreatePage() {
             ) : null}
           </div>
         ) : (
-          <div className="safety-modal-footer safety-modal-footer--center">
-            <button type="button" className="safety-btn-secondary" onClick={() => setCreateStep(1)}>
-              Back to details
-            </button>
-            <button
-              type="button"
-              className="safety-btn-primary"
-              disabled={createMutation.isPending}
-              onClick={() => setShowCreateConfirmModal(true)}
-            >
-              {createMutation.isPending ? 'Creating...' : createMode === 'one_off' ? 'Create schedule' : 'Create recurring program'}
-            </button>
-          </div>
+          <>
+            <p className="safety-schedule-recipients-footer-summary" aria-live="polite">
+              <strong>{recipientsForCreate.length}</strong>
+              {recipientsForCreate.length === 1 ? ' recipient selected' : ' recipients selected'}
+              {fromGeneratedDocumentFlow ? (
+                <span className="safety-schedule-recipients-footer-context"> · Project workers</span>
+              ) : null}
+            </p>
+            <div className="safety-modal-footer safety-modal-footer--center safety-schedule-recipients-footer-actions">
+              <button type="button" className="safety-btn-secondary" onClick={() => setCreateStep(1)}>
+                Back to details
+              </button>
+              <button
+                type="button"
+                className="safety-btn-primary"
+                disabled={createMutation.isPending}
+                onClick={() => setShowCreateConfirmModal(true)}
+              >
+                {createMutation.isPending ? 'Creating...' : createMode === 'one_off' ? 'Create schedule' : 'Create recurring program'}
+              </button>
+            </div>
+          </>
         )}
       </section>
 
@@ -752,11 +870,11 @@ export default function ScheduleCreatePage() {
             </header>
 
             <div className="safety-confirm-recipients-list">
-              {selectedRecipients.length === 0 ? (
+              {recipientsForCreate.length === 0 ? (
                 <p className="safety-muted">No recipients selected yet.</p>
               ) : (
-                selectedRecipients.map((recipient) => {
-                  const key = recipientKey(recipient)
+                recipientsForCreate.map((recipient) => {
+                  const key = scheduleRecipientKey(recipient)
                   return (
                     <div key={key} className="safety-confirm-recipients-item">
                       <span className="safety-confirm-recipients-label">{recipientDisplayLabel(recipient)}</span>
@@ -811,6 +929,8 @@ export default function ScheduleCreatePage() {
           continueLabel={createSuccess.scheduleId ? 'View schedule' : 'Back to project schedules'}
         />
       ) : null}
+        </>
+      )}
     </SafetyLayout>
   )
 }

@@ -15,6 +15,7 @@ import { dailyPreStartChecklist } from './schema/dailyPreStartChecklist'
 import { dailyPreStartTrees } from './schema/dailyPreStartTrees'
 
 import { safetyProjectsPath } from '../utils/safetyProjectsPath'
+import SafetyManagerAccessGate from '../SafetyManagerAccessGate'
 
 import {
 
@@ -518,6 +519,13 @@ export default function PreStartFormPage() {
 
     >
 
+      <SafetyManagerAccessGate
+        projectName={projectName}
+        backToProjectsPath={backPath}
+        featureDescription="complete and submit Daily Pre-Start checklists"
+        loadingMessage="Checking pre-start permissions…"
+      >
+
       <div className="safety-prestart-layout">
 
       <section className="safety-card safety-prestart-form-card">
@@ -886,6 +894,8 @@ export default function PreStartFormPage() {
       </section>
 
       </div>
+
+      </SafetyManagerAccessGate>
 
     </SafetyLayout>
 

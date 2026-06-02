@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import SafetyLayout from '../SafetyLayout'
@@ -20,6 +20,8 @@ import {
   scheduleNeedsFollowUp,
   type SafetyScheduleListFilter
 } from '../utils/scheduleFollowUp'
+import { useSafetyManagerProjectAccess } from '../hooks/useSafetyManagerProjectAccess'
+import { useMatchMedia } from '../../../hooks/useMatchMedia'
 
 export default function ProjectsSchedulesPage() {
   useDocumentTitle('Safety Projects - Cladding Creations')
@@ -38,6 +40,8 @@ export default function ProjectsSchedulesPage() {
     readFollowUpFromSearchParams(searchParams) ? 'followup' : 'all'
   ))
   const [showProjectContact, setShowProjectContact] = useState(false)
+  const { isChecking: isCheckingManageAccess, isAllowed: canManageSelectedProject } = useSafetyManagerProjectAccess(projectName)
+  const isMobileLayout = useMatchMedia('(max-width: 768px)')
 
   useEffect(() => {
     if (readFollowUpFromSearchParams(searchParams)) {
@@ -167,6 +171,25 @@ export default function ProjectsSchedulesPage() {
     setSearchParams(next, { replace: true })
   }
 
+  function openScheduleRow(scheduleId: string) {
+    if (!isMobileLayout) return
+    navigate(`/safety/schedules/${scheduleId}`)
+  }
+
+  function openSeriesRow(seriesId: string) {
+    if (!isMobileLayout || !projectName.trim()) return
+    navigate(`/safety/projects/${encodeURIComponent(projectName)}/series/${seriesId}`)
+  }
+
+  function handleTapRowKeyDown(
+    event: KeyboardEvent<HTMLTableRowElement>,
+    onActivate: () => void
+  ) {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    onActivate()
+  }
+
   const selectedProjectInfo = useMemo(
     () => (projectsQuery.data ?? []).find(project => project.Name === projectName),
     [projectsQuery.data, projectName]
@@ -291,6 +314,10 @@ export default function ProjectsSchedulesPage() {
 
                 <div className="safety-project-quick-actions" role="group" aria-label="Project actions">
                   <p className="safety-project-quick-actions-label">Quick actions</p>
+                  {isCheckingManageAccess ? (
+                    <p className="safety-muted">Checking permissions…</p>
+                  ) : canManageSelectedProject ? (
+                    <>
                   <div className="safety-project-quick-actions-row">
                     <Link
                       className="safety-btn-primary safety-project-action-btn safety-project-action-btn--primary"
@@ -324,6 +351,12 @@ export default function ProjectsSchedulesPage() {
                       Toolbox Talk
                     </Link>
                   </div>
+                    </>
+                  ) : (
+                    <p className="safety-muted safety-inline-help">
+                      Manager actions are available to project managers. Open My assignments to review SWMS assigned to you.
+                    </p>
+                  )}
                 </div>
 
                 {selectedProjectInfo ? (
@@ -423,12 +456,20 @@ export default function ProjectsSchedulesPage() {
                   <th>Pending</th>
                   <th>Signed</th>
                   <th>Overdue</th>
-                  <th>Actions</th>
+                  <th className="safety-table-col-actions">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map(row => (
-                  <tr key={row.schedule_id} className={scheduleFollowUpRowClass(row)}>
+                  <tr
+                    key={row.schedule_id}
+                    className={`${scheduleFollowUpRowClass(row)}${isMobileLayout ? ' safety-table-row--tap-open' : ''}`}
+                    onClick={isMobileLayout ? () => openScheduleRow(row.schedule_id) : undefined}
+                    onKeyDown={isMobileLayout ? (event) => handleTapRowKeyDown(event, () => openScheduleRow(row.schedule_id)) : undefined}
+                    tabIndex={isMobileLayout ? 0 : undefined}
+                    role={isMobileLayout ? 'link' : undefined}
+                    aria-label={isMobileLayout ? `Open schedule for ${row.document_title}` : undefined}
+                  >
                     <td>
                       <div className="safety-cell-title">{row.document_title}</div>
                       <div className="safety-schedule-doc-meta">
@@ -438,12 +479,18 @@ export default function ProjectsSchedulesPage() {
                           {row.status}
                         </span>
                       </div>
+                      {isMobileLayout ? (
+                        <span className="safety-table-row-open-hint">
+                          Tap to open
+                          <span className="material-icons" aria-hidden>chevron_right</span>
+                        </span>
+                      ) : null}
                     </td>
                     <td>{row.due_at ? new Date(row.due_at).toLocaleString('en-AU') : '—'}</td>
                     <td>{row.pending_count}</td>
                     <td>{row.signed_count}</td>
                     <td>{row.overdue_count}</td>
-                    <td>
+                    <td className="safety-table-col-actions">
                       <Link className="safety-btn-link" to={`/safety/schedules/${row.schedule_id}`}>
                         <span className="material-icons safety-btn-link-icon" aria-hidden>open_in_new</span>
                         Open
@@ -491,15 +538,29 @@ export default function ProjectsSchedulesPage() {
                       <th>Status</th>
                       <th>Next due</th>
                       <th>Instances</th>
-                      <th>Actions</th>
+                      <th className="safety-table-col-actions">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(seriesQuery.data ?? []).map((series) => (
-                      <tr key={series.series_id}>
+                      <tr
+                        key={series.series_id}
+                        className={isMobileLayout ? 'safety-table-row--tap-open' : undefined}
+                        onClick={isMobileLayout ? () => openSeriesRow(series.series_id) : undefined}
+                        onKeyDown={isMobileLayout ? (event) => handleTapRowKeyDown(event, () => openSeriesRow(series.series_id)) : undefined}
+                        tabIndex={isMobileLayout ? 0 : undefined}
+                        role={isMobileLayout ? 'link' : undefined}
+                        aria-label={isMobileLayout ? `Open recurring program for ${series.document_title}` : undefined}
+                      >
                         <td>
                           <div className="safety-cell-title">{series.document_title}</div>
                           <div className="safety-schedule-doc-meta">{series.due_time_local} ({series.time_zone})</div>
+                          {isMobileLayout ? (
+                            <span className="safety-table-row-open-hint">
+                              Tap to open
+                              <span className="material-icons" aria-hidden>chevron_right</span>
+                            </span>
+                          ) : null}
                         </td>
                         <td>{series.frequency}</td>
                         <td>
@@ -509,7 +570,7 @@ export default function ProjectsSchedulesPage() {
                         </td>
                         <td>{series.next_due_at ? new Date(series.next_due_at).toLocaleString('en-AU') : '—'}</td>
                         <td>{series.materialized_instances}</td>
-                        <td>
+                        <td className="safety-table-col-actions">
                           <Link
                             className="safety-btn-link"
                             to={`/safety/projects/${encodeURIComponent(projectName)}/series/${series.series_id}`}

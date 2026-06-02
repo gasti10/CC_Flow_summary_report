@@ -28,6 +28,7 @@ import type {
   SafetyWorkerSignatureResult,
   SafetyScheduleDetail,
   SafetyScheduleRecipientInput,
+  SafetyScheduleSignedPackResult,
   SafetyScheduleSummary,
   SafetyScheduleWorkerSignatureEvidence,
   SafetyScheduleWorkerRow,
@@ -619,6 +620,42 @@ class SafetyAPI {
     }
   }
 
+  async canManageProject(projectName: string): Promise<boolean> {
+    const project = projectName.trim()
+    if (!project) return false
+
+    const rpcRes = await supabaseClient.rpc('safety_user_can_manage_project', {
+      p_project_name: project
+    })
+    if (rpcRes.error) return false
+    return Boolean(rpcRes.data)
+  }
+
+  /** True when the signed-in user is a global admin or active manager on at least one project. */
+  async canManageAnySafetyProject(): Promise<boolean> {
+    const { data: authData, error: authError } = await supabaseClient.auth.getUser()
+    const userId = authData.user?.id
+    if (authError || !userId) return false
+
+    const profileRes = await supabaseClient
+      .from('profiles')
+      .select('global_role')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (profileRes.data?.global_role === 'admin') return true
+
+    const managerRes = await supabaseClient
+      .from('project_members')
+      .select('member_id')
+      .eq('user_id', userId)
+      .eq('role', 'manager')
+      .eq('is_active', true)
+      .limit(1)
+    if (managerRes.error) return false
+    return (managerRes.data?.length ?? 0) > 0
+  }
+
   async addProjectMemberAndSendInvite(params: {
     projectName: string
     profileId?: string | null
@@ -1079,6 +1116,9 @@ class SafetyAPI {
         created_at: first.created_at as string,
         updated_at: first.updated_at as string,
         closed_at: (first.closed_at as string | null) ?? null,
+        signed_pack_storage_path: (first.signed_pack_storage_path as string | null) ?? null,
+        signed_pack_updated_at: (first.signed_pack_updated_at as string | null) ?? null,
+        completion_notified_at: (first.completion_notified_at as string | null) ?? null,
         document_version_id: first.document_version_id as string,
         document_id: first.document_id as string,
         document_title: first.document_title as string,
@@ -1117,7 +1157,9 @@ class SafetyAPI {
       .from('schedules')
       .select(`
         schedule_id, series_id, instance_id, project_name, status, due_at, allow_late_sign, notes,
-        created_by, updated_by, created_at, updated_at, closed_at, document_version_id,
+        created_by, updated_by, created_at, updated_at, closed_at,
+        signed_pack_storage_path, signed_pack_updated_at, completion_notified_at,
+        document_version_id,
         safety_document_versions!schedules_document_version_id_fkey(
           document_version_id, document_id, version_number,
           safety_documents!safety_document_versions_document_id_fkey(title)
@@ -1206,6 +1248,9 @@ class SafetyAPI {
         created_at: schedule.created_at,
         updated_at: schedule.updated_at,
         closed_at: schedule.closed_at,
+        signed_pack_storage_path: (schedule.signed_pack_storage_path as string | null) ?? null,
+        signed_pack_updated_at: (schedule.signed_pack_updated_at as string | null) ?? null,
+        completion_notified_at: (schedule.completion_notified_at as string | null) ?? null,
         document_version_id: schedule.document_version_id,
         document_id: versionMeta.document_id,
         document_title: versionMeta.document_title,
@@ -1533,6 +1578,33 @@ class SafetyAPI {
     } satisfies SafetyWorkerSignatureResult
   }
 
+  async generateScheduleSignedPack(scheduleId: string): Promise<SafetyScheduleSignedPackResult> {
+    const id = scheduleId.trim()
+    if (!id) throw new Error('Schedule ID is required.')
+
+    const edgeRes = await supabaseClient.functions.invoke('safety-generate-schedule-signed-pack', {
+      body: { schedule_id: id }
+    })
+    if (edgeRes.error) {
+      throw new Error(`Could not generate signed pack: ${edgeRes.error.message}`)
+    }
+
+    const data = (edgeRes.data ?? {}) as Record<string, unknown>
+    if (data.ok !== true) {
+      throw new Error(String(data.error ?? 'Signed pack generation returned an invalid response.'))
+    }
+
+    return {
+      schedule_id: String(data.schedule_id ?? id),
+      storage_bucket: String(data.storage_bucket ?? SAFETY_BUCKET),
+      storage_path: String(data.storage_path ?? ''),
+      signed_url: (data.signed_url as string | null) ?? null,
+      signature_count: Number(data.signature_count ?? 0),
+      is_fully_signed: Boolean(data.is_fully_signed),
+      completion_notification_id: (data.completion_notification_id as string | null) ?? null
+    } satisfies SafetyScheduleSignedPackResult
+  }
+
   async queueScheduleNotifications(params: {
     scheduleId: string
     scheduleWorkerIds?: string[]
@@ -1654,6 +1726,39 @@ class SafetyAPI {
     return {
       full_name: (res.data?.full_name as string | null) ?? null,
       email: (res.data?.email as string | null) ?? null
+    }
+  }
+
+  /** Active profile row for the signed-in user, for auto-including them on generated-document schedules. */
+  async getMyScheduleCreatorRecipient(projectName: string): Promise<SafetyScheduleRecipientInput | null> {
+    const uid = await this.getAuthUid()
+    const project = projectName.trim()
+    if (!uid || !project) return null
+
+    const profileRes = await supabaseClient
+      .from('profiles')
+      .select('profile_id, user_id, email, full_name, is_active')
+      .eq('user_id', uid)
+      .eq('is_active', true)
+      .maybeSingle()
+    if (profileRes.error) throw new Error(`Could not load your profile: ${profileRes.error.message}`)
+    if (!profileRes.data?.profile_id) return null
+
+    const memberRes = await supabaseClient
+      .from('project_members')
+      .select('member_id')
+      .eq('project_name', project)
+      .eq('user_id', uid)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    return {
+      recipient_user_id: uid,
+      profile_id: String(profileRes.data.profile_id),
+      recipient_email: (profileRes.data.email as string | null) ?? null,
+      recipient_full_name: (profileRes.data.full_name as string | null) ?? null,
+      membership_state: memberRes.data ? 'project_member' : 'non_member',
+      invitation_status: 'requested'
     }
   }
 
