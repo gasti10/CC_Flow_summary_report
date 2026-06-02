@@ -12,12 +12,13 @@ interface ProjectMembersAddPanelProps {
   memberProfileIds: Set<string>
   addRole: SafetyProjectMemberRole
   isAdding: boolean
+  isAddingByEmail?: boolean
   onProfileSearchChange: (value: string) => void
   onProfileJobTitleChange: (value: string) => void
   onAddRoleChange: (role: SafetyProjectMemberRole) => void
-  onAddProfile: (profile: SafetyActiveProfile) => void
-  onAddProfiles: (profiles: SafetyActiveProfile[]) => void
-  onAddByEmail: (email: string, displayName?: string | null) => void
+  onAddProfile: (profile: SafetyActiveProfile) => void | Promise<void>
+  onAddProfiles: (profiles: SafetyActiveProfile[]) => void | Promise<void>
+  onAddByEmail: (email: string, displayName?: string | null) => void | Promise<void>
 }
 
 export default function ProjectMembersAddPanel({
@@ -29,6 +30,7 @@ export default function ProjectMembersAddPanel({
   memberProfileIds,
   addRole,
   isAdding,
+  isAddingByEmail = false,
   onProfileSearchChange,
   onProfileJobTitleChange,
   onAddRoleChange,
@@ -98,7 +100,7 @@ export default function ProjectMembersAddPanel({
     setListFilter('not_in_project')
   }
 
-  function submitInviteEmail() {
+  async function submitInviteEmail() {
     const email = inviteEmail.trim().toLowerCase()
     if (!email) {
       setInviteError('Enter an email.')
@@ -109,9 +111,13 @@ export default function ProjectMembersAddPanel({
       return
     }
     setInviteError(null)
-    onAddByEmail(email, inviteName.trim() || null)
-    setInviteEmail('')
-    setInviteName('')
+    try {
+      await onAddByEmail(email, inviteName.trim() || null)
+      setInviteEmail('')
+      setInviteName('')
+    } catch {
+      // Parent surfaces mutation errors in the page feedback banner.
+    }
   }
 
   function focusAddMemberEmailInput() {
@@ -338,7 +344,11 @@ export default function ProjectMembersAddPanel({
               </div>
 
               <div className="safety-form-section">
-                <div className="safety-invite-email-block" ref={inviteBlockRef}>
+                <div
+                  className={`safety-invite-email-block${isAddingByEmail ? ' is-pending' : ''}`}
+                  ref={inviteBlockRef}
+                  aria-busy={isAddingByEmail}
+                >
                   <h4 className="safety-invite-email-title">
                     Add new member
                     <span
@@ -355,6 +365,7 @@ export default function ProjectMembersAddPanel({
                     className="safety-input"
                     value={inviteName}
                     placeholder="As shown to recipients"
+                    disabled={isAddingByEmail}
                     onChange={(event) => setInviteName(event.target.value)}
                   />
                   <label className="safety-label" htmlFor="safety-member-invite-email">Email</label>
@@ -365,22 +376,31 @@ export default function ProjectMembersAddPanel({
                     type="email"
                     value={inviteEmail}
                     placeholder="name@company.com"
+                    disabled={isAddingByEmail}
                     onChange={(event) => setInviteEmail(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') {
                         event.preventDefault()
-                        submitInviteEmail()
+                        void submitInviteEmail()
                       }
                     }}
                   />
                   {inviteError ? <p className="safety-muted" role="alert">{inviteError}</p> : null}
                   <button
                     type="button"
-                    className="safety-btn-secondary"
+                    className={`safety-btn-secondary safety-invite-email-btn${isAddingByEmail ? ' is-pending' : ''}`}
                     disabled={isAdding}
-                    onClick={() => { submitInviteEmail() }}
+                    aria-busy={isAddingByEmail}
+                    onClick={() => { void submitInviteEmail() }}
                   >
-                    Add new member by email
+                    {isAddingByEmail ? (
+                      <>
+                        <span className="material-icons safety-invite-email-btn-icon" aria-hidden>hourglass_top</span>
+                        Adding member…
+                      </>
+                    ) : (
+                      'Add new member by email'
+                    )}
                   </button>
                 </div>
               </div>

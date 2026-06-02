@@ -21,6 +21,7 @@ import type {
   SafetyProjectMember,
   SafetyProjectMemberRole,
   SafetyProjectMemberWorker,
+  SafetyAddProjectMemberResult,
   SafetyWorkerAssignmentDetail,
   SafetyWorkerAssignmentListItem,
   SafetyWorkerSignaturePayload,
@@ -582,7 +583,7 @@ class SafetyAPI {
     email?: string | null
     fullName?: string | null
     role?: SafetyProjectMemberRole
-  }): Promise<string> {
+  }): Promise<SafetyAddProjectMemberResult> {
     const projectName = params.projectName.trim()
     if (!projectName) throw new Error('Project name is required.')
 
@@ -594,7 +595,58 @@ class SafetyAPI {
       p_role: params.role ?? 'worker'
     })
     if (rpcRes.error) throw new Error(`Could not add project member: ${rpcRes.error.message}`)
-    return String(rpcRes.data ?? '')
+    return this.normalizeAddProjectMemberResult(rpcRes.data)
+  }
+
+  private normalizeAddProjectMemberResult(value: unknown): SafetyAddProjectMemberResult {
+    if (typeof value === 'string') {
+      return {
+        member_id: value,
+        notification_id: null,
+        allowlist_added: false,
+        invitation_queued: false
+      }
+    }
+    if (!value || typeof value !== 'object') {
+      throw new Error('Unexpected response when adding project member.')
+    }
+    const row = value as Record<string, unknown>
+    return {
+      member_id: String(row.member_id ?? ''),
+      notification_id: row.notification_id ? String(row.notification_id) : null,
+      allowlist_added: Boolean(row.allowlist_added),
+      invitation_queued: Boolean(row.invitation_queued)
+    }
+  }
+
+  async addProjectMemberAndSendInvite(params: {
+    projectName: string
+    profileId?: string | null
+    email?: string | null
+    fullName?: string | null
+    role?: SafetyProjectMemberRole
+  }): Promise<SafetyAddProjectMemberResult & { email_sent: boolean; email_error?: string }> {
+    const result = await this.addProjectMember(params)
+    if (!result.notification_id) {
+      return { ...result, email_sent: false }
+    }
+
+    try {
+      const sendResult = await this.sendQueuedNotifications([result.notification_id])
+      return {
+        ...result,
+        email_sent: sendResult.sent_count > 0,
+        email_error: sendResult.failed_count > 0
+          ? 'Invitation email could not be sent.'
+          : undefined
+      }
+    } catch (error) {
+      return {
+        ...result,
+        email_sent: false,
+        email_error: error instanceof Error ? error.message : 'Invitation email could not be sent.'
+      }
+    }
   }
 
   async updateProjectMemberRole(memberId: string, role: SafetyProjectMemberRole): Promise<void> {

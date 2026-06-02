@@ -94,6 +94,13 @@ export interface SafetyProjectMember {
   updated_at: string
 }
 
+export interface SafetyAddProjectMemberResult {
+  member_id: string
+  notification_id: string | null
+  allowlist_added: boolean
+  invitation_queued: boolean
+}
+
 /** Perfil activo para destinatarios de schedule (RPC `safety_list_active_profiles` o fallback). */
 export interface SafetyActiveProfile {
   profile_id: string

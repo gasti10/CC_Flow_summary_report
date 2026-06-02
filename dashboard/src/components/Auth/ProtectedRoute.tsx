@@ -27,7 +27,7 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   // Si no hay usuario, redirigir al login guardando la ruta de destino
   if (!user) {
-    return <Navigate to="/login" state={{ from: location.pathname }} replace />
+    return <Navigate to="/login" state={{ from: `${location.pathname}${location.search}` }} replace />
   }
 
   // Usuario autenticado, renderizar el contenido protegido

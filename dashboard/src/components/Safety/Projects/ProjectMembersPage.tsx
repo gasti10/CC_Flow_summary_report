@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import SafetyLayout from '../SafetyLayout'
@@ -20,8 +20,19 @@ export default function ProjectMembersPage() {
   const [profileJobTitle, setProfileJobTitle] = useState('')
   const [addRole, setAddRole] = useState<SafetyProjectMemberRole>('worker')
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const feedbackRef = useRef<HTMLDivElement>(null)
 
   useDocumentTitle(`Project Members - ${projectName || 'Safety'} - Cladding Creations`)
+
+  useEffect(() => {
+    if (!feedback) return
+    const node = feedbackRef.current
+    if (!node) return
+    node.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    window.requestAnimationFrame(() => {
+      node.focus({ preventScroll: true })
+    })
+  }, [feedback])
 
   const membersQuery = useQuery({
     queryKey: ['safety-project-members', projectName],
@@ -79,7 +90,7 @@ export default function ProjectMembersPage() {
       fullName?: string | null
       role?: SafetyProjectMemberRole
     }) => {
-      await safetyApi.addProjectMember({
+      return safetyApi.addProjectMemberAndSendInvite({
         projectName,
         profileId: payload.profileId,
         email: payload.email,
@@ -87,14 +98,27 @@ export default function ProjectMembersPage() {
         role: payload.role ?? addRole
       })
     },
-    onSuccess: async () => {
-      setFeedback({ type: 'success', message: 'Project member added or updated.' })
+    onSuccess: async (result) => {
+      if (result.email_error) {
+        setFeedback({
+          type: 'error',
+          message: `Member added, but invitation email failed: ${result.email_error}`
+        })
+      } else if (result.email_sent) {
+        setFeedback({ type: 'success', message: 'Project member added. Invitation email sent.' })
+      } else if (result.invitation_queued) {
+        setFeedback({ type: 'success', message: 'Project member added. Invitation email queued.' })
+      } else {
+        setFeedback({ type: 'success', message: 'Project member added or updated.' })
+      }
       await invalidateMemberQueries()
     },
     onError: (error: Error) => {
       setFeedback({ type: 'error', message: error.message })
     }
   })
+
+  const isAddingByEmail = addMemberMutation.isPending && Boolean(addMemberMutation.variables?.email)
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ memberId, role }: { memberId: string; role: SafetyProjectMemberRole }) => {
@@ -228,7 +252,13 @@ export default function ProjectMembersPage() {
         </p>
 
         {feedback ? (
-          <div className={`safety-alert safety-alert--${feedback.type === 'success' ? 'success' : 'error'}`}>
+          <div
+            ref={feedbackRef}
+            tabIndex={-1}
+            role="status"
+            aria-live="polite"
+            className={`safety-alert safety-alert--reveal safety-alert--${feedback.type === 'success' ? 'success' : 'error'}`}
+          >
             <p>{feedback.message}</p>
           </div>
         ) : null}
@@ -270,6 +300,7 @@ export default function ProjectMembersPage() {
           memberProfileIds={memberProfileIds}
           addRole={addRole}
           isAdding={addMemberMutation.isPending}
+          isAddingByEmail={isAddingByEmail}
           onProfileSearchChange={setProfileSearch}
           onProfileJobTitleChange={setProfileJobTitle}
           onAddRoleChange={setAddRole}

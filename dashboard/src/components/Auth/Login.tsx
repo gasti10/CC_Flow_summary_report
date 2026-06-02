@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import './Login.css'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
+import { resolveLoginRedirectPath } from './loginRedirect'
 
 const Login = () => {
   const [email, setEmail] = useState('')
@@ -16,12 +17,10 @@ const Login = () => {
   const navigate = useNavigate()
   const location = useLocation()
 
-  // Ruta de retorno: state.from (ProtectedRoute) > query ?from= > default
-  const getRedirectFrom = () => {
-    const fromState = (location.state as { from?: string } | null)?.from
-    const fromQuery = new URLSearchParams(window.location.search).get('from')
-    return fromState ?? fromQuery ?? '/creator-of-orders'
-  }
+  const getRedirectFrom = () => resolveLoginRedirectPath({
+    fromState: (location.state as { from?: string } | null)?.from,
+    fromQuery: new URLSearchParams(location.search).get('from')
+  })
 
   // Obtener rutas de imágenes según el entorno
   const getLogoPath = () => {
@@ -44,12 +43,9 @@ const Login = () => {
   // Si el usuario ya está autenticado, redirigir a la ruta de origen
   useEffect(() => {
     if (user) {
-      const from = (location.state as { from?: string } | null)?.from
-        ?? new URLSearchParams(window.location.search).get('from')
-        ?? '/creator-of-orders'
-      navigate(from, { replace: true })
+      navigate(getRedirectFrom(), { replace: true })
     }
-  }, [user, navigate, location.state])
+  }, [user, navigate, location.state, location.search])
 
   const handleEmailSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
