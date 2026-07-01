@@ -166,5 +166,10 @@ export interface OrderCreationData {
     order: string
     qty: number
     change_time: string
+    source?: string
+    executed_by?: string
+    comment?: string
+    factory_qty_before?: number
+    store_qty_before?: number
   }>
 }

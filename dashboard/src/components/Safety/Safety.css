@@ -6368,9 +6368,14 @@
 .safety-worker-assignments {
   display: grid;
   gap: 12px;
+  width: 100%;
+  min-width: 0;
 }
 
 .safety-worker-project-section {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid #d8e0cc;
   border-radius: 12px;
   background: #fff;
@@ -6379,9 +6384,12 @@
 
 .safety-worker-project-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: 14px 16px;
   border: none;
   background: #f7faf2;
@@ -6402,6 +6410,7 @@
 
 .safety-worker-project-head-icon {
   flex-shrink: 0;
+  margin-top: 0.1rem;
   font-size: 1.4rem !important;
   line-height: 1;
   color: var(--safety-valley);
@@ -6424,23 +6433,27 @@
   font-weight: 700;
   line-height: 1.3;
   color: var(--safety-valley);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .safety-worker-project-summary {
   font-size: 0.82rem;
   color: #5f6d5a;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .safety-worker-project-body {
   border-top: 1px solid #e4ead8;
+  min-width: 0;
 }
 
 .safety-worker-status-filters {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
-  justify-content: center;
   gap: 6px;
   padding: 10px 12px;
   background: #fbfcf8;
@@ -6448,17 +6461,35 @@
 }
 
 .safety-worker-status-filter {
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   cursor: pointer;
-  font-size: 0.68rem;
+  font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.25;
-  padding: 2px 8px;
-  transition: box-shadow 0.15s ease, filter 0.15s ease, border-color 0.15s ease;
+  padding: 8px 12px;
+  min-width: 0;
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.safety-worker-status-filter:hover {
-  filter: brightness(0.97);
+.safety-worker-status-filter--open {
+  background: #f3eadf;
+  color: #6a4a1e;
+}
+
+.safety-worker-status-filter--open:hover:not(.is-active) {
+  background: #ead9b8;
+  border-color: #c9a86a;
+  color: #5a3d12;
+}
+
+.safety-worker-status-filter.safety-status-pill--signed:hover:not(.is-active) {
+  background: #d4e8b8;
+  border-color: #9fc874;
+  color: #234816;
 }
 
 .safety-worker-status-filter.is-active {
@@ -6466,14 +6497,9 @@
   box-shadow: inset 0 0 0 1px currentColor;
 }
 
-.safety-worker-status-filter.safety-status-pill--pending.is-active {
+.safety-worker-status-filter--open.is-active {
   background: #ead9b8;
   color: #5a3d12;
-}
-
-.safety-worker-status-filter.safety-status-pill--overdue.is-active {
-  background: #f5cfc4;
-  color: #6f2a18;
 }
 
 .safety-worker-status-filter.safety-status-pill--signed.is-active {
@@ -6529,26 +6555,118 @@
 
 .safety-worker-assignment-title {
   font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .safety-worker-assignment-due {
   font-size: 0.85rem;
+  min-width: 0;
 }
 
 .safety-worker-assignment-chevron {
   font-size: 1.25rem;
   color: #6b7280;
+  flex-shrink: 0;
+}
+
+@media (max-width: 719px) {
+  .safety-worker-project-head {
+    padding: 12px 14px;
+    gap: 8px;
+  }
+
+  .safety-worker-project-heading {
+    font-size: 1.05rem;
+  }
+
+  .safety-worker-project-summary {
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+
+  .safety-worker-status-filter {
+    font-size: 0.8125rem;
+    padding: 8px 10px;
+  }
+
+  .safety-worker-assignment-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'title chevron'
+      'due chevron'
+      'status chevron';
+    align-items: center;
+    justify-content: stretch;
+    gap: 4px 8px;
+    padding: 12px 14px;
+  }
+
+  .safety-worker-assignment-title {
+    grid-area: title;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .safety-worker-assignment-due {
+    grid-area: due;
+    font-size: 0.8rem;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .safety-worker-assignment-row > .safety-status-pill {
+    grid-area: status;
+    justify-self: start;
+  }
+
+  .safety-worker-assignment-chevron {
+    grid-area: chevron;
+    align-self: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .safety-worker-status-filter {
+    font-size: 0.78rem;
+    padding: 8px 6px;
+  }
 }
 
 @media (min-width: 720px) {
   .safety-worker-assignment-row {
-    flex-wrap: nowrap;
-    justify-content: center;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    gap: 8px 16px;
+    justify-content: stretch;
   }
 
-  .safety-worker-assignment-title,
+  .safety-worker-assignment-title {
+    text-align: left;
+  }
+
   .safety-worker-assignment-due {
     white-space: nowrap;
+    text-align: left;
+  }
+
+  .safety-worker-assignment-row > .safety-status-pill {
+    justify-self: start;
+  }
+
+  .safety-worker-assignment-chevron {
+    justify-self: end;
+  }
+}
+
+@media (min-width: 1024px) {
+  .safety-worker-assignment-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
@@ -7848,6 +7966,14 @@
     height: 1.85rem;
     top: 0;
     right: 0;
+  }
+
+  .safety-card:has(.safety-worker-assignments) {
+    padding: 14px 12px;
+  }
+
+  .safety-worker-project-head {
+    padding: 11px 12px;
   }
 
   .safety-worker-assignment-layout {

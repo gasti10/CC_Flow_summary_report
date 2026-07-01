@@ -4,9 +4,12 @@ import { useQuery } from '@tanstack/react-query'
 import SafetyLayout from '../SafetyLayout'
 import { safetyApi } from '../../../services/safetyApi'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
+import { useMatchMedia } from '../../../hooks/useMatchMedia'
 import type { SafetyWorkerStatus } from '../../../types/safety'
 
-type WorkerStatusFilter = SafetyWorkerStatus
+type WorkerAssignmentFilter = 'open' | 'signed'
+
+const MOBILE_LAYOUT_QUERY = '(max-width: 719px)'
 
 function formatDueAt(value: string | null): string {
   if (!value) return 'No due date'
@@ -19,9 +22,34 @@ function projectPanelId(projectName: string): string {
   return `worker-project-panel-${projectName.replace(/\s+/g, '-')}`
 }
 
+function buildCollapsedSummary(
+  total: number,
+  pending: number,
+  overdue: number,
+  signed: number,
+  compact: boolean
+): string {
+  const openCount = pending + overdue
+  const parts = [`${total} active`]
+  if (!compact || openCount > 0) parts.push(`${openCount} to sign`)
+  parts.push(`${signed} signed`)
+  return parts.join(' · ')
+}
+
+function matchesAssignmentFilter(status: SafetyWorkerStatus, filter: WorkerAssignmentFilter): boolean {
+  if (filter === 'open') return status === 'pending' || status === 'overdue'
+  return status === 'signed'
+}
+
+function buildFilterEmptyMessage(filter: WorkerAssignmentFilter): string {
+  if (filter === 'open') return 'No pending or overdue assignments in this project.'
+  return 'No signed assignments in this project.'
+}
+
 export default function WorkerHomePage() {
   useDocumentTitle('My Assignments - Cladding Creations')
-  const [statusFilterByProject, setStatusFilterByProject] = useState<Record<string, WorkerStatusFilter | null>>({})
+  const isMobileLayout = useMatchMedia(MOBILE_LAYOUT_QUERY)
+  const [statusFilterByProject, setStatusFilterByProject] = useState<Record<string, WorkerAssignmentFilter | null>>({})
   const [collapsedByProject, setCollapsedByProject] = useState<Record<string, boolean>>({})
 
   const assignmentsQuery = useQuery({
@@ -79,16 +107,22 @@ export default function WorkerHomePage() {
               const signedCount = allRows.filter(row => row.worker_status === 'signed').length
               const activeFilter = statusFilterByProject[projectName] ?? null
               const visibleRows = activeFilter
-                ? allRows.filter(row => row.worker_status === activeFilter)
+                ? allRows.filter(row => matchesAssignmentFilter(row.worker_status, activeFilter))
                 : allRows
               const isCollapsed = isProjectCollapsed(projectName)
               const panelId = projectPanelId(projectName)
-              const collapsedSummary = `${allRows.length} active · ${pendingCount} pending · ${overdueCount} overdue · ${signedCount} signed`
+              const collapsedSummary = buildCollapsedSummary(
+                allRows.length,
+                pendingCount,
+                overdueCount,
+                signedCount,
+                isMobileLayout
+              )
 
-              function toggleStatusFilter(status: WorkerStatusFilter) {
+              function toggleStatusFilter(filter: WorkerAssignmentFilter) {
                 setStatusFilterByProject(prev => ({
                   ...prev,
-                  [projectName]: prev[projectName] === status ? null : status
+                  [projectName]: prev[projectName] === filter ? null : filter
                 }))
               }
 
@@ -124,19 +158,11 @@ export default function WorkerHomePage() {
                       >
                         <button
                           type="button"
-                          className={`safety-status-pill safety-status-pill--pending safety-worker-status-filter${activeFilter === 'pending' ? ' is-active' : ''}`}
-                          aria-pressed={activeFilter === 'pending'}
-                          onClick={() => toggleStatusFilter('pending')}
+                          className={`safety-status-pill safety-worker-status-filter safety-worker-status-filter--open${activeFilter === 'open' ? ' is-active' : ''}`}
+                          aria-pressed={activeFilter === 'open'}
+                          onClick={() => toggleStatusFilter('open')}
                         >
-                          Pending: {pendingCount}
-                        </button>
-                        <button
-                          type="button"
-                          className={`safety-status-pill safety-status-pill--overdue safety-worker-status-filter${activeFilter === 'overdue' ? ' is-active' : ''}`}
-                          aria-pressed={activeFilter === 'overdue'}
-                          onClick={() => toggleStatusFilter('overdue')}
-                        >
-                          Overdue: {overdueCount}
+                          To sign
                         </button>
                         <button
                           type="button"
@@ -144,13 +170,13 @@ export default function WorkerHomePage() {
                           aria-pressed={activeFilter === 'signed'}
                           onClick={() => toggleStatusFilter('signed')}
                         >
-                          Signed: {signedCount}
+                          Signed
                         </button>
                       </div>
 
                       {activeFilter && visibleRows.length === 0 ? (
                         <p className="safety-muted safety-worker-filter-empty">
-                          No {activeFilter} assignments in this project.
+                          {buildFilterEmptyMessage(activeFilter)}
                         </p>
                       ) : null}
 

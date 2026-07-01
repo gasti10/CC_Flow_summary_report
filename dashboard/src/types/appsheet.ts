@@ -103,6 +103,17 @@ export interface Sheet {
   TotalUsed?: number
 }
 
+/** Values for Sheets Inventory `source` (must match AppSheet Enum). */
+export const SHEET_INVENTORY_SOURCE = {
+  MATERIAL_INCOMING: 'material_incoming',
+  CUT_ORDER: 'cut_order',
+  MANUAL_ADD: 'manual_add',
+  MANUAL_SUBTRACT: 'manual_subtract',
+} as const
+
+export type SheetInventorySource =
+  (typeof SHEET_INVENTORY_SOURCE)[keyof typeof SHEET_INVENTORY_SOURCE]
+
 export interface SheetInventory {
   _RowNumber: string
   sheet_inventory_id: string
@@ -112,6 +123,27 @@ export interface SheetInventory {
   qty: number
   change_time: string
   material_incoming_detail: string
+  source?: SheetInventorySource | string
+  executed_by?: string
+  comment?: string
+  prev_qty?: number
+  factory_qty_before?: number
+  store_qty_before?: number
+}
+
+/** Payload for AppSheet API Add on Sheets Inventory. */
+export interface SheetInventoryCreateRecord {
+  'Sheet ID': string
+  order: string
+  qty: number
+  change_time: string
+  source?: SheetInventorySource | string
+  executed_by?: string
+  comment?: string
+  /** Snapshot of Sheets.Quantity in Factory before this movement (cut order / manual). */
+  factory_qty_before?: number
+  /** Snapshot of Sheets.Quantity in Store before this movement (incoming only; optional). */
+  store_qty_before?: number
 }
 
 /** Tabla Supplier en AppSheet: columnas Supplier ID, Name, etc. */

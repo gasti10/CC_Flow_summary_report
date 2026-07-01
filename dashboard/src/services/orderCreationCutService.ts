@@ -6,8 +6,14 @@ import { supabaseClient } from './supabaseClient'
 import AppSheetAPI from './appsheetApi'
 import { getBrisbaneDateTime, fromDateTimeLocalToStorage } from '../utils/dateUtils'
 import type { OrderFormData } from '../components/CreatorOfOrders/types/wizard.types'
+import { SHEET_INVENTORY_SOURCE } from '../types/appsheet'
 
 const appSheetApi = new AppSheetAPI()
+
+async function getSignedInUserEmail(): Promise<string | null> {
+  const { data } = await supabaseClient.auth.getUser()
+  return data.user?.email ?? null
+}
 
 /** Dimensiones normalizadas de las sheets usadas en la orden, separadas por ", " (ej: 2500x1500, 3200x1500). */
 function getSheetsDimensionsString(selectedSheets: { dimension: string }[]): string {
@@ -305,12 +311,21 @@ export async function createOrder(
 
     try {
       if (formData.selectedSheets.length > 0) {
-        // Preparar registros de Sheets Inventory
+        const executedBy = await getSignedInUserEmail()
+        if (!executedBy) {
+          warnings.push(
+            'Sheets inventory audit: signed-in user email not available; executed_by was not sent to AppSheet.'
+          )
+        }
+
         const sheetsInventoryRecords = formData.selectedSheets.map(sheet => ({
           'Sheet ID': sheet.sheetId,
           order: formData.orderId,
-          qty: -sheet.qty, // Negativo porque representa salida/reducción
-          change_time: creationDate
+          qty: -sheet.qty, // Negative quantity indicates a reduction in inventory
+          change_time: creationDate,
+          source: SHEET_INVENTORY_SOURCE.CUT_ORDER,
+          factory_qty_before: Number(sheet.sheetData['Quantity in Factory']) || 0,
+          ...(executedBy ? { executed_by: executedBy } : {}),
         }))
 
         await appSheetApi.createSheetsInventory(sheetsInventoryRecords)

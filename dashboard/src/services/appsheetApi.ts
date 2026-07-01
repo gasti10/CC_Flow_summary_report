@@ -6,6 +6,7 @@ import type {
   ItemRequest,
   Sheet,
   SheetInventory,
+  SheetInventoryCreateRecord,
   Supplier,
   PeopleAllowance,
   DeliveryDocket,
@@ -1303,12 +1304,9 @@ class AppSheetAPI {
   }
 
   // Crear registros de Sheets Inventory en AppSheet
-  async createSheetsInventory(inventoryRecords: Array<{
-    'Sheet ID': string
-    order: string
-    qty: number
-    change_time: string
-  }>): Promise<unknown[]> {
+  async createSheetsInventory(
+    inventoryRecords: SheetInventoryCreateRecord[]
+  ): Promise<unknown[]> {
     if (inventoryRecords.length === 0) {
       console.warn('⚠️ No sheets inventory records to create')
       return []
@@ -1318,12 +1316,24 @@ class AppSheetAPI {
       console.log(`🔄 Creating ${inventoryRecords.length} sheets inventory records in AppSheet...`)
       
       // Preparar registros completos
-      const records = inventoryRecords.map(record => ({
-        sheet: record['Sheet ID'], // Mapear 'Sheet ID' del servicio a 'sheet' de AppSheet
-        order: record.order,
-        qty: record.qty, // Ya viene negativo desde el servicio
-        change_time: record.change_time
-      }))
+      const records = inventoryRecords.map(record => {
+        const payload: Record<string, unknown> = {
+          sheet: record['Sheet ID'],
+          order: record.order,
+          qty: record.qty,
+          change_time: record.change_time,
+        }
+        if (record.source) payload.source = record.source
+        if (record.executed_by) payload.executed_by = record.executed_by
+        if (record.comment) payload.comment = record.comment
+        if (typeof record.factory_qty_before === 'number' && !Number.isNaN(record.factory_qty_before)) {
+          payload.factory_qty_before = record.factory_qty_before
+        }
+        if (typeof record.store_qty_before === 'number' && !Number.isNaN(record.store_qty_before)) {
+          payload.store_qty_before = record.store_qty_before
+        }
+        return payload
+      })
 
       const response = await this.makeRequest<unknown>('Sheets Inventory', 'Add', records)
 
