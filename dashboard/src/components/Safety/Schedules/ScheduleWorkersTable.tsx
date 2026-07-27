@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { SafetyNotificationLog, SafetyScheduleWorkerRow, SafetyWorkerStatus } from '../../../types/safety'
+import { formatRecipientMembershipLabel } from './scheduleRecipientFromProfile'
 import ScheduleWorkerSignatureModal from './ScheduleWorkerSignatureModal'
 import '../../SiteOrdersPlanner/SiteOrdersPlanner.css'
 
@@ -36,8 +37,7 @@ function formatDate(iso: string | null): string {
 }
 
 function formatMembershipState(value: SafetyScheduleWorkerRow['membership_state']): string {
-  if (value === 'project_member') return 'Project member'
-  return 'External'
+  return formatRecipientMembershipLabel(value)
 }
 
 function formatInvitationStatus(value: SafetyScheduleWorkerRow['invitation_status']): string {

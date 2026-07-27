@@ -32,6 +32,7 @@ import WorkerAssignmentPage from './components/Safety/Worker/WorkerAssignmentPag
 import PreStartFormPage from './components/Safety/PreStart/PreStartFormPage'
 import PreStartEntryPage from './components/Safety/PreStart/PreStartEntryPage'
 import ToolboxTalkFormPage from './components/Safety/ToolboxTalk/ToolboxTalkFormPage'
+import PeopleDirectoryPage from './components/Safety/People/PeopleDirectoryPage'
 
 // Configurar QueryClient con optimizaciones
 const queryClient = new QueryClient({
@@ -342,6 +343,14 @@ function AppContent() {
                   element={
                     <ProtectedRoute>
                       <ScheduleDetailPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/safety/people"
+                  element={
+                    <ProtectedRoute>
+                      <PeopleDirectoryPage />
                     </ProtectedRoute>
                   }
                 />

@@ -82,6 +82,7 @@ export default function ProjectMembersPage() {
   const invalidateMemberQueries = async () => {
     await queryClient.invalidateQueries({ queryKey: ['safety-project-members', projectName] })
     await queryClient.invalidateQueries({ queryKey: ['safety-project-member-profiles', projectName] })
+    await queryClient.invalidateQueries({ queryKey: ['safety-active-profiles'] })
   }
 
   const addMemberMutation = useMutation({

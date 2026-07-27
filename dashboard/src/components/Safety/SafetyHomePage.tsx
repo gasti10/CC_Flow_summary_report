@@ -5,6 +5,7 @@ import SafetyLayout from './SafetyLayout'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import { safetyApi } from '../../services/safetyApi'
 import { safetyProjectsPath } from './utils/safetyProjectsPath'
+import { useSafetyGlobalAdmin } from './hooks/useSafetyGlobalAdmin'
 
 function formatProjectFollowUpMeta(scheduleCount: number, overdueCount: number): string {
   const scheduleLabel = scheduleCount === 1 ? '1 schedule' : `${scheduleCount} schedules`
@@ -27,6 +28,7 @@ export default function SafetyHomePage() {
   const followUpProjects = followUp?.projects ?? []
   const [followUpExpanded, setFollowUpExpanded] = useState(false)
   const followUpPanelId = 'safety-hub-followup-projects'
+  const { isAdmin: isGlobalAdmin } = useSafetyGlobalAdmin()
 
   return (
     <SafetyLayout
@@ -105,6 +107,16 @@ export default function SafetyHomePage() {
               Open Projects
             </Link>
           </article>
+
+          {isGlobalAdmin ? (
+            <article className="safety-hub-card">
+              <h3>People</h3>
+              <p>View all Safety profiles, project memberships, and promote onsite leads to Manager.</p>
+              <Link to="/safety/people" className="safety-btn-primary">
+                Open People
+              </Link>
+            </article>
+          ) : null}
 
           <article className="safety-hub-card">
             <h3>My assignments</h3>

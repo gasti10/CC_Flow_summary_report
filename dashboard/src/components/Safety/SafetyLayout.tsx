@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { getLogoPath } from '../../utils/assetUtils'
+import { useSafetyGlobalAdmin } from './hooks/useSafetyGlobalAdmin'
 import './Safety.css'
 
 interface SafetyLayoutProps {
@@ -41,6 +42,8 @@ export default function SafetyLayout({
     location.pathname.startsWith('/safety/projects') || location.pathname.startsWith('/safety/schedules/')
   const myAssignmentsNavActive =
     location.pathname === '/safety/my-assignments' || location.pathname.startsWith('/safety/my-assignments/')
+  const peopleNavActive = location.pathname === '/safety/people'
+  const { isAdmin: isGlobalAdmin } = useSafetyGlobalAdmin()
 
   useEffect(() => {
     const container = subnavLinksRef.current
@@ -141,6 +144,9 @@ export default function SafetyLayout({
               <Link to="/safety" className={`safety-subnav-item${isSafetyHub ? ' is-active' : ''}`}>Overview</Link>
               <Link to="/safety/documents" className={`safety-subnav-item${documentsNavActive ? ' is-active' : ''}`}>Documents</Link>
               <Link to="/safety/projects" className={`safety-subnav-item${projectsNavActive ? ' is-active' : ''}`}>Projects/Jobs/Sites</Link>
+              {isGlobalAdmin ? (
+                <Link to="/safety/people" className={`safety-subnav-item${peopleNavActive ? ' is-active' : ''}`}>People</Link>
+              ) : null}
               <Link to="/safety/my-assignments" className={`safety-subnav-item${myAssignmentsNavActive ? ' is-active' : ''}`}>My assignments</Link>
             </div>
             {subnavEnd ? <div className="safety-subnav-trailing">{subnavEnd}</div> : null}

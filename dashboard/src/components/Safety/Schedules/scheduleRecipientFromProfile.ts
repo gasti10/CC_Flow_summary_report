@@ -1,4 +1,8 @@
-import type { SafetyActiveProfile, SafetyScheduleRecipientInput } from '../../../types/safety'
+import type {
+  SafetyActiveProfile,
+  SafetyRecipientMembershipState,
+  SafetyScheduleRecipientInput
+} from '../../../types/safety'
 import { scheduleRecipientKey } from './scheduleWorkerRecipientKey'
 
 /** UI: `project_member` → "Project Member" (sin guiones bajos). */
@@ -8,13 +12,20 @@ export function formatSafetyEnumLabel(raw: string | undefined | null): string {
   return s.replace(/\b\w/g, (ch) => ch.toUpperCase())
 }
 
+export function formatRecipientMembershipLabel(
+  state: SafetyRecipientMembershipState | null | undefined
+): string {
+  if (state === 'project_member') return 'Project member'
+  return 'Not in project'
+}
+
 export function recipientFromActiveProfile(p: SafetyActiveProfile): SafetyScheduleRecipientInput {
   return {
     recipient_user_id: p.user_id,
     profile_id: p.profile_id,
     recipient_email: p.email,
     recipient_full_name: p.full_name,
-    membership_state: p.is_project_worker ? 'project_member' : 'non_member',
+    membership_state: p.is_project_member ? 'project_member' : 'non_member',
     invitation_status: p.user_id ? 'requested' : 'invited'
   }
 }

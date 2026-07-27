@@ -106,6 +106,13 @@ export const ROUTE_CONFIG: Record<string, RouteConfig> = {
     loadingText: 'Loading Project Members...',
     showHeader: false
   },
+  '/safety/people': {
+    name: 'safety-people',
+    animationDuration: 0,
+    showDataPreloader: false,
+    loadingText: 'Loading Safety People...',
+    showHeader: false
+  },
   '/safety/projects/:projectName/schedules/new': {
     name: 'safety-schedule-create',
     animationDuration: 0,

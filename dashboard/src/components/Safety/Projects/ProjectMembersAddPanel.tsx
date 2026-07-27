@@ -296,8 +296,6 @@ export default function ProjectMembersAddPanel({
                           <span className="safety-profile-row-meta">
                             {isMember ? (
                               <span className="safety-status-pill safety-status-pill--signed">Project member</span>
-                            ) : profile.is_project_worker ? (
-                              <span className="safety-status-pill safety-status-pill--pending">Project worker</span>
                             ) : (
                               <span className="safety-status-pill safety-status-pill--pending">Not in project</span>
                             )}

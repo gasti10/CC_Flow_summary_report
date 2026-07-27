@@ -22,6 +22,10 @@ import type {
   SafetyProjectMemberRole,
   SafetyProjectMemberWorker,
   SafetyAddProjectMemberResult,
+  SafetyAdminUpdateProfilePayload,
+  SafetyPeopleDirectoryFilters,
+  SafetyPeopleDirectoryProfile,
+  SafetyProfileMembership,
   SafetyWorkerAssignmentDetail,
   SafetyWorkerAssignmentListItem,
   SafetyWorkerSignaturePayload,
@@ -443,9 +447,102 @@ class SafetyAPI {
     return this.getDocumentDetail(documentId)
   }
 
+  private mapActiveProfileRow(row: Record<string, unknown>): SafetyActiveProfile {
+    const isProjectWorker = Boolean(row.is_project_worker)
+    const isProjectMember = row.is_project_member != null
+      ? Boolean(row.is_project_member)
+      : isProjectWorker
+    return {
+      profile_id: String(row.profile_id ?? ''),
+      user_id: row.user_id ? String(row.user_id) : null,
+      email: row.email != null ? String(row.email) : null,
+      full_name: row.full_name != null ? String(row.full_name) : null,
+      job_title: row.job_title != null ? String(row.job_title) : null,
+      is_project_worker: isProjectWorker,
+      is_project_member: isProjectMember,
+      project_member_role: null
+    }
+  }
+
+  private async enrichActiveProfilesWithProjectMembership(
+    projectName: string,
+    profiles: SafetyActiveProfile[]
+  ): Promise<SafetyActiveProfile[]> {
+    if (profiles.length === 0) return profiles
+
+    let members: SafetyProjectMember[] = []
+    try {
+      members = await this.listProjectMembers(projectName)
+    } catch {
+      return profiles
+    }
+
+    const memberByProfileId = new Map(
+      members
+        .filter((member) => member.is_active)
+        .map((member) => [member.profile_id, member] as const)
+    )
+
+    return profiles.map((profile) => {
+      const member = memberByProfileId.get(profile.profile_id)
+      if (!member) {
+        return {
+          ...profile,
+          is_project_member: false,
+          is_project_worker: false,
+          project_member_role: null
+        }
+      }
+      return {
+        ...profile,
+        is_project_member: true,
+        is_project_worker: member.role === 'worker',
+        project_member_role: member.role
+      }
+    })
+  }
+
+  private async reconcileScheduleWorkersMembership(
+    projectName: string,
+    workers: SafetyScheduleWorkerRow[]
+  ): Promise<SafetyScheduleWorkerRow[]> {
+    const project = projectName.trim()
+    if (!project || workers.length === 0) return workers
+
+    let members: SafetyProjectMember[] = []
+    try {
+      members = await this.listProjectMembers(project)
+    } catch {
+      return workers
+    }
+
+    const profileIds = new Set(
+      members.filter((member) => member.is_active).map((member) => member.profile_id)
+    )
+    const userIds = new Set(
+      members
+        .filter((member) => member.is_active && member.user_id)
+        .map((member) => member.user_id as string)
+    )
+
+    return workers.map((worker) => {
+      const isMember = (
+        (worker.profile_id && profileIds.has(worker.profile_id))
+        || (worker.recipient_user_id && userIds.has(worker.recipient_user_id))
+      )
+      if (!isMember || worker.membership_state === 'project_member') {
+        return worker
+      }
+      return {
+        ...worker,
+        membership_state: 'project_member'
+      }
+    })
+  }
+
   /**
    * Perfiles activos para destinatarios. Usa RPC `safety_list_active_profiles` si existe;
-   * si no, consulta `profiles` y deja `is_project_worker` en false hasta desplegar la migración.
+   * si no, consulta `profiles`. La membresía del proyecto se reconcilia con `project_members`.
    */
   async listActiveProfiles(params: {
     projectName: string
@@ -464,14 +561,10 @@ class SafetyAPI {
       p_limit: lim
     })
     if (!rpcRes.error && Array.isArray(rpcRes.data)) {
-      return (rpcRes.data as Array<Record<string, unknown>>).map((row) => ({
-        profile_id: String(row.profile_id ?? ''),
-        user_id: row.user_id ? String(row.user_id) : null,
-        email: row.email != null ? String(row.email) : null,
-        full_name: row.full_name != null ? String(row.full_name) : null,
-        job_title: row.job_title != null ? String(row.job_title) : null,
-        is_project_worker: Boolean(row.is_project_worker)
-      })).filter((row) => row.profile_id.length > 0)
+      const profiles = (rpcRes.data as Array<Record<string, unknown>>)
+        .map((row) => this.mapActiveProfileRow(row))
+        .filter((row) => row.profile_id.length > 0)
+      return this.enrichActiveProfilesWithProjectMembership(projectName, profiles)
     }
 
     const sel = await supabaseClient
@@ -495,14 +588,9 @@ class SafetyAPI {
     if (jt) {
       rows = rows.filter((row) => String(row.job_title ?? '').toLowerCase().includes(jt))
     }
-    return rows.map((row) => ({
-      profile_id: String(row.profile_id ?? ''),
-      user_id: row.user_id ? String(row.user_id) : null,
-      email: row.email != null ? String(row.email) : null,
-      full_name: row.full_name != null ? String(row.full_name) : null,
-      job_title: row.job_title != null ? String(row.job_title) : null,
-      is_project_worker: false
-    })).filter((row) => row.profile_id.length > 0)
+    const profiles = rows.map((row) => this.mapActiveProfileRow(row))
+      .filter((row) => row.profile_id.length > 0)
+    return this.enrichActiveProfilesWithProjectMembership(projectName, profiles)
   }
 
   async listWorkerMembers(projectName: string): Promise<SafetyProjectMemberWorker[]> {
@@ -632,7 +720,7 @@ class SafetyAPI {
   }
 
   /** True when the signed-in user is a global admin or active manager on at least one project. */
-  async canManageAnySafetyProject(): Promise<boolean> {
+  async isGlobalAdmin(): Promise<boolean> {
     const { data: authData, error: authError } = await supabaseClient.auth.getUser()
     const userId = authData.user?.id
     if (authError || !userId) return false
@@ -643,7 +731,83 @@ class SafetyAPI {
       .eq('user_id', userId)
       .eq('is_active', true)
       .maybeSingle()
-    if (profileRes.data?.global_role === 'admin') return true
+    if (profileRes.error) return false
+    return profileRes.data?.global_role === 'admin'
+  }
+
+  async listPeopleDirectory(filters: SafetyPeopleDirectoryFilters = {}): Promise<SafetyPeopleDirectoryProfile[]> {
+    const rpcRes = await supabaseClient.rpc('safety_admin_list_profiles_with_memberships', {
+      p_search: filters.search?.trim() || null,
+      p_project_name: filters.projectName?.trim() || null,
+      p_managers_only: filters.managersOnly ?? false,
+      p_include_inactive: filters.includeInactive ?? false
+    })
+    if (rpcRes.error) {
+      throw new Error(`Could not load people directory: ${rpcRes.error.message}`)
+    }
+
+    return (rpcRes.data ?? []).map((row: Record<string, unknown>) => {
+      const rawMemberships = row.memberships
+      const memberships: SafetyProfileMembership[] = Array.isArray(rawMemberships)
+        ? rawMemberships.map((item) => {
+            const m = item as Record<string, unknown>
+            return {
+              member_id: String(m.member_id ?? ''),
+              project_name: String(m.project_name ?? ''),
+              role: ((m.role as SafetyProjectMemberRole | null) ?? 'worker'),
+              source_role: m.source_role != null ? String(m.source_role) : null,
+              is_active: Boolean(m.is_active)
+            }
+          }).filter((m) => m.member_id.length > 0 && m.project_name.length > 0)
+        : []
+
+      return {
+        profile_id: String(row.profile_id ?? ''),
+        user_id: row.user_id ? String(row.user_id) : null,
+        email: row.email != null ? String(row.email) : null,
+        full_name: row.full_name != null ? String(row.full_name) : null,
+        job_title: row.job_title != null ? String(row.job_title) : null,
+        phone: row.phone != null ? String(row.phone) : null,
+        is_active: Boolean(row.is_active),
+        memberships
+      } satisfies SafetyPeopleDirectoryProfile
+    }).filter((row: SafetyPeopleDirectoryProfile) => row.profile_id.length > 0)
+  }
+
+  async adminUpdateProfile(payload: SafetyAdminUpdateProfilePayload): Promise<void> {
+    const profileId = payload.profileId.trim()
+    if (!profileId) throw new Error('Profile id is required.')
+
+    const rpcRes = await supabaseClient.rpc('safety_admin_update_profile', {
+      p_profile_id: profileId,
+      p_full_name: payload.fullName ?? '',
+      p_job_title: payload.jobTitle ?? '',
+      p_phone: payload.phone ?? ''
+    })
+    if (rpcRes.error) {
+      throw new Error(`Could not update profile: ${rpcRes.error.message}`)
+    }
+  }
+
+  async adminSetProfileActive(profileId: string, isActive: boolean): Promise<void> {
+    const id = profileId.trim()
+    if (!id) throw new Error('Profile id is required.')
+
+    const rpcRes = await supabaseClient.rpc('safety_admin_set_profile_active', {
+      p_profile_id: id,
+      p_is_active: isActive
+    })
+    if (rpcRes.error) {
+      throw new Error(`Could not update profile status: ${rpcRes.error.message}`)
+    }
+  }
+
+  async canManageAnySafetyProject(): Promise<boolean> {
+    if (await this.isGlobalAdmin()) return true
+
+    const { data: authData, error: authError } = await supabaseClient.auth.getUser()
+    const userId = authData.user?.id
+    if (authError || !userId) return false
 
     const managerRes = await supabaseClient
       .from('project_members')
@@ -1129,26 +1293,29 @@ class SafetyAPI {
         total_count: Number(first.total_count ?? 0)
       }
 
-      const workers: SafetyScheduleWorkerRow[] = rows
-        .filter(row => row.schedule_worker_id)
-        .map((row) => ({
-          schedule_worker_id: row.schedule_worker_id as string,
-          schedule_id: row.schedule_id as string,
-          recipient_user_id: (row.recipient_user_id as string | null) ?? (row.worker_user_id as string | null) ?? null,
-          profile_id: (row.profile_id as string | null) ?? null,
-          recipient_email: (row.recipient_email as string | null) ?? null,
-          recipient_full_name: (row.recipient_full_name as string | null) ?? null,
-          membership_state: ((row.membership_state as 'project_member' | 'non_member' | null) ?? 'project_member'),
-          invitation_status: ((row.invitation_status as SafetyScheduleWorkerRow['invitation_status'] | null) ?? 'requested'),
-          status: row.worker_status as 'pending' | 'signed' | 'overdue',
-          assigned_at: row.assigned_at as string,
-          assigned_by: (row.assigned_by as string | null) ?? null,
-          invited_at: (row.invited_at as string | null) ?? null,
-          joined_at: (row.joined_at as string | null) ?? null,
-          signed_at: (row.signed_at as string | null) ?? null,
-          signed_name: (row.signed_name as string | null) ?? null,
-          signature_payload: this.normalizeSignaturePayload(row.signature_payload)
-        }))
+      const workers: SafetyScheduleWorkerRow[] = await this.reconcileScheduleWorkersMembership(
+        schedule.project_name,
+        rows
+          .filter(row => row.schedule_worker_id)
+          .map((row) => ({
+            schedule_worker_id: row.schedule_worker_id as string,
+            schedule_id: row.schedule_id as string,
+            recipient_user_id: (row.recipient_user_id as string | null) ?? (row.worker_user_id as string | null) ?? null,
+            profile_id: (row.profile_id as string | null) ?? null,
+            recipient_email: (row.recipient_email as string | null) ?? null,
+            recipient_full_name: (row.recipient_full_name as string | null) ?? null,
+            membership_state: ((row.membership_state as 'project_member' | 'non_member' | null) ?? 'project_member'),
+            invitation_status: ((row.invitation_status as SafetyScheduleWorkerRow['invitation_status'] | null) ?? 'requested'),
+            status: row.worker_status as 'pending' | 'signed' | 'overdue',
+            assigned_at: row.assigned_at as string,
+            assigned_by: (row.assigned_by as string | null) ?? null,
+            invited_at: (row.invited_at as string | null) ?? null,
+            joined_at: (row.joined_at as string | null) ?? null,
+            signed_at: (row.signed_at as string | null) ?? null,
+            signed_name: (row.signed_name as string | null) ?? null,
+            signature_payload: this.normalizeSignaturePayload(row.signature_payload)
+          }))
+      )
 
       return { schedule, workers }
     }
@@ -1233,6 +1400,10 @@ class SafetyAPI {
 
     const schedule = scheduleRes.data
     const versionMeta = this.extractVersionJoinMeta(schedule as unknown as Record<string, unknown>)
+    const reconciledWorkers = await this.reconcileScheduleWorkersMembership(
+      schedule.project_name,
+      workers
+    )
     return {
       schedule: {
         schedule_id: schedule.schedule_id,
@@ -1258,9 +1429,9 @@ class SafetyAPI {
         pending_count: pending,
         signed_count: signed,
         overdue_count: overdue,
-        total_count: workers.length
+        total_count: reconciledWorkers.length
       },
-      workers
+      workers: reconciledWorkers
     }
   }
 

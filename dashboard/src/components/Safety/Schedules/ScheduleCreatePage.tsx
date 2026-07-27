@@ -21,7 +21,7 @@ import type {
   SafetyScheduleCreateMode,
   SafetyScheduleRecipientInput
 } from '../../../types/safety'
-import { formatSafetyEnumLabel, ensureCreatorInRecipients, recipientFromActiveProfile } from './scheduleRecipientFromProfile'
+import { formatRecipientMembershipLabel, ensureCreatorInRecipients, recipientFromActiveProfile } from './scheduleRecipientFromProfile'
 import { defaultPreStartDueAtIso, shouldRestrictScheduleCreateToProjectPreStart } from '../utils/preStartToday'
 import { shouldRestrictScheduleCreateToProjectToolboxTalk } from '../utils/toolboxTalkToday'
 import { safetyProjectsPath } from '../utils/safetyProjectsPath'
@@ -719,7 +719,7 @@ export default function ScheduleCreatePage() {
           profileSearch={profileSearch}
           profileJobTitle={profileJobTitle}
           shouldAutoFocusSearch={createStep === 2}
-          initialListFilter={fromGeneratedDocumentFlow ? 'project_workers' : 'all'}
+          initialListFilter={fromGeneratedDocumentFlow ? 'project_members' : 'all'}
           showGeneratedFlowHint={fromGeneratedDocumentFlow}
           onProfileSearchChange={setProfileSearch}
           onProfileJobTitleChange={setProfileJobTitle}
@@ -819,7 +819,7 @@ export default function ScheduleCreatePage() {
               <strong>{recipientsForCreate.length}</strong>
               {recipientsForCreate.length === 1 ? ' recipient selected' : ' recipients selected'}
               {fromGeneratedDocumentFlow ? (
-                <span className="safety-schedule-recipients-footer-context"> · Project workers</span>
+                <span className="safety-schedule-recipients-footer-context"> · Project members</span>
               ) : null}
             </p>
             <div className="safety-modal-footer safety-modal-footer--center safety-schedule-recipients-footer-actions">
@@ -879,7 +879,7 @@ export default function ScheduleCreatePage() {
                     <div key={key} className="safety-confirm-recipients-item">
                       <span className="safety-confirm-recipients-label">{recipientDisplayLabel(recipient)}</span>
                       <span className={`safety-status-pill safety-status-pill--${recipient.membership_state === 'project_member' ? 'signed' : 'pending'}`}>
-                        {formatSafetyEnumLabel(recipient.membership_state ?? 'non_member')}
+                        {formatRecipientMembershipLabel(recipient.membership_state)}
                       </span>
                     </div>
                   )

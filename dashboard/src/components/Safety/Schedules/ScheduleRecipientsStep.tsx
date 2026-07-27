@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMatchMedia } from '../../../hooks/useMatchMedia'
 import type { SafetyActiveProfile, SafetyScheduleRecipientInput } from '../../../types/safety'
-import { formatSafetyEnumLabel, isActiveProfileSelected } from './scheduleRecipientFromProfile'
+import { formatSafetyEnumLabel, formatRecipientMembershipLabel, isActiveProfileSelected } from './scheduleRecipientFromProfile'
 
-export type RecipientListFilter = 'all' | 'project_workers' | 'selected_in_list'
+export type RecipientListFilter = 'all' | 'project_members' | 'selected_in_list'
 type RecipientsMobileTab = 'workers' | 'selected' | 'invite'
 
 interface ScheduleRecipientsStepProps {
@@ -109,8 +109,8 @@ export default function ScheduleRecipientsStep({
   )
 
   const filteredProfiles = useMemo(() => {
-    if (listFilter === 'project_workers') {
-      return profiles.filter((profile) => profile.is_project_worker)
+    if (listFilter === 'project_members') {
+      return profiles.filter((profile) => profile.is_project_member)
     }
     if (listFilter === 'selected_in_list') {
       return profiles.filter((profile) => isActiveProfileSelected(profile, selectedRecipients))
@@ -136,8 +136,24 @@ export default function ScheduleRecipientsStep({
     return profiles.filter((profile) => (profile.job_title?.trim().toLowerCase() ?? '').includes(q)).length
   }, [profileJobTitle, profiles])
 
-  const projectWorkers = useMemo(
-    () => profiles.filter((profile) => profile.is_project_worker),
+  function renderProfileMembershipBadge(profile: SafetyActiveProfile) {
+    if (profile.is_project_member) {
+      return (
+        <span className="safety-status-pill safety-status-pill--signed">Project member</span>
+      )
+    }
+    return (
+      <span
+        className="safety-status-pill safety-status-pill--pending"
+        title="This person is not linked to this project yet."
+      >
+        Not in project
+      </span>
+    )
+  }
+
+  const projectMembers = useMemo(
+    () => profiles.filter((profile) => profile.is_project_member),
     [profiles]
   )
 
@@ -292,11 +308,11 @@ export default function ScheduleRecipientsStep({
                 </button>
                 <button
                   type="button"
-                  className={`safety-filter-chip${listFilter === 'project_workers' ? ' is-active' : ''}`}
-                  onClick={() => setListFilter('project_workers')}
-                  title="Show only workers already linked to this project."
+                  className={`safety-filter-chip${listFilter === 'project_members' ? ' is-active' : ''}`}
+                  onClick={() => setListFilter('project_members')}
+                  title="Show everyone already linked to this project (workers and managers)."
                 >
-                  Project workers ({projectWorkers.length})
+                  Project members ({projectMembers.length})
                 </button>
                 <button
                   type="button"
@@ -404,10 +420,10 @@ export default function ScheduleRecipientsStep({
           </button>
           <button
             type="button"
-            className={`safety-filter-chip${listFilter === 'project_workers' ? ' is-active' : ''}`}
-            onClick={() => setListFilter('project_workers')}
+            className={`safety-filter-chip${listFilter === 'project_members' ? ' is-active' : ''}`}
+            onClick={() => setListFilter('project_members')}
           >
-            Project workers ({projectWorkers.length})
+            Project members ({projectMembers.length})
           </button>
         </div>
         <button
@@ -457,11 +473,7 @@ export default function ScheduleRecipientsStep({
                       ) : null}
                     </span>
                     <span className="safety-profile-row-meta">
-                      {profile.is_project_worker ? (
-                        <span className="safety-status-pill safety-status-pill--signed">Project worker</span>
-                      ) : (
-                        <span className="safety-status-pill safety-status-pill--pending">Non member</span>
-                      )}
+                      {renderProfileMembershipBadge(profile)}
                     </span>
                   </span>
                 </button>
@@ -491,16 +503,7 @@ export default function ScheduleRecipientsStep({
                     <span className="safety-profile-row-email">{profile.email || '—'}</span>
                   </span>
                   <span className="safety-profile-row-meta">
-                    {profile.is_project_worker ? (
-                      <span className="safety-status-pill safety-status-pill--signed">Project worker</span>
-                    ) : (
-                      <span
-                        className="safety-status-pill safety-status-pill--pending"
-                        title="Non member means this worker is not currently linked to this project yet."
-                      >
-                        Non member
-                      </span>
-                    )}
+                    {renderProfileMembershipBadge(profile)}
                     {selectedRecipientKeys.has(`profile:${profile.profile_id}`) ? (
                       <span className="safety-status-pill safety-status-pill--available">Selected</span>
                     ) : null}
@@ -515,21 +518,21 @@ export default function ScheduleRecipientsStep({
   }
 
   function renderWorkersQuickAction() {
-    if ((!isMobileLayout && !showGeneratedFlowHint) || projectWorkers.length === 0) return null
+    if ((!isMobileLayout && !showGeneratedFlowHint) || projectMembers.length === 0) return null
     return (
       <div className="safety-recipients-mobile-quick-action">
         {showGeneratedFlowHint ? (
           <p className="safety-recipients-mobile-hint">
-            Workers linked to this project — tap to add everyone on site today. You are included automatically so you can sign too.
+            Project members on this job — tap to add everyone on site today. You are included automatically so you can sign too.
           </p>
         ) : null}
         <button
           type="button"
           className="safety-btn-primary safety-recipients-add-project-workers-btn"
-          onClick={() => onSelectVisibleProfiles(projectWorkers)}
-          disabled={projectWorkers.length === 0 || isLoadingProfiles}
+          onClick={() => onSelectVisibleProfiles(projectMembers)}
+          disabled={projectMembers.length === 0 || isLoadingProfiles}
         >
-          Add all project workers ({projectWorkers.length})
+          Add all project members ({projectMembers.length})
         </button>
       </div>
     )
@@ -567,7 +570,7 @@ export default function ScheduleRecipientsStep({
                             <>
                               {' · '}
                               <span className={`safety-status-pill safety-status-pill--${recipient.membership_state === 'project_member' ? 'signed' : 'pending'}`}>
-                                {formatSafetyEnumLabel(recipient.membership_state ?? 'non_member')}
+                                {formatRecipientMembershipLabel(recipient.membership_state)}
                               </span>
                               {' '}
                               <span className={`safety-status-pill safety-status-pill--${recipient.invitation_status === 'signed' ? 'signed' : recipient.invitation_status === 'failed' ? 'overdue' : 'pending'}`}>
@@ -810,7 +813,7 @@ export default function ScheduleRecipientsStep({
           <p className="safety-recipients-legend">
             <span className="material-icons" aria-hidden>info</span>
             <span>
-              <strong>Non member</strong>: worker exists but is not linked to this project yet.
+              <strong>Not in project</strong>: person exists in Safety but is not linked to this project yet.
             </span>
           </p>
         </div>

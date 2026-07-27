@@ -101,6 +101,39 @@ export interface SafetyAddProjectMemberResult {
   invitation_queued: boolean
 }
 
+export interface SafetyProfileMembership {
+  member_id: string
+  project_name: string
+  role: SafetyProjectMemberRole
+  source_role: string | null
+  is_active: boolean
+}
+
+export interface SafetyPeopleDirectoryProfile {
+  profile_id: string
+  user_id: string | null
+  email: string | null
+  full_name: string | null
+  job_title: string | null
+  phone: string | null
+  is_active: boolean
+  memberships: SafetyProfileMembership[]
+}
+
+export interface SafetyPeopleDirectoryFilters {
+  search?: string
+  projectName?: string
+  managersOnly?: boolean
+  includeInactive?: boolean
+}
+
+export interface SafetyAdminUpdateProfilePayload {
+  profileId: string
+  fullName?: string | null
+  jobTitle?: string | null
+  phone?: string | null
+}
+
 /** Perfil activo para destinatarios de schedule (RPC `safety_list_active_profiles` o fallback). */
 export interface SafetyActiveProfile {
   profile_id: string
@@ -108,7 +141,11 @@ export interface SafetyActiveProfile {
   email: string | null
   full_name: string | null
   job_title: string | null
+  /** Active project member with role worker (used for worker-only filters). */
   is_project_worker: boolean
+  /** Active project member with any role (worker or manager). */
+  is_project_member: boolean
+  project_member_role?: SafetyProjectMemberRole | null
 }
 
 export interface SafetyScheduleSummary {

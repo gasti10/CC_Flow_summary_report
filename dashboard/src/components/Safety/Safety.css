@@ -8062,3 +8062,268 @@
   gap: 0.4rem;
   align-items: flex-end;
 }
+
+/* People directory (admin) */
+.safety-people-toolbar {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.safety-people-toolbar .safety-people-toolbar-search {
+  flex: 1 1 16rem;
+  min-width: 12rem;
+  height: 2.5rem;
+  min-height: 2.5rem;
+  box-sizing: border-box;
+}
+
+.safety-people-toolbar-project-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 18rem;
+  min-width: 14rem;
+}
+
+.safety-people-toolbar-project-combobox {
+  flex: 1 1 12rem;
+  min-width: 12rem;
+}
+
+.safety-people-manage-members-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.safety-people-filter-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.92rem;
+  color: var(--safety-text-muted, #6b7280);
+  white-space: nowrap;
+}
+
+.safety-shell .safety-people-mfg-wrap {
+  margin-top: 0.75rem;
+}
+
+.safety-shell .safety-people-mfg-table .safety-people-col-expand {
+  width: 2.5rem;
+}
+
+.safety-shell .safety-people-mfg-table .safety-people-col-memberships {
+  min-width: 12rem;
+}
+
+.safety-shell .safety-people-mfg-table .safety-people-col-phone {
+  min-width: 7.5rem;
+}
+
+.safety-people-project-combobox {
+  position: relative;
+  flex: 1 1 16rem;
+  min-width: 12rem;
+  align-self: center;
+}
+
+.safety-people-project-combobox-input {
+  width: 100%;
+  height: 2.5rem;
+  min-height: 2.5rem;
+  box-sizing: border-box;
+}
+
+.safety-people-project-combobox-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  border: 1px solid #cfd9be;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.safety-people-project-combobox-list--portal {
+  position: fixed;
+  z-index: 1200;
+}
+
+.safety-people-project-combobox-option {
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+  background: transparent;
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.875rem;
+  line-height: 1.3;
+  color: var(--safety-ink, #1f2937);
+  cursor: pointer;
+}
+
+.safety-people-project-combobox-option:last-child {
+  border-bottom: none;
+}
+
+.safety-people-project-combobox-option:hover,
+.safety-people-project-combobox-option.is-selected {
+  background: rgba(90, 108, 125, 0.08);
+}
+
+.safety-people-project-combobox-empty {
+  padding: 0.65rem;
+  font-size: 0.85rem;
+}
+
+.safety-people-row {
+  cursor: pointer;
+}
+
+.safety-people-row:hover {
+  background: rgba(90, 108, 125, 0.06);
+}
+
+.safety-people-row.is-expanded {
+  background: rgba(90, 108, 125, 0.08);
+}
+
+.safety-people-td-expand {
+  width: 2.5rem;
+  text-align: center;
+}
+
+.safety-people-expand-icon {
+  font-size: 1.25rem;
+  color: var(--safety-text-muted, #6b7280);
+  vertical-align: middle;
+}
+
+.safety-people-membership-chips {
+  margin-top: 0.2rem;
+}
+
+.safety-people-detail-row .safety-people-detail-cell {
+  padding: 0;
+  background: #f8fafc;
+  border-top: 1px solid var(--safety-border, #e5e7eb);
+}
+
+.safety-people-membership-panel {
+  padding: 1rem 1.1rem 1.15rem;
+}
+
+.safety-people-profile-edit {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--safety-border, #e5e7eb);
+}
+
+.safety-people-profile-edit-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.safety-people-profile-edit-title,
+.safety-people-section-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.safety-people-profile-edit-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.safety-people-profile-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.safety-people-profile-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.safety-people-profile-edit-field .safety-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.safety-people-profile-edit-actions {
+  margin-top: 0.85rem;
+}
+
+.safety-people-section-title {
+  margin-bottom: 0.35rem;
+}
+
+@media (max-width: 720px) {
+  .safety-people-profile-edit-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.safety-people-membership-table-wrap {
+  margin-top: 0.5rem;
+}
+
+.safety-shell .safety-people-membership-table-wrap col.safety-people-membership-col-project {
+  min-width: 14rem;
+}
+
+.safety-people-add-membership {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--safety-border, #e5e7eb);
+}
+
+.safety-people-add-membership-title {
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.safety-people-add-membership-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.safety-people-add-membership-row > .safety-input {
+  min-width: 12rem;
+  flex: 1 1 12rem;
+  height: 2.5rem;
+  min-height: 2.5rem;
+  box-sizing: border-box;
+}
+
+.safety-people-add-membership-row > .safety-btn-primary {
+  align-self: center;
+}
+
+@media (max-width: 720px) {
+  .safety-people-add-membership-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .safety-people-add-membership-row > .safety-btn-primary {
+    width: 100%;
+  }
+}
