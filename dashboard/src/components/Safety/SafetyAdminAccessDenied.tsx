@@ -25,6 +25,7 @@ export default function SafetyAdminAccessDenied() {
         </p>
         <p className="safety-muted">
           Project managers can still manage members from each project under Safety → Projects → Manage members.
+          Site Leaders can run schedules on their jobs but cannot manage members.
         </p>
       </div>
       <div className="safety-create-access-denied-actions">

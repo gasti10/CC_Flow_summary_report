@@ -21,6 +21,7 @@ import type {
   SafetyProjectMember,
   SafetyProjectMemberRole,
   SafetyProjectMemberWorker,
+  SafetyProjectManagerContact,
   SafetyAddProjectMemberResult,
   SafetyAdminUpdateProfilePayload,
   SafetyPeopleDirectoryFilters,
@@ -31,6 +32,7 @@ import type {
   SafetyWorkerSignaturePayload,
   SafetyWorkerSignatureResult,
   SafetyScheduleDetail,
+  SafetyScheduleCreatorRecipient,
   SafetyScheduleRecipientInput,
   SafetyScheduleSignedPackResult,
   SafetyScheduleSummary,
@@ -719,6 +721,36 @@ class SafetyAPI {
     return Boolean(rpcRes.data)
   }
 
+  /** True when auth user is admin or active manager on the project (not site_leader). */
+  async canManageProjectMembers(projectName: string): Promise<boolean> {
+    const project = projectName.trim()
+    if (!project) return false
+
+    const rpcRes = await supabaseClient.rpc('safety_user_can_manage_project_members', {
+      p_project_name: project
+    })
+    if (rpcRes.error) return false
+    return Boolean(rpcRes.data)
+  }
+
+  async listProjectManagers(projectName: string): Promise<SafetyProjectManagerContact[]> {
+    const project = projectName.trim()
+    if (!project) return []
+
+    const rpcRes = await supabaseClient.rpc('safety_list_project_managers', {
+      p_project_name: project
+    })
+    if (rpcRes.error) {
+      throw new Error(`Could not load project managers: ${rpcRes.error.message}`)
+    }
+
+    return (rpcRes.data ?? []).map((row: Record<string, unknown>) => ({
+      member_id: String(row.member_id ?? ''),
+      full_name: row.full_name != null ? String(row.full_name) : null,
+      phone: row.phone != null ? String(row.phone) : null
+    })).filter((row: { member_id: string }) => row.member_id.length > 0)
+  }
+
   /** True when the signed-in user is a global admin or active manager on at least one project. */
   async isGlobalAdmin(): Promise<boolean> {
     const { data: authData, error: authError } = await supabaseClient.auth.getUser()
@@ -813,7 +845,7 @@ class SafetyAPI {
       .from('project_members')
       .select('member_id')
       .eq('user_id', userId)
-      .eq('role', 'manager')
+      .in('role', ['manager', 'site_leader'])
       .eq('is_active', true)
       .limit(1)
     if (managerRes.error) return false
@@ -1900,8 +1932,11 @@ class SafetyAPI {
     }
   }
 
-  /** Active profile row for the signed-in user, for auto-including them on generated-document schedules. */
-  async getMyScheduleCreatorRecipient(projectName: string): Promise<SafetyScheduleRecipientInput | null> {
+  /**
+   * Active profile for the signed-in user, used to auto-include them as a recipient
+   * on generated-document schedules and when they are a Site Leader on the project.
+   */
+  async getMyScheduleCreatorRecipient(projectName: string): Promise<SafetyScheduleCreatorRecipient | null> {
     const uid = await this.getAuthUid()
     const project = projectName.trim()
     if (!uid || !project) return null
@@ -1917,11 +1952,18 @@ class SafetyAPI {
 
     const memberRes = await supabaseClient
       .from('project_members')
-      .select('member_id')
+      .select('member_id, role')
       .eq('project_name', project)
       .eq('user_id', uid)
       .eq('is_active', true)
       .maybeSingle()
+    if (memberRes.error) throw new Error(`Could not load your project membership: ${memberRes.error.message}`)
+
+    const roleRaw = memberRes.data?.role
+    const projectMemberRole: SafetyProjectMemberRole | null =
+      roleRaw === 'manager' || roleRaw === 'site_leader' || roleRaw === 'worker'
+        ? roleRaw
+        : null
 
     return {
       recipient_user_id: uid,
@@ -1929,7 +1971,8 @@ class SafetyAPI {
       recipient_email: (profileRes.data.email as string | null) ?? null,
       recipient_full_name: (profileRes.data.full_name as string | null) ?? null,
       membership_state: memberRes.data ? 'project_member' : 'non_member',
-      invitation_status: 'requested'
+      invitation_status: 'requested',
+      project_member_role: projectMemberRole
     }
   }
 

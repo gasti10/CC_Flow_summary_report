@@ -67,7 +67,13 @@ export interface SafetyDocumentDetail {
   versions: SafetyDocumentVersion[]
 }
 
-export type SafetyProjectMemberRole = 'manager' | 'worker'
+export type SafetyProjectMemberRole = 'manager' | 'site_leader' | 'worker'
+
+export interface SafetyProjectManagerContact {
+  member_id: string
+  full_name: string | null
+  phone: string | null
+}
 
 export interface SafetyProjectMemberWorker {
   user_id: string
@@ -384,6 +390,11 @@ export interface SafetyScheduleRecipientInput {
   recipient_full_name?: string | null
   membership_state?: SafetyRecipientMembershipState
   invitation_status?: SafetyInvitationStatus
+}
+
+/** Creator profile for auto-including on schedule create (pre-start / site leader). */
+export interface SafetyScheduleCreatorRecipient extends SafetyScheduleRecipientInput {
+  project_member_role: SafetyProjectMemberRole | null
 }
 
 export interface ExtendSafetyScheduleDueDatePayload {

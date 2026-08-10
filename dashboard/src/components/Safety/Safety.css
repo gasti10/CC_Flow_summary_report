@@ -3776,6 +3776,16 @@
   gap: 0.65rem;
 }
 
+.safety-members-denied-manager-list {
+  margin: 0.75rem 0 0;
+  padding-left: 1.25rem;
+  text-align: left;
+}
+
+.safety-members-denied-manager-list li {
+  margin: 0.25rem 0;
+}
+
 @keyframes safety-invite-hourglass {
   0%,
   100% {
@@ -4532,8 +4542,9 @@
 
 .safety-stats-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
+  align-items: stretch;
 }
 
 .safety-context-panel {
@@ -7770,16 +7781,16 @@
     grid-template-columns: 1fr;
   }
 
-  .safety-stats-row {
-    grid-template-columns: 1fr;
-  }
-
   .safety-recipients-layout {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
+  .safety-stats-row {
+    grid-template-columns: 1fr;
+  }
+
   .safety-header {
     padding: 8px 10px;
     gap: 6px;

@@ -28,13 +28,23 @@ function profileLabel(profile: SafetyPeopleDirectoryProfile): string {
   return profile.full_name?.trim() || profile.email?.trim() || 'Unknown profile'
 }
 
+function roleLabel(role: SafetyProjectMemberRole): string {
+  if (role === 'manager') return 'Manager'
+  if (role === 'site_leader') return 'Site Leader'
+  return 'Worker'
+}
+
 function membershipSummary(profile: SafetyPeopleDirectoryProfile): string {
   const active = profile.memberships.filter((m) => m.is_active)
   if (active.length === 0) return 'No projects'
   const managerCount = active.filter((m) => m.role === 'manager').length
+  const siteLeaderCount = active.filter((m) => m.role === 'site_leader').length
   const parts = [`${active.length} project${active.length === 1 ? '' : 's'}`]
   if (managerCount > 0) {
     parts.push(`${managerCount} Manager${managerCount === 1 ? '' : 's'}`)
+  }
+  if (siteLeaderCount > 0) {
+    parts.push(`${siteLeaderCount} Site Leader${siteLeaderCount === 1 ? '' : 's'}`)
   }
   return parts.join(' · ')
 }
@@ -44,7 +54,7 @@ function membershipChips(profile: SafetyPeopleDirectoryProfile): string {
   if (active.length === 0) return 'No projects'
   return active
     .slice(0, 3)
-    .map((m) => `${m.project_name} (${m.role === 'manager' ? 'Manager' : 'Worker'})`)
+    .map((m) => `${m.project_name} (${roleLabel(m.role)})`)
     .join(', ')
     + (active.length > 3 ? ` +${active.length - 3} more` : '')
 }

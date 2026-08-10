@@ -31,7 +31,7 @@ export default function SafetyManagerAccessDenied({
     >
       <div className="safety-alert safety-alert--error safety-alert--reveal">
         <p>
-          You don&apos;t have manager access for {projectName}. Only project managers can {featureDescription}.
+          You don&apos;t have manager or Site Leader access for {projectName}. Only Managers and Site Leaders can {featureDescription}.
         </p>
         <p className="safety-muted">
           Your account is set up as a Worker. Open My assignments to review and sign SWMS documents assigned to you.

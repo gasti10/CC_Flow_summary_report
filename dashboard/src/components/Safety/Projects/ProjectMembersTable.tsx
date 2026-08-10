@@ -73,6 +73,7 @@ export default function ProjectMembersTable({
                     aria-label={`Role for ${memberLabel(member.full_name, member.email)}`}
                   >
                     <option value="manager">Manager</option>
+                    <option value="site_leader">Site Leader</option>
                     <option value="worker">Worker</option>
                   </select>
                   </div>

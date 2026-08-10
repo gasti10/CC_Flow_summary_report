@@ -8,7 +8,7 @@ import type { SafetyActiveProfile, SafetyProjectMember, SafetyProjectMemberRole 
 import ProjectMembersTable from './ProjectMembersTable'
 import { safetyProjectsPath } from '../utils/safetyProjectsPath'
 import ProjectMembersAddPanel from './ProjectMembersAddPanel'
-import SafetyManagerAccessGate from '../SafetyManagerAccessGate'
+import ProjectMembersAccessGate from './ProjectMembersAccessGate'
 
 export default function ProjectMembersPage() {
   const { projectName: projectNameParam } = useParams<{ projectName: string }>()
@@ -75,6 +75,7 @@ export default function ProjectMembersPage() {
     return {
       total: rows.length,
       managers: rows.filter((member) => member.role === 'manager' && member.is_active).length,
+      siteLeaders: rows.filter((member) => member.role === 'site_leader' && member.is_active).length,
       workers: rows.filter((member) => member.role === 'worker' && member.is_active).length
     }
   }, [membersQuery.data])
@@ -209,10 +210,9 @@ export default function ProjectMembersPage() {
         </Link>
       )}
     >
-      <SafetyManagerAccessGate
+      <ProjectMembersAccessGate
         projectName={projectName}
         backToProjectsPath={safetyProjectsPath(projectName)}
-        featureDescription="manage project members and invitations"
         loadingMessage="Checking member management permissions…"
       >
       <section className="safety-card safety-stats-row">
@@ -223,6 +223,10 @@ export default function ProjectMembersPage() {
         <div className="safety-kpi-card">
           <span className="safety-muted">Managers</span>
           <strong>{counters.managers}</strong>
+        </div>
+        <div className="safety-kpi-card">
+          <span className="safety-muted">Site Leaders</span>
+          <strong>{counters.siteLeaders}</strong>
         </div>
         <div className="safety-kpi-card">
           <span className="safety-muted">Workers</span>
@@ -252,11 +256,12 @@ export default function ProjectMembersPage() {
           >
             <option value="all">All roles</option>
             <option value="manager">Managers</option>
+            <option value="site_leader">Site Leaders</option>
             <option value="worker">Workers</option>
           </select>
         </div>
         <p className="safety-muted safety-inline-help">
-          Tip: managers can create schedules and manage members. Workers receive SWMS assignments only.
+          Tip: Managers can create schedules and manage members. Site Leaders run daily pre-starts and schedules but cannot manage members. Workers receive assignments only.
         </p>
 
         {feedback ? (
@@ -317,7 +322,7 @@ export default function ProjectMembersPage() {
           onAddByEmail={handleAddByEmail}
         />
       </section>
-      </SafetyManagerAccessGate>
+      </ProjectMembersAccessGate>
     </SafetyLayout>
   )
 }

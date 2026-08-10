@@ -20,6 +20,7 @@ export default function PeopleDirectoryPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [projectFilter, setProjectFilter] = useState('')
   const [managersOnly, setManagersOnly] = useState(false)
+  const [siteLeadersOnly, setSiteLeadersOnly] = useState(false)
   const [includeInactive, setIncludeInactive] = useState(false)
   const [expandedProfileId, setExpandedProfileId] = useState<string | null>(null)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -41,15 +42,29 @@ export default function PeopleDirectoryPage() {
   }, [feedback])
 
   const directoryQuery = useQuery({
-    queryKey: ['safety-people-directory', debouncedSearch, projectFilter, managersOnly, includeInactive],
+    queryKey: ['safety-people-directory', debouncedSearch, projectFilter, managersOnly, siteLeadersOnly, includeInactive],
     queryFn: () => safetyApi.listPeopleDirectory({
       search: debouncedSearch || undefined,
       projectName: projectFilter || undefined,
-      managersOnly,
+      // Server filter only when Managers-only is alone; Site Leaders filtered client-side.
+      managersOnly: managersOnly && !siteLeadersOnly,
       includeInactive
     }),
     enabled: isAdmin
   })
+
+  const directoryRows = useMemo(() => {
+    const rows = directoryQuery.data ?? []
+    if (!siteLeadersOnly && !managersOnly) return rows
+    if (managersOnly && !siteLeadersOnly) return rows
+    if (siteLeadersOnly && !managersOnly) {
+      return rows.filter((row) => row.memberships.some((m) => m.is_active && m.role === 'site_leader'))
+    }
+    // Both: Manager or Site Leader on any project
+    return rows.filter((row) =>
+      row.memberships.some((m) => m.is_active && (m.role === 'manager' || m.role === 'site_leader'))
+    )
+  }, [directoryQuery.data, managersOnly, siteLeadersOnly])
 
   const projectsQuery = useQuery({
     queryKey: ['safety-projects-for-people'],
@@ -70,15 +85,17 @@ export default function PeopleDirectoryPage() {
   )
 
   const counters = useMemo(() => {
-    const rows = directoryQuery.data ?? []
+    const rows = directoryRows
     const withMemberships = rows.filter((row) => row.memberships.some((m) => m.is_active)).length
     const managers = rows.filter((row) => row.memberships.some((m) => m.is_active && m.role === 'manager')).length
+    const siteLeaders = rows.filter((row) => row.memberships.some((m) => m.is_active && m.role === 'site_leader')).length
     return {
       total: rows.length,
       withMemberships,
-      managers
+      managers,
+      siteLeaders
     }
-  }, [directoryQuery.data])
+  }, [directoryRows])
 
   const invalidateDirectory = async () => {
     await queryClient.invalidateQueries({ queryKey: ['safety-people-directory'] })
@@ -216,7 +233,7 @@ export default function PeopleDirectoryPage() {
     return (
       <SafetyLayout title="People" subtitle="View all Safety profiles and manage project memberships.">
         <section className="safety-card">
-          <p className="safety-muted">Checking permissions…</p>
+          <p className="safety-muted">Checking permissions...</p>
         </section>
       </SafetyLayout>
     )
@@ -254,13 +271,17 @@ export default function PeopleDirectoryPage() {
           <span className="safety-muted">Managers (any project)</span>
           <strong>{counters.managers}</strong>
         </div>
+        <div className="safety-kpi-card">
+          <span className="safety-muted">Site Leaders (any project)</span>
+          <strong>{counters.siteLeaders}</strong>
+        </div>
       </section>
 
       <section className="safety-card">
         <div className="safety-toolbar safety-people-toolbar">
           <input
             className="safety-input safety-people-toolbar-search"
-            placeholder="Search by name, email, phone, or job title…"
+            placeholder="Search by name, email, phone, or job title..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             autoComplete="off"
@@ -272,7 +293,7 @@ export default function PeopleDirectoryPage() {
               ariaLabel="Filter by project"
               options={projectOptions}
               value={projectFilter}
-              placeholder="All projects — search to filter…"
+              placeholder="All projects - search to filter..."
               disabled={projectsQuery.isLoading}
               onChange={setProjectFilter}
             />
@@ -297,6 +318,14 @@ export default function PeopleDirectoryPage() {
           <label className="safety-people-filter-check">
             <input
               type="checkbox"
+              checked={siteLeadersOnly}
+              onChange={(event) => setSiteLeadersOnly(event.target.checked)}
+            />
+            Site Leaders only
+          </label>
+          <label className="safety-people-filter-check">
+            <input
+              type="checkbox"
               checked={includeInactive}
               onChange={(event) => setIncludeInactive(event.target.checked)}
             />
@@ -305,7 +334,7 @@ export default function PeopleDirectoryPage() {
         </div>
 
         <p className="safety-muted safety-inline-help">
-          Expand a row to edit profile details and project memberships. Promote onsite leads to Manager so they can create new schedules.
+          Expand a row to edit profile details and project memberships. Promote onsite leads to Site Leader so they can run daily pre-starts and schedules (Managers still manage members).
         </p>
 
         {feedback ? (
@@ -321,18 +350,18 @@ export default function PeopleDirectoryPage() {
         ) : null}
 
         {directoryQuery.isLoading ? (
-          <p className="safety-muted">Loading people directory…</p>
+          <p className="safety-muted">Loading people directory...</p>
         ) : directoryQuery.isError ? (
           <div className="safety-alert safety-alert--error">
             <p>{directoryQuery.error instanceof Error ? directoryQuery.error.message : 'Could not load people directory.'}</p>
           </div>
-        ) : (directoryQuery.data ?? []).length === 0 ? (
+        ) : directoryRows.length === 0 ? (
           <div className="safety-empty-block">
             <p className="safety-muted">No profiles match your current filters.</p>
           </div>
         ) : (
           <PeopleDirectoryTable
-            rows={directoryQuery.data ?? []}
+            rows={directoryRows}
             expandedProfileId={expandedProfileId}
             projects={projects}
             savingProfileId={updateProfileMutation.isPending ? updateProfileMutation.variables?.profileId ?? null : null}

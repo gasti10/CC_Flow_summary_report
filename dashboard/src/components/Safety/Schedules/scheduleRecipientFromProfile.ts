@@ -40,7 +40,7 @@ export function isActiveProfileSelected(
   return selected.some((r) => r.profile_id === p.profile_id)
 }
 
-/** Ensures the schedule creator is in the recipient list (e.g. pre-start / toolbox talk sign-off). */
+/** Ensures the schedule creator is in the recipient list (pre-start / toolbox talk / site leader). */
 export function ensureCreatorInRecipients(
   recipients: SafetyScheduleRecipientInput[],
   creator: SafetyScheduleRecipientInput | null | undefined

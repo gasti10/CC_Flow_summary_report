@@ -354,7 +354,7 @@ export default function ProjectsSchedulesPage() {
                     </>
                   ) : (
                     <p className="safety-muted safety-inline-help">
-                      Manager actions are available to project managers. Open My assignments to review SWMS assigned to you.
+                      Manager actions are available to Managers and Site Leaders. Open My assignments to review SWMS assigned to you.
                     </p>
                   )}
                 </div>

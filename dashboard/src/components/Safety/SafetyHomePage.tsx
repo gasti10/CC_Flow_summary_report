@@ -111,7 +111,7 @@ export default function SafetyHomePage() {
           {isGlobalAdmin ? (
             <article className="safety-hub-card">
               <h3>People</h3>
-              <p>View all Safety profiles, project memberships, and promote onsite leads to Manager.</p>
+              <p>View all Safety profiles, project memberships, and promote onsite leads to Site Leader.</p>
               <Link to="/safety/people" className="safety-btn-primary">
                 Open People
               </Link>

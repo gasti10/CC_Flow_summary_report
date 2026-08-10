@@ -89,7 +89,7 @@ export default function PeopleMembershipPanel({
 
       <h4 className="safety-people-section-title">Project memberships</h4>
       <p className="safety-muted safety-inline-help">
-        Managers can create schedules, daily pre-starts, and toolbox talks. Workers receive and sign assignments only.
+        Managers can create schedules and manage members. Site Leaders run daily pre-starts and schedules but cannot manage members. Workers receive and sign assignments only.
       </p>
 
       {profile.memberships.length === 0 ? (
@@ -133,6 +133,7 @@ export default function PeopleMembershipPanel({
                           aria-label={`Role for ${label} on ${membership.project_name}`}
                         >
                           <option value="manager">Manager</option>
+                          <option value="site_leader">Site Leader</option>
                           <option value="worker">Worker</option>
                         </select>
                       </div>
@@ -189,6 +190,7 @@ export default function PeopleMembershipPanel({
             onChange={(event) => setAddRole(event.target.value as SafetyProjectMemberRole)}
             aria-label="Role for new membership"
           >
+            <option value="site_leader">Site Leader</option>
             <option value="manager">Manager</option>
             <option value="worker">Worker</option>
           </select>

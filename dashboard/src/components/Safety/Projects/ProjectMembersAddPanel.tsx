@@ -322,7 +322,7 @@ export default function ProjectMembersAddPanel({
                   <span
                     className="material-icons safety-inline-tooltip"
                     aria-label="Role applied when adding from the list or by email"
-                    title="Manager can manage schedules and members. Worker receives assignments."
+                    title="Manager can manage schedules and members. Site Leader can run schedules and daily pre-starts but cannot manage members. Worker receives assignments."
                   >
                     help_outline
                   </span>
@@ -334,6 +334,7 @@ export default function ProjectMembersAddPanel({
                   onChange={(event) => onAddRoleChange(event.target.value as SafetyProjectMemberRole)}
                 >
                   <option value="worker">Worker</option>
+                  <option value="site_leader">Site Leader</option>
                   <option value="manager">Manager</option>
                 </select>
                 <p className="safety-muted safety-member-role-help">

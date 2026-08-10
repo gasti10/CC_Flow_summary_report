@@ -302,23 +302,27 @@ export default function ScheduleCreatePage() {
   const creatorRecipientQuery = useQuery({
     queryKey: ['safety-schedule-creator-recipient', projectInput],
     queryFn: () => safetyApi.getMyScheduleCreatorRecipient(projectInput),
-    enabled: fromGeneratedDocumentFlow && !!projectInput.trim()
+    enabled: !!projectInput.trim()
   })
 
+  const shouldAutoIncludeCreator = Boolean(
+    fromGeneratedDocumentFlow
+    || creatorRecipientQuery.data?.project_member_role === 'site_leader'
+  )
+
+  const autoIncludeCreator = shouldAutoIncludeCreator ? creatorRecipientQuery.data : null
+
   const recipientsForCreate = useMemo(
-    () => ensureCreatorInRecipients(
-      selectedRecipients,
-      fromGeneratedDocumentFlow ? creatorRecipientQuery.data : null
-    ),
-    [selectedRecipients, fromGeneratedDocumentFlow, creatorRecipientQuery.data]
+    () => ensureCreatorInRecipients(selectedRecipients, autoIncludeCreator),
+    [selectedRecipients, autoIncludeCreator]
   )
 
   useEffect(() => {
-    if (!fromGeneratedDocumentFlow || createStep !== 2) return
+    if (!shouldAutoIncludeCreator || createStep !== 2) return
     const creator = creatorRecipientQuery.data
     if (!creator) return
     setSelectedRecipients((prev) => ensureCreatorInRecipients(prev, creator))
-  }, [fromGeneratedDocumentFlow, createStep, creatorRecipientQuery.data])
+  }, [shouldAutoIncludeCreator, createStep, creatorRecipientQuery.data])
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -554,8 +558,8 @@ export default function ScheduleCreatePage() {
           <div className="safety-alert safety-alert--error safety-alert--reveal">
             <p>
               {resolvedProjectName
-                ? `You don't have manager access for ${resolvedProjectName}. Only project managers can create schedules and assign workers.`
-                : 'Only project managers can create schedules and assign workers.'}
+                ? `You don't have Manager or Site Leader access for ${resolvedProjectName}. Only Managers and Site Leaders can create schedules and assign workers.`
+                : 'Only Managers and Site Leaders can create schedules and assign workers.'}
             </p>
             <p className="safety-muted">
               Your account is set up as a Worker. Open My assignments to review and sign SWMS documents assigned to you.
@@ -727,9 +731,8 @@ export default function ScheduleCreatePage() {
             const next = recipientFromActiveProfile(profile)
             const key = scheduleRecipientKey(next)
             const isProtectedCreator = Boolean(
-              fromGeneratedDocumentFlow
-              && creatorRecipientQuery.data
-              && key === scheduleRecipientKey(creatorRecipientQuery.data)
+              autoIncludeCreator
+              && key === scheduleRecipientKey(autoIncludeCreator)
             )
             setSelectedRecipients((prev) => {
               const exists = prev.some((r) => scheduleRecipientKey(r) === key)
@@ -743,24 +746,22 @@ export default function ScheduleCreatePage() {
           onSelectVisibleProfiles={(profiles) => addProfilesToRecipients(profiles)}
           onClearRecipients={() => {
             setSelectedRecipients(() => {
-              const creator = fromGeneratedDocumentFlow ? creatorRecipientQuery.data : null
-              if (!creator) return []
-              return ensureCreatorInRecipients([], creator)
+              if (!autoIncludeCreator) return []
+              return ensureCreatorInRecipients([], autoIncludeCreator)
             })
           }}
           onRemoveRecipient={(recipientKeyStr) => {
             if (
-              fromGeneratedDocumentFlow
-              && creatorRecipientQuery.data
-              && recipientKeyStr === scheduleRecipientKey(creatorRecipientQuery.data)
+              autoIncludeCreator
+              && recipientKeyStr === scheduleRecipientKey(autoIncludeCreator)
             ) {
               return
             }
             setSelectedRecipients((prev) => prev.filter((item) => scheduleRecipientKey(item) !== recipientKeyStr))
           }}
           protectedRecipientKey={
-            fromGeneratedDocumentFlow && creatorRecipientQuery.data
-              ? scheduleRecipientKey(creatorRecipientQuery.data)
+            autoIncludeCreator
+              ? scheduleRecipientKey(autoIncludeCreator)
               : undefined
           }
           onAddRecipientByEmail={(email, displayName) => {
