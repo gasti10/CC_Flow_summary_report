@@ -664,6 +664,31 @@
   margin: 0;
 }
 
+.safety-alert__follow-up {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.safety-alert-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.safety-alert-actions .safety-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+}
+
+.safety-alert-actions .material-icons {
+  font-size: 1.1rem;
+}
+
 .safety-inline-help {
   margin: 4px 0 12px;
   font-size: 0.84rem;

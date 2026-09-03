@@ -57,8 +57,8 @@ export default function PeopleProfileEditPanel({
     const nextActive = !profile.is_active
     const action = nextActive ? 'Reactivate' : 'Deactivate'
     const note = nextActive
-      ? `${profileLabel} will appear in active profile lists again.`
-      : `${profileLabel} will be hidden from active lists and cannot receive new schedules. Existing assignment history is kept.`
+      ? `${profileLabel} will appear in active profile lists again. CC Flow Web Platform login will be allowed (OTP sign-in required).`
+      : `${profileLabel} will lose CC Flow Web Platform access. Active sessions stop on the next request. Assignment history is kept.`
     const confirmed = window.confirm(`${action} ${profileLabel}?\n\n${note}`)
     if (!confirmed) return
     onSetActive(nextActive)

@@ -7,8 +7,15 @@ import { useSafetyGlobalAdmin } from '../hooks/useSafetyGlobalAdmin'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { safetyApi } from '../../../services/safetyApi'
 import type { SafetyProfileMembership, SafetyProjectMemberRole } from '../../../types/safety'
+import { CC_FLOW_2026_APPSHEET_EDITOR_URL } from '../../../config/ccFlowAppsheet'
 import PeopleDirectoryTable from './PeopleDirectoryTable'
 import PeopleProjectSelect from './PeopleProjectSelect'
+
+type PeopleDirectoryFeedback = {
+  type: 'success' | 'error'
+  message: string
+  showAppsheetAccessNote?: boolean
+}
 
 export default function PeopleDirectoryPage() {
   useDocumentTitle('Safety People - Cladding Creations')
@@ -23,7 +30,7 @@ export default function PeopleDirectoryPage() {
   const [siteLeadersOnly, setSiteLeadersOnly] = useState(false)
   const [includeInactive, setIncludeInactive] = useState(false)
   const [expandedProfileId, setExpandedProfileId] = useState<string | null>(null)
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [feedback, setFeedback] = useState<PeopleDirectoryFeedback | null>(null)
   const feedbackRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -139,7 +146,10 @@ export default function PeopleDirectoryPage() {
     onSuccess: async (_data, variables) => {
       setFeedback({
         type: 'success',
-        message: variables.isActive ? 'Profile reactivated.' : 'Profile deactivated.'
+        message: variables.isActive
+          ? 'Profile reactivated. CC Flow Web Platform login is allowed again.'
+          : 'Profile deactivated. CC Flow Web Platform access has been revoked.',
+        showAppsheetAccessNote: !variables.isActive
       })
       await invalidateDirectory()
     },
@@ -343,9 +353,28 @@ export default function PeopleDirectoryPage() {
             tabIndex={-1}
             role="status"
             aria-live="polite"
-            className={`safety-alert safety-alert--reveal safety-alert--${feedback.type === 'success' ? 'success' : 'error'}`}
+            className={`safety-alert safety-alert--reveal safety-alert--${feedback.type === 'success' ? 'success' : 'error'}${feedback.showAppsheetAccessNote ? ' safety-alert--with-actions' : ''}`}
           >
             <p>{feedback.message}</p>
+            {feedback.showAppsheetAccessNote ? (
+              <>
+                <p className="safety-alert__follow-up">
+                  This does not remove access to CC Flow (AppSheet) on factory phones or shared devices.
+                  To revoke AppSheet access, remove the user in the CC Flow 2026 app editor.
+                </p>
+                <div className="safety-alert-actions">
+                  <a
+                    className="safety-btn-secondary"
+                    href={CC_FLOW_2026_APPSHEET_EDITOR_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span className="material-icons" aria-hidden>open_in_new</span>
+                    Open CC Flow in AppSheet
+                  </a>
+                </div>
+              </>
+            ) : null}
           </div>
         ) : null}
 
