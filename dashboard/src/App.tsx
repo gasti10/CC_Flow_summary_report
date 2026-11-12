@@ -33,6 +33,7 @@ import PreStartFormPage from './components/Safety/PreStart/PreStartFormPage'
 import PreStartEntryPage from './components/Safety/PreStart/PreStartEntryPage'
 import ToolboxTalkFormPage from './components/Safety/ToolboxTalk/ToolboxTalkFormPage'
 import PeopleDirectoryPage from './components/Safety/People/PeopleDirectoryPage'
+import PreferDesktopNotice from './components/Common/PreferDesktopNotice'
 
 // Configurar QueryClient con optimizaciones
 const queryClient = new QueryClient({
@@ -372,6 +373,9 @@ function AppContent() {
                 />
               </Routes>
             </ProgressiveLoader>
+            <PreferDesktopNotice
+              enabled={currentRouteConfig.preferLargeScreen === true}
+            />
           </>
         )}
       </ErrorBoundary>
