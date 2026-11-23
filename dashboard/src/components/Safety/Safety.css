@@ -2124,6 +2124,13 @@
   text-transform: lowercase;
 }
 
+.safety-status-pill--closed-pending {
+  background: #f3eadf;
+  color: #6a4a1e;
+  border: 1px solid #e2cfa8;
+  text-transform: none;
+}
+
 .safety-modal-backdrop {
   position: fixed;
   inset: 0;

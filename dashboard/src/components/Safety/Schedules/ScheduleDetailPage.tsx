@@ -9,6 +9,7 @@ import ScheduleAddWorkersModal from './ScheduleAddWorkersModal'
 import type { SafetyNotificationLog, SafetyScheduleRecipientInput, SafetyScheduleWorkerRow, SafetyWorkerAssignmentListItem, SafetyWorkerStatus } from '../../../types/safety'
 import { useDocumentTitle } from '../../../hooks/useDocumentTitle'
 import { safetyProjectsPath } from '../utils/safetyProjectsPath'
+import { getScheduleStatusBadge } from '../utils/scheduleFollowUp'
 import '../../SiteOrdersPlanner/SiteOrdersPlanner.css'
 
 function formatDueAt(value: string | null): string {
@@ -316,9 +317,14 @@ export default function ScheduleDetailPage() {
                 <h3 className="safety-card-title safety-detail-doc-title">
                   {detailQuery.data.schedule.document_title}
                   <span className="safety-detail-doc-version">v{detailQuery.data.schedule.version_number}</span>
-                  <span className={`safety-status-pill safety-status-pill--${detailQuery.data.schedule.status}`}>
-                    {detailQuery.data.schedule.status}
-                  </span>
+                  {(() => {
+                    const badge = getScheduleStatusBadge(detailQuery.data.schedule)
+                    return (
+                      <span className={badge.className} title={badge.title}>
+                        {badge.label}
+                      </span>
+                    )
+                  })()}
                 </h3>
                 <div className="safety-detail-meta-grid">
                   <div className="safety-detail-meta-item">

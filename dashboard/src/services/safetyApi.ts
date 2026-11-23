@@ -32,6 +32,7 @@ import type {
   SafetyWorkerSignaturePayload,
   SafetyWorkerSignatureResult,
   SafetyScheduleDetail,
+  SafetyScheduleCloseReason,
   SafetyScheduleCreatorRecipient,
   SafetyScheduleRecipientInput,
   SafetyScheduleSignedPackResult,
@@ -921,7 +922,7 @@ class SafetyAPI {
     const schedulesRes = await supabaseClient
       .from('schedules')
       .select(`
-        schedule_id, series_id, instance_id, project_name, status, due_at, allow_late_sign, notes,
+        schedule_id, series_id, instance_id, project_name, status, close_reason, due_at, allow_late_sign, notes,
         created_by, updated_by, created_at, updated_at, closed_at, document_version_id,
         safety_document_versions!schedules_document_version_id_fkey (
           document_version_id, document_id, version_number,
@@ -968,6 +969,7 @@ class SafetyAPI {
         instance_id: schedule.instance_id ?? null,
         project_name: schedule.project_name,
         status: schedule.status,
+        close_reason: (schedule.close_reason as SafetyScheduleCloseReason | null) ?? null,
         due_at: schedule.due_at,
         allow_late_sign: schedule.allow_late_sign,
         notes: schedule.notes,
@@ -1304,6 +1306,7 @@ class SafetyAPI {
         instance_id: (first.instance_id as string | null) ?? null,
         project_name: first.project_name as string,
         status: first.status as 'active' | 'closed',
+        close_reason: (first.close_reason as SafetyScheduleCloseReason | null) ?? null,
         due_at: first.due_at as string | null,
         allow_late_sign: Boolean(first.allow_late_sign),
         notes: (first.notes as string | null) ?? null,
@@ -1355,7 +1358,7 @@ class SafetyAPI {
     const scheduleRes = await supabaseClient
       .from('schedules')
       .select(`
-        schedule_id, series_id, instance_id, project_name, status, due_at, allow_late_sign, notes,
+        schedule_id, series_id, instance_id, project_name, status, close_reason, due_at, allow_late_sign, notes,
         created_by, updated_by, created_at, updated_at, closed_at,
         signed_pack_storage_path, signed_pack_updated_at, completion_notified_at,
         document_version_id,
@@ -1443,6 +1446,7 @@ class SafetyAPI {
         instance_id: schedule.instance_id ?? null,
         project_name: schedule.project_name,
         status: schedule.status,
+        close_reason: (schedule.close_reason as SafetyScheduleCloseReason | null) ?? null,
         due_at: schedule.due_at,
         allow_late_sign: schedule.allow_late_sign,
         notes: schedule.notes,

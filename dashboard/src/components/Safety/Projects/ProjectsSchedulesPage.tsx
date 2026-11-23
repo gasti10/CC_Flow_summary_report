@@ -16,6 +16,7 @@ import { buildPreStartEntryPath } from '../utils/preStartToday'
 import { buildToolboxTalkFormPath } from '../utils/toolboxTalkToday'
 import {
   filterSchedulesByListFilter,
+  getScheduleStatusBadge,
   scheduleFollowUpRowClass,
   scheduleNeedsFollowUp,
   type SafetyScheduleListFilter
@@ -475,9 +476,14 @@ export default function ProjectsSchedulesPage() {
                       <div className="safety-schedule-doc-meta">
                         Version {row.version_number}
                         {' · '}
-                        <span className={`safety-status-pill safety-status-pill--${row.status === 'active' ? 'active' : 'closed'}`}>
-                          {row.status}
-                        </span>
+                        {(() => {
+                          const badge = getScheduleStatusBadge(row)
+                          return (
+                            <span className={badge.className} title={badge.title}>
+                              {badge.label}
+                            </span>
+                          )
+                        })()}
                       </div>
                       {isMobileLayout ? (
                         <span className="safety-table-row-open-hint">

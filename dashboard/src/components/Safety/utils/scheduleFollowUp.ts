@@ -36,9 +36,32 @@ export function filterSchedulesByListFilter(
 }
 
 export function scheduleFollowUpRowClass(row: SafetyScheduleSummary): string {
+  if (row.status !== 'active') return ''
   if (row.overdue_count > 0) return 'safety-schedule-row--overdue'
-  if (row.status === 'active' && row.pending_count > 0) return 'safety-schedule-row--pending-followup'
+  if (row.pending_count > 0) return 'safety-schedule-row--pending-followup'
   return ''
+}
+
+export function getScheduleStatusBadge(
+  schedule: Pick<SafetyScheduleSummary, 'status' | 'close_reason'>
+): { label: string; className: string; title?: string } {
+  if (schedule.status === 'active') {
+    return {
+      label: 'active',
+      className: 'safety-status-pill safety-status-pill--active'
+    }
+  }
+  if (schedule.close_reason === 'expired_pending') {
+    return {
+      label: 'Closed · Pending',
+      className: 'safety-status-pill safety-status-pill--closed-pending',
+      title: 'Closed automatically after 7 days with pending signatures'
+    }
+  }
+  return {
+    label: 'closed',
+    className: 'safety-status-pill safety-status-pill--closed'
+  }
 }
 
 type ScheduleWorkerStatusRow = { schedule_id: string; status: string }

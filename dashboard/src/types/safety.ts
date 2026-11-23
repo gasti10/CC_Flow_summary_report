@@ -1,5 +1,6 @@
 export type SafetyDocumentStatus = 'available' | 'disabled'
 export type SafetyScheduleStatus = 'active' | 'closed'
+export type SafetyScheduleCloseReason = 'completed' | 'recovered_completed' | 'expired_pending' | 'manual'
 export type SafetyWorkerStatus = 'pending' | 'signed' | 'overdue'
 export type SafetyRecipientMembershipState = 'project_member' | 'non_member'
 export type SafetyInvitationStatus = 'requested' | 'invited' | 'joined' | 'signed' | 'failed' | 'cancelled'
@@ -160,6 +161,7 @@ export interface SafetyScheduleSummary {
   instance_id?: string | null
   project_name: string
   status: SafetyScheduleStatus
+  close_reason?: SafetyScheduleCloseReason | null
   due_at: string | null
   allow_late_sign: boolean
   notes: string | null
